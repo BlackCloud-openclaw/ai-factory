@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     sandbox_memory_limit: int = 512  # MB
     sandbox_network_enabled: bool = False
 
+    # LLM Pool
+    llm_max_concurrent: int = 4
+    llm_timeout: int = 120
+
+    # Tools
+    tools_dir: str = "/tmp/ai_factory/tools"
+
     # RAG
     rag_k: int = 10
     rerank_threshold: float = 0.5
