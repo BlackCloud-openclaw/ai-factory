@@ -122,7 +122,10 @@ class CoderAgent:
         try:
             logger.info(f"Attempting code generation with primary model: {PRIMARY_MODEL}")
             code = await self._generate_code_with_model(
-                PRIMARY_MODEL, user_input, research_results, subtasks
+                model=PRIMARY_MODEL,
+                user_input=user_input,
+                research_results=research_results,
+                subtasks=subtasks,
             )
             if code:
                 logger.info("Code generation succeeded with primary model")
@@ -136,7 +139,10 @@ class CoderAgent:
         try:
             logger.info(f"Attempting code generation with fallback model: {FALLBACK_MODEL}")
             code = await self._generate_code_with_model(
-                FALLBACK_MODEL, user_input, research_results, subtasks
+                model=FALLBACK_MODEL,
+                user_input=user_input,
+                research_results=research_results,
+                subtasks=subtasks,
             )
             if code:
                 logger.info("Code generation succeeded with fallback model")
@@ -151,7 +157,7 @@ class CoderAgent:
     @smart_retry(max_retries=3, backoff_factor=1.0, fallback_model=FALLBACK_MODEL)
     async def _generate_code_with_model(
         self,
-        model_name: str,
+        model: str,
         user_input: str,
         research_results: List[Dict[str, Any]],
         subtasks: List[str],
@@ -159,7 +165,7 @@ class CoderAgent:
         """Generate code using a specific LLM model.
 
         Args:
-            model_name: Name of the LLM model to use
+            model: Name of the LLM model to use
             user_input: User's task description
             research_results: Research results
             subtasks: List of subtasks
@@ -196,7 +202,7 @@ Please generate Python code that fulfills the above task, using the research con
         ]
 
         response = await client.chat.completions.create(
-            model=model_name,
+            model=model,
             messages=messages,
             temperature=0.2,
             max_tokens=config.llm_max_tokens,
