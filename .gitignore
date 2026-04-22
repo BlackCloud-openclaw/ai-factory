@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environment
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Docker
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sandbox generated files
+/tmp/ai_factory/
+*.pyc
+
+# Conda 环境（项目本地）
+.conda/
+
+# 日志
+*.log
+logs/
+
+# 数据库
+*.db
+*.sqlite*
+
+# 模型文件（不要提交，太大）
+*.gguf
+*.bin
+*.pth
+*.pt
+*.onnx
+
+# 工作目录
+workspace/
+temp/
+tmp/
+
+# 备份
+*.bak
+*.backup
+*.old
+
+# 项目配置
+settings.json
+backup.log
+
+# 运行时生成
+*.pid
+*.sock

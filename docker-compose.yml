@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: ai_factory_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openclaw
+      POSTGRES_USER: openclaw
+      POSTGRES_PASSWORD: openclaw123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sh:/docker-entrypoint-initdb.d/01_init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai_factory_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M.gguf}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=openclaw
+      - POSTGRES_USER=openclaw
+      - POSTGRES_PASSWORD=openclaw123
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres_data:
