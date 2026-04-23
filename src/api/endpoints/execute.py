@@ -29,6 +29,7 @@ def get_workflow():
 class ExecuteRequest(BaseModel):
     user_input: str
     session_id: Optional[str] = None
+    project_id: Optional[str] = None
     max_retries: Optional[int] = None
 
 
@@ -43,21 +44,23 @@ async def execute(request: ExecuteRequest) -> AgentResponse:
         raise HTTPException(status_code=400, detail="user_input cannot be empty")
 
     session_id = request.session_id or uuid.uuid4().hex[:8]
+    project_id = request.project_id or session_id
     max_retries = request.max_retries or 3
 
-    logger.info(f"Executing request for session={session_id}: {request.user_input[:150]}")
+    logger.info(f"Executing request for session={session_id}, project={project_id}: {request.user_input[:150]}")
 
     try:
         from src.orchestrator.state import AgentState
 
         initial_state = AgentState(
             user_input=request.user_input,
+            project_id=project_id,
             max_retries=max_retries,
-            metadata={"session_id": session_id},
+            metadata={"session_id": session_id, "project_id": project_id},
         )
 
         workflow = get_workflow()
-        result = await workflow.ainvoke(initial_state.model_dump())
+        result = await workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100})
 
         execution_result = result.get("execution_result")
         sources = []
@@ -91,20 +94,22 @@ async def execute_stream(request: ExecuteRequest) -> dict:
         raise HTTPException(status_code=400, detail="user_input cannot be empty")
 
     session_id = request.session_id or uuid.uuid4().hex[:8]
+    project_id = request.project_id or session_id
 
-    logger.info(f"Streaming execution for session={session_id}")
+    logger.info(f"Streaming execution for session={session_id}, project={project_id}")
 
     try:
         from src.orchestrator.state import AgentState
 
         initial_state = AgentState(
             user_input=request.user_input,
+            project_id=project_id,
             max_retries=3,
-            metadata={"session_id": session_id},
+            metadata={"session_id": session_id, "project_id": project_id},
         )
 
         workflow = get_workflow()
-        result = await workflow.ainvoke(initial_state.model_dump())
+        result = await workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100})
 
         return {
             "session_id": session_id,

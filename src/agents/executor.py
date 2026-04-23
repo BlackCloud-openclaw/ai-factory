@@ -13,7 +13,7 @@ from src.config import config
 from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff, smart_retry
 
-logger = setup_logging("agents.coder")
+logger = setup_logging("agents.executor")
 
 PRIMARY_MODEL = "Qwen3.6-35B-A3B-UD-Q5_K_M"
 FALLBACK_MODEL = "DeepSeek-R1-Distill-Qwen-32B-Q5_K_M"
@@ -34,7 +34,7 @@ Output format:
 ```"""
 
 
-class CoderAgent:
+class ExecutorAgent:
     """Agent responsible for code generation and sandbox execution.
 
     Supports dual-model fallback, code validation, and tool generation.
@@ -71,7 +71,7 @@ class CoderAgent:
         Returns:
             Dictionary with code, file_path, execution_result
         """
-        logger.info("CoderAgent starting code generation")
+        logger.info("ExecutorAgent starting code generation")
 
         user_input = context.get("user_input", "")
         research_results = context.get("research_results", [])
@@ -82,7 +82,7 @@ class CoderAgent:
         )
 
         if not code:
-            logger.error("CoderAgent: No code was generated")
+            logger.error("ExecutorAgent: No code was generated")
             return {
                 "code": "",
                 "file_path": "",
@@ -93,7 +93,7 @@ class CoderAgent:
         execution_result = await self.sandbox.execute(file_path)
 
         logger.info(
-            f"CoderAgent completed. Success: {execution_result.get('success')}, "
+            f"ExecutorAgent completed. Success: {execution_result.get('success')}, "
             f"File: {file_path}"
         )
 
@@ -354,7 +354,14 @@ Return your response in JSON format:
             )
 
             raw_output = response.choices[0].message.content or ""
-            return self._parse_validation_result(raw_output)
+            logger.info(f"Raw LLM response length: {len(raw_output)}")
+            logger.info(f"Raw LLM response preview: {raw_output[:500]}")
+            
+            code = self._extract_code(raw_output)
+            logger.info(f"Extracted code length: {len(code)}")
+            
+            if not code:
+             raise ValueError(f"No code extracted from LLM response. Raw output: {raw_output[:200]}")
 
         except Exception as e:
             logger.warning(f"Code validation LLM call failed: {e}")

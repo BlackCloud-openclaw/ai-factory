@@ -35,6 +35,9 @@ class AgentState(BaseModel):
     # Retry control
     retry_count: int = 0
     max_retries: int = 3
+    needs_retry: bool = False
+    remaining_subtasks: list = []
+    max_retries_per_subtask: int = 3
 
     # Current node tracking
     current_node: str = ""
@@ -45,5 +48,16 @@ class AgentState(BaseModel):
     # Additional metadata
     metadata: dict[str, Any] = {}
 
-    def needs_retry(self) -> bool:
-        return self.retry_count < self.max_retries and self.error is not None
+    # Project identifier for memory isolation
+    project_id: str = ""
+
+    # Memory context loaded from MemoryAgent
+    memory_context: dict[str, Any] = {}
+
+    # Complexity flag and plan execution state
+    is_complex: bool = False
+    plan: list[dict[str, Any]] = []
+    current_subtask_index: int = 0
+    current_subtask_id: str = ""
+
+ 
