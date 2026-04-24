@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     # LLM
     llm_api_url: str = "http://localhost:8081"
-    llm_model_name: str = "Qwen3.6-35B-A3B-UD-Q5_K_M.gguf"
+    llm_model_name: str = "Qwen3.6-35B-A3B-UD-Q5_K_M"
     llm_temperature: float = 0.2
     llm_max_tokens: int = 4096
     llm_context_window: int = 32768

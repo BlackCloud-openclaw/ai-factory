@@ -55,13 +55,21 @@ class AgentState(BaseModel):
 
     # Complexity flag and plan execution state
     is_complex: bool = False
+
+    # Skip remaining nodes after plan (set by plan_node)
+    skip_remaining: bool = False
     plan: list[dict[str, Any]] = []
     current_subtask_index: int = 0
     current_subtask_id: str = ""
-
+    
+    # Scheduler fields
+    task_id: str = ""
+    subtask_results: dict[str, Any] = {}
+    plan_status: str = ""
+    task_plan: dict[str, Any] | None = None
+    
     # Retry flag (set by nodes, checked by routing functions)
     needs_retry: bool = False
-
+    
     def should_retry(self) -> bool:
-        """Determine if the workflow should retry based on error state and retry limits."""
         return self.retry_count < self.max_retries and self.error is not None

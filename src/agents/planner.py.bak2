@@ -113,50 +113,29 @@ class PlannerAgent:
         )
         content = response.choices[0].message.content
         if not content:
-            content = response.choices[0].message.reasoning_content
-        if not content:
             raise ValueError("Empty response from LLM")
         return content
 
-
     def _parse_response(self, response: str) -> TaskPlan:
-        """鲁棒地提取 JSON 对象，忽略尾部额外文本。"""
-        response = response.strip()
-        # 移除 markdown 代码块标记
-        match = re.search(r'```json\s*([\s\S]*?)\s*```', response, re.DOTALL)
-        if match:
-            response = match.group(1).strip()
-        else:
-            # 如果没有代码块，尝试取从第一个 { 到最后一个 } 但小心嵌套
-            pass
-
-        # 找到第一个 '{'
-        start = response.find('{')
-        if start == -1:
-            raise ValueError("No JSON object found")
-        # 匹配最外层花括号
-        brace_count = 0
-        end = start
-        for i, ch in enumerate(response[start:]):
-            if ch == '{':
-                brace_count += 1
-            elif ch == '}':
-                brace_count -= 1
-                if brace_count == 0:
-                    end = start + i + 1
-                    break
-        if end == start:
-            raise ValueError("Unbalanced braces")
-
-        json_str = response[start:end]
-        # 清理常见问题
-        json_str = re.sub(r',\s*}', '}', json_str)
-        json_str = re.sub(r',\s*]', ']', json_str)
+        """鲁棒地提取 JSON 对象，即使前后有额外文本。"""
+        # 尝试直接解析整个响应
         try:
-            data = json.loads(json_str)
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON: {e}\nRaw JSON: {json_str[:500]}")
-            raise ValueError("Invalid JSON from LLM")
+            data = json.loads(response.strip())
+        except json.JSONDecodeError:
+            # 寻找第一个 '{' 和最后一个 '}'
+            start = response.find('{')
+            end = response.rfind('}')
+            if start == -1 or end == -1:
+                raise ValueError("No JSON object found in LLM response")
+            json_str = response[start:end+1]
+            # 尝试修正常见问题：移除尾随逗号等
+            json_str = re.sub(r',\s*}', '}', json_str)
+            json_str = re.sub(r',\s*]', ']', json_str)
+            try:
+                data = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON: {e}\nRaw content: {json_str[:500]}")
+                raise ValueError("Invalid JSON from LLM")
 
         subtasks = []
         for st in data.get("subtasks", []):
@@ -169,9 +148,10 @@ class PlannerAgent:
             ))
         return TaskPlan(
             plan_id=data.get("plan_id", "plan_001"),
-            original_request="",   # 外层会填充
+            original_request="",   # will be filled by caller
             subtasks=subtasks
         )
+
 
 # --- 用于 __init__.py 导出的辅助函数 ---
 def topological_sort(subtasks: List[Subtask]) -> List[str]:

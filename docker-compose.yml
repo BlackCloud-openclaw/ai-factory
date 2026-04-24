@@ -30,7 +30,7 @@ services:
       - "8000:8000"
     environment:
       - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M.gguf}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=openclaw

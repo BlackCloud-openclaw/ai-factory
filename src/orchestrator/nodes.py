@@ -235,37 +235,129 @@ async def analyze_node(state: AgentState) -> dict[str, Any]:
 
 
 async def plan_node(state: AgentState) -> dict[str, Any]:
-    """Plan complex tasks by breaking them into subtasks."""
+    """Plan complex tasks using PlannerAgent to generate structured subtask plans."""
     logger.info(f"Planning complex task: {state.user_input[:200]}...")
 
-    from src.agents.planner import plan_task_async
+    from src.agents.planner import PlannerAgent
 
-    user_input = state.user_input
-    memory_context_str = (
-        json.dumps(state.memory_context) if state.memory_context else ""
-    )
-    plan = await plan_task_async(user_input, memory_context_str)
+    planner = PlannerAgent()
+    plan = await planner.plan(state.user_input, {"memory_context": state.memory_context})
 
-    if plan:
-        first_subtask_id = plan[0]["id"]
+    if plan and plan.subtasks:
+        first_subtask = plan.subtasks[0]
         logger.info(
-            f"Plan generated with {len(plan)} subtasks, first: {first_subtask_id}"
+            f"Plan generated: {plan.plan_id} with {len(plan.subtasks)} subtasks, "
+            f"first: {first_subtask.id}"
         )
     else:
-        first_subtask_id = ""
+        first_subtask = None
         logger.warning("Empty plan generated, using fallback")
 
-    first_subtask_desc = plan[0]["description"] if plan else user_input
-    remaining = plan[1:] if len(plan) > 1 else []
+    first_subtask_desc = first_subtask.description if first_subtask else state.user_input
+    remaining = plan.subtasks[1:] if plan and len(plan.subtasks) > 1 else []
+
     return {
-        "plan": plan,
-        "subtasks": [first_subtask_desc] if plan else [],
+        "plan": plan.model_dump() if plan else [],
+        "subtasks": [first_subtask_desc] if first_subtask else [],
         "current_subtask_index": 0,
-        "remaining_subtasks": remaining,
-        "current_subtask_id": plan[0]["id"] if plan else "",
+        "remaining_subtasks": [s.model_dump() for s in remaining],
+        "current_subtask_id": first_subtask.id if first_subtask else "",
         "max_retries_per_subtask": 2,
         "retry_count": 0,
         "current_node": "plan",
+    }
+
+
+async def scheduler_node(state: AgentState) -> dict[str, Any]:
+    """Execute all subtasks from the plan using TaskScheduler.
+
+    Runs the TaskScheduler to process all subtasks respecting dependencies
+    and concurrency limits. Merges results back into the state.
+    """
+    logger.info(f"Running scheduler for plan: {len(state.plan) if state.plan else 0} subtasks")
+
+    from src.agents.planner import TaskPlan, Subtask
+    from src.scheduler.task_scheduler import TaskScheduler
+
+    # Reconstruct TaskPlan from state
+    plan_data = state.plan if isinstance(state.plan, dict) else {}
+    subtasks_data = plan_data.get("subtasks", [])
+    if not subtasks_data:
+        logger.warning("No subtasks in plan, skipping scheduler")
+        return {
+            "plan_status": "no_subtasks",
+            "subtask_results": {},
+            "current_node": "scheduler",
+        }
+
+    subtasks = []
+    for sd in subtasks_data:
+        subtasks.append(
+            Subtask(
+                id=sd.get("id", f"st_{len(subtasks):03d}"),
+                name=sd.get("name", sd.get("description", "")),
+                description=sd.get("description", ""),
+                type=sd.get("type", "code"),
+                dependencies=sd.get("dependencies", sd.get("depends_on", [])),
+                required_tools=sd.get("required_tools", []),
+            )
+        )
+
+    task_plan = TaskPlan(
+        plan_id=plan_data.get("plan_id", f"plan_{uuid.uuid4().hex[:8]}"),
+        description=plan_data.get("description", ""),
+        subtasks=subtasks,
+        execution_order=plan_data.get("execution_order", [s.id for s in subtasks]),
+    )
+
+    scheduler = TaskScheduler(max_concurrent=3, max_retries=2)
+    task_id = await scheduler.submit_plan(task_plan)
+    summary = await scheduler.run(task_id)
+
+    # Merge results into state
+    subtask_results = summary.get("results", {})
+    success_count = summary.get("success", 0)
+    fail_count = summary.get("failed", 0)
+
+    # Collect all code outputs for downstream nodes
+    code_outputs = []
+    research_outputs = []
+    for st_id, result in subtask_results.items():
+        if result.get("status") == "success":
+            raw = result.get("result", {})
+            if raw.get("type") == "code":
+                code_outputs.append(raw.get("output", ""))
+            elif raw.get("type") == "research":
+                research_outputs.append(raw.get("output", ""))
+
+    merged_code = "\n\n".join(code_outputs) if code_outputs else ""
+    merged_research = "\n\n".join(research_outputs) if research_outputs else ""
+
+    plan_status = "success" if fail_count == 0 else "partial"
+    if success_count == 0:
+        plan_status = "failed"
+
+    logger.info(
+        f"Scheduler completed: {success_count} success, {fail_count} failed, "
+        f"status={plan_status}"
+    )
+
+    return {
+        "task_id": task_id,
+        "subtask_results": subtask_results,
+        "plan_status": plan_status,
+        "code_generated": merged_code,
+        "research_results": (
+            [{"summary": r, "source": "scheduler"} for r in research_outputs]
+            if research_outputs
+            else state.research_results
+        ),
+        "execution_result": (
+            {"success": True, "stdout": merged_code[:500]}
+            if merged_code and success_count > 0
+            else None
+        ),
+        "current_node": "scheduler",
     }
 
 

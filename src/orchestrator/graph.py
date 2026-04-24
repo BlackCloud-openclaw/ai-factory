@@ -1,3 +1,6 @@
+import uuid
+from typing import Any, Dict
+
 from langgraph.graph import StateGraph, END
 
 from src.orchestrator.state import AgentState
@@ -8,35 +11,96 @@ from src.orchestrator.nodes import (
     validate_node,
     load_memory_node,
     save_memory_node,
-    plan_node,
+    scheduler_node,
     advance_subtask_node,
 )
+from src.agents.planner import PlannerAgent
+from src.scheduler.task_scheduler import TaskScheduler
+from src.common.logging import setup_logging
+
+logger = setup_logging("orchestrator.graph")
 
 
 def route_after_analyze(state: AgentState) -> str:
-    """Decide which node to go to after analysis."""
-    subtasks = state.subtasks if hasattr(state, 'subtasks') else state.get('subtasks', [])
-    if not subtasks:
-        return END
-    has_code = any('code' in s.lower() or 'implement' in s.lower() for s in subtasks)
-    return 'code' if has_code else 'research'
+    """Decide which node to go to after analysis.
+
+    Always routes to planning for complex tasks or when subtasks are detected.
+    For simple tasks with no subtasks, routes to planning which may
+    create a single-subtask plan and then route accordingly.
+    """
+    return "planning"
 
 
 def route_after_plan(state: AgentState) -> str:
-    """Decide which node to go to after planning based on first subtask type."""
-    plan = getattr(state, 'plan', None)
+    """Decide which node to go to after planning.
+
+    Routes to scheduler for complex multi-subtask plans, or to individual
+    nodes for simple single-subtask plans.
+    """
+    # Check new task_plan field first (from graph.py plan_node)
+    plan = getattr(state, 'task_plan', None)
+    if not plan:
+        # Fallback to legacy plan field (from nodes.py plan_node)
+        plan = getattr(state, 'plan', None)
     if not plan:
         return END
-    first_subtask = plan[0]
-    subtask_type = first_subtask.get("type", "research")
-    route_map = {
-        "research": "research",
-        "code": "code",
-        "validate": "validate",
-        "write": "code",
-        "plan": "research",
-    }
-    return route_map.get(subtask_type, "research")
+
+    # If plan is a dict (new format with subtasks list)
+    if isinstance(plan, dict):
+        subtasks = plan.get("subtasks", [])
+        if len(subtasks) > 1:
+            return "scheduler"
+        elif len(subtasks) == 1:
+            subtask_type = subtasks[0].get("type", "code")
+            route_map = {
+                "research": "research",
+                "code": "code",
+                "validate": "validate",
+                "write": "code",
+                "plan": "code",
+            }
+            return route_map.get(subtask_type, "code")
+        else:
+            return END
+    # Legacy format (list of subtask dicts)
+    elif isinstance(plan, list):
+        if len(plan) > 1:
+            return "scheduler"
+        elif len(plan) == 1:
+            subtask_type = plan[0].get("type", "code")
+            route_map = {
+                "research": "research",
+                "code": "code",
+                "validate": "validate",
+                "write": "code",
+                "plan": "code",
+            }
+            return route_map.get(subtask_type, "code")
+        else:
+            return END
+
+    return END
+
+
+def after_plan(state: AgentState) -> str:
+    # plan_node already executed all subtasks via TaskScheduler
+    return "save_memory"
+
+
+def route_after_scheduler(state: AgentState) -> str:
+    """Decide which node to go to after scheduler completes.
+
+    Routes to validate if there's code output, otherwise to save_memory.
+    """
+    plan_status = getattr(state, 'plan_status', '')
+    code_generated = getattr(state, 'code_generated', '') or ''
+
+    if plan_status == "failed":
+        return 'save_memory'
+    elif code_generated and len(code_generated.strip()) > 10:
+        return 'validate'
+    else:
+        return 'save_memory'
 
 
 def route_after_research(state: AgentState) -> str:
@@ -74,6 +138,29 @@ def route_after_validate(state: AgentState) -> str:
         return 'research' if retry_count < max_retries else 'save_memory'
 
 
+async def plan_node(state: AgentState) -> Dict[str, Any]:
+    """Plan complex tasks using PlannerAgent and TaskScheduler.
+
+    Calls PlannerAgent to generate a TaskPlan, submits the plan to
+    TaskScheduler, runs all subtasks, and returns the results.
+    """
+    logger.info(f"Planning task: {state.original_request[:200] if hasattr(state, 'original_request') else state.user_input[:200]}...")
+
+    planner = PlannerAgent()
+    task_plan = await planner.plan(
+        state.original_request if hasattr(state, "original_request") else state.user_input,
+        {},
+    )
+    scheduler = TaskScheduler()
+    await scheduler.submit_plan(task_plan)
+    results = await scheduler.run()
+
+    return {
+    "task_plan": task_plan.dict() if hasattr(task_plan, "dict") else task_plan.model_dump(),
+    "subtask_results": results,
+}
+
+
 def create_workflow() -> StateGraph:
     """Build the LangGraph workflow for AI Factory."""
 
@@ -83,6 +170,7 @@ def create_workflow() -> StateGraph:
     workflow.add_node("load_memory", load_memory_node)
     workflow.add_node("analyze", analyze_node)
     workflow.add_node("planning", plan_node)
+    workflow.add_node("scheduler", scheduler_node)
     workflow.add_node("research", research_node)
     workflow.add_node("code", code_node)
     workflow.add_node("validate", validate_node)
@@ -110,11 +198,20 @@ def create_workflow() -> StateGraph:
     # Edges from planning (conditional)
     workflow.add_conditional_edges(
         "planning",
-        route_after_plan,
+        after_plan,
         {
+            "save_memory": "save_memory",
             "research": "research",
-            "code": "code",
+        },
+    )
+
+    # Edges from scheduler (conditional)
+    workflow.add_conditional_edges(
+        "scheduler",
+        route_after_scheduler,
+        {
             "validate": "validate",
+            "save_memory": "save_memory",
             END: END,
         },
     )
