@@ -83,8 +83,16 @@ def route_after_plan(state: AgentState) -> str:
 
 
 def after_plan(state: AgentState) -> str:
-    # plan_node already executed all subtasks via TaskScheduler
-    return "save_memory"
+    task_plan = getattr(state, 'task_plan', None)
+    if not task_plan:
+        return 'save_memory'
+    subtasks = task_plan.get('subtasks', [])
+    if len(subtasks) > 1:
+        return 'scheduler'
+    elif len(subtasks) == 1:
+        # 可以进一步根据类型路由，但简单返回 code 通常可行
+        return 'code'
+    return 'save_memory'
 
 
 def route_after_scheduler(state: AgentState) -> str:
@@ -139,26 +147,9 @@ def route_after_validate(state: AgentState) -> str:
 
 
 async def plan_node(state: AgentState) -> Dict[str, Any]:
-    """Plan complex tasks using PlannerAgent and TaskScheduler.
-
-    Calls PlannerAgent to generate a TaskPlan, submits the plan to
-    TaskScheduler, runs all subtasks, and returns the results.
-    """
-    logger.info(f"Planning task: {state.original_request[:200] if hasattr(state, 'original_request') else state.user_input[:200]}...")
-
     planner = PlannerAgent()
-    task_plan = await planner.plan(
-        state.original_request if hasattr(state, "original_request") else state.user_input,
-        {},
-    )
-    scheduler = TaskScheduler()
-    await scheduler.submit_plan(task_plan)
-    results = await scheduler.run()
-
-    return {
-    "task_plan": task_plan.dict() if hasattr(task_plan, "dict") else task_plan.model_dump(),
-    "subtask_results": results,
-}
+    updates = await planner.run(state)
+    return updates
 
 
 def create_workflow() -> StateGraph:
@@ -200,6 +191,8 @@ def create_workflow() -> StateGraph:
         "planning",
         after_plan,
         {
+            "scheduler": "scheduler",
+            "code": "code",
             "save_memory": "save_memory",
             "research": "research",
         },

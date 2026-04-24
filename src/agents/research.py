@@ -1,5 +1,5 @@
 import json
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage
 
@@ -7,6 +7,7 @@ from src.knowledge.retrieval import KnowledgeRetriever
 from src.config import config
 from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff
+from src.orchestrator.state import AgentState
 
 logger = setup_logging("agents.research")
 
@@ -32,8 +33,13 @@ class ResearchAgent:
             "Cite your sources when possible."
         )
 
-    async def run(self, query: str, state: Any = None) -> dict[str, Any]:
-        """Execute research on the given query."""
+    async def run(self, state: AgentState) -> Dict[str, Any]:
+        """Execute research based on the current agent state."""
+        query = state.user_input or state.original_request
+        if not query:
+            logger.warning("ResearchAgent: no query found in state")
+            return {"research_results": [], "sources": []}
+
         logger.info(f"ResearchAgent running for query: {query[:150]}")
 
         # Step 1: Retrieve relevant chunks from knowledge base
@@ -41,12 +47,7 @@ class ResearchAgent:
 
         if not chunks:
             logger.warning(f"No knowledge base results for query: {query}")
-            return {
-                "query": query,
-                "summary": "No relevant information found in the knowledge base.",
-                "sources": [],
-                "chunks": [],
-            }
+            return {"research_results": [], "sources": []}
 
         # Step 2: Build context from retrieved chunks
         context = self._build_context(chunks)
@@ -63,17 +64,23 @@ class ResearchAgent:
             for c in chunks
         ]
 
+        research_results = [
+            {
+                "summary": summary,
+                "sources": sources,
+                "chunks": [
+                    {
+                        "content": c.get("content", "")[:500],
+                        "score": c.get("score", 0.0),
+                    }
+                    for c in chunks
+                ],
+            }
+        ]
+
         result = {
-            "query": query,
-            "summary": summary,
+            "research_results": research_results,
             "sources": sources,
-            "chunks": [
-                {
-                    "content": c.get("content", "")[:500],
-                    "score": c.get("score", 0.0),
-                }
-                for c in chunks
-            ],
         }
 
         logger.info(f"ResearchAgent completed. Found {len(chunks)} relevant chunks.")

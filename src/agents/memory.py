@@ -2,9 +2,10 @@
 
 import time
 import uuid
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from src.common.logging import setup_logging
+from src.orchestrator.state import AgentState
 
 logger = setup_logging("agents.memory")
 
@@ -19,6 +20,16 @@ class MemoryAgent:
     def __init__(self):
         self.memories: dict[str, dict[str, dict[str, Any]]] = {}
         logger.info("MemoryAgent initialized")
+
+    async def run(self, state: AgentState) -> Dict[str, Any]:
+        """Load memory context for the current project.
+
+        This is the unified entry point that returns the memory context
+        to be merged into the agent state. It does NOT perform any saves.
+        """
+        project_id = state.project_id or state.metadata.get("session_id", "default")
+        context = await self.list_all(project_id)
+        return {"memory_context": context}
 
     async def store(self, project_id: str, key: str, value: Any, metadata: dict = None) -> str:
         """Store a memory entry for a given project.

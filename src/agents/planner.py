@@ -1,35 +1,25 @@
 # src/agents/planner.py
 import re
 import json
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
-from enum import Enum
 
 from src.config import config
 from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff
+from src.agents.base import BaseAgent
+from src.orchestrator.state import AgentState
 
 logger = setup_logging("agents.planner")
-
-
-class TaskStatus(str, Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    SUCCESS = "success"
-    FAILED = "failed"
-    BLOCKED = "blocked"
-
 
 class Subtask(BaseModel):
     id: str
     name: str
     description: str
-    type: str = "code"  # 'code', 'research', 'validate', 'plan'
+    type: str = "code"
     dependencies: List[str] = Field(default_factory=list)
-    required_tools: List[str] = Field(default_factory=list)
-    expected_output: Optional[str] = None
-
+    required_tools: List[str] = Field(default_factory=list)  # 兼容原计划
 
 class TaskPlan(BaseModel):
     plan_id: str
@@ -37,8 +27,6 @@ class TaskPlan(BaseModel):
     subtasks: List[Subtask]
     created_at: datetime = Field(default_factory=datetime.now)
 
-
-# 注意：JSON 示例中的花括号已转义为双花括号，避免被 .format() 误解析
 PLANNER_PROMPT = """You are a Task Planner. Break down the user request into a sequence of subtasks (each with a type, description, and dependencies). Use only these types: code, research, validate.
 
 Return ONLY a valid JSON object with this structure:
@@ -65,40 +53,53 @@ Return ONLY a valid JSON object with this structure:
 User request: {user_request}
 """
 
-
-class PlannerAgent:
+class PlannerAgent(BaseAgent):
     def __init__(self, llm_api_url: str = config.llm_api_url, llm_model: str = config.llm_model_name):
         self.llm_api_url = llm_api_url
         self.llm_model = llm_model
 
-    async def plan(self, user_request: str, context: Optional[Dict[str, Any]] = None) -> TaskPlan:
-        """Generate a task plan from user request."""
+    async def run(self, state: AgentState) -> Dict[str, Any]:
+        user_request = state.original_request or state.user_input
         logger.info(f"Planning task: {user_request[:100]}...")
         try:
-            response = await self._call_llm(user_request, context or {})
+            response = await self._call_llm(user_request)
             plan = self._parse_response(response)
-            # 补充原请求
             plan.original_request = user_request
-            return plan
+            plan_dict = plan.dict()
+            # 计算执行顺序（拓扑排序）
+            execution_order = self._topological_sort(plan.subtasks)
+            plan_dict["execution_order"] = execution_order
+            return {
+                "task_plan": plan_dict,
+                "plan_id": plan.plan_id,
+                "subtasks": [st.description for st in plan.subtasks],
+                "original_request": user_request,  # 确保传递
+            }
         except Exception as e:
             logger.error(f"LLM plan generation failed: {e}")
             logger.warning("Using fallback plan with single subtask")
-            return TaskPlan(
+            fallback_subtask = Subtask(
+                id="task_1",
+                name="Execute request",
+                description=user_request,
+                type="code",
+                dependencies=[]
+            )
+            fallback_plan = TaskPlan(
                 plan_id="fallback",
                 original_request=user_request,
-                subtasks=[
-                    Subtask(
-                        id="task_1",
-                        name="Execute request",
-                        description=user_request,
-                        type="code",
-                        dependencies=[]
-                    )
-                ]
+                subtasks=[fallback_subtask]
             )
+            plan_dict = fallback_plan.dict()
+            plan_dict["execution_order"] = ["task_1"]
+            return {
+                "task_plan": plan_dict,
+                "plan_id": "fallback",
+                "subtasks": [user_request],
+            }
 
     @retry_with_backoff(max_retries=2, base_delay=1.0)
-    async def _call_llm(self, user_request: str, context: Dict[str, Any]) -> str:
+    async def _call_llm(self, user_request: str) -> str:
         from openai import AsyncOpenAI
         client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
         prompt = PLANNER_PROMPT.format(user_request=user_request)
@@ -113,28 +114,19 @@ class PlannerAgent:
         )
         content = response.choices[0].message.content
         if not content:
-            content = response.choices[0].message.reasoning_content
+            content = getattr(response.choices[0].message, "reasoning_content", None)
         if not content:
             raise ValueError("Empty response from LLM")
         return content
 
-
     def _parse_response(self, response: str) -> TaskPlan:
-        """鲁棒地提取 JSON 对象，忽略尾部额外文本。"""
         response = response.strip()
-        # 移除 markdown 代码块标记
         match = re.search(r'```json\s*([\s\S]*?)\s*```', response, re.DOTALL)
         if match:
             response = match.group(1).strip()
-        else:
-            # 如果没有代码块，尝试取从第一个 { 到最后一个 } 但小心嵌套
-            pass
-
-        # 找到第一个 '{'
         start = response.find('{')
         if start == -1:
             raise ValueError("No JSON object found")
-        # 匹配最外层花括号
         brace_count = 0
         end = start
         for i, ch in enumerate(response[start:]):
@@ -147,17 +139,10 @@ class PlannerAgent:
                     break
         if end == start:
             raise ValueError("Unbalanced braces")
-
         json_str = response[start:end]
-        # 清理常见问题
         json_str = re.sub(r',\s*}', '}', json_str)
         json_str = re.sub(r',\s*]', ']', json_str)
-        try:
-            data = json.loads(json_str)
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON: {e}\nRaw JSON: {json_str[:500]}")
-            raise ValueError("Invalid JSON from LLM")
-
+        data = json.loads(json_str)
         subtasks = []
         for st in data.get("subtasks", []):
             subtasks.append(Subtask(
@@ -169,37 +154,28 @@ class PlannerAgent:
             ))
         return TaskPlan(
             plan_id=data.get("plan_id", "plan_001"),
-            original_request="",   # 外层会填充
+            original_request="",
             subtasks=subtasks
         )
 
-# --- 用于 __init__.py 导出的辅助函数 ---
-def topological_sort(subtasks: List[Subtask]) -> List[str]:
-    """返回基于依赖关系的执行顺序（拓扑排序）。"""
-    id_to_index = {st.id: i for i, st in enumerate(subtasks)}
-    indeg = {st.id: 0 for st in subtasks}
-    graph = {st.id: [] for st in subtasks}
-    for st in subtasks:
-        for dep in st.dependencies:
-            if dep in id_to_index:
-                graph[dep].append(st.id)
-                indeg[st.id] += 1
-    queue = [st.id for st in subtasks if indeg[st.id] == 0]
-    order = []
-    while queue:
-        node = queue.pop(0)
-        order.append(node)
-        for neighbor in graph[node]:
-            indeg[neighbor] -= 1
-            if indeg[neighbor] == 0:
-                queue.append(neighbor)
-    if len(order) != len(subtasks):
-        # 存在循环依赖，返回原始顺序
-        return [st.id for st in subtasks]
-    return order
-
-
-async def plan_task_async(user_request: str, context: Optional[Dict[str, Any]] = None) -> TaskPlan:
-    """异步包装器，便于外部调用。"""
-    planner = PlannerAgent()
-    return await planner.plan(user_request, context)
+    def _topological_sort(self, subtasks: List[Subtask]) -> List[str]:
+        id_map = {st.id: st for st in subtasks}
+        indeg = {st.id: 0 for st in subtasks}
+        graph = {st.id: [] for st in subtasks}
+        for st in subtasks:
+            for dep in st.dependencies:
+                if dep in id_map:
+                    graph[dep].append(st.id)
+                    indeg[st.id] += 1
+        queue = [sid for sid, deg in indeg.items() if deg == 0]
+        order = []
+        while queue:
+            node = queue.pop(0)
+            order.append(node)
+            for nei in graph[node]:
+                indeg[nei] -= 1
+                if indeg[nei] == 0:
+                    queue.append(nei)
+        if len(order) != len(subtasks):
+            return [st.id for st in subtasks]
+        return order
