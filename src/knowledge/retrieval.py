@@ -1,12 +1,12 @@
 """Vector retrieval module using PostgreSQL + pgvector with HNSW indexing."""
 
+import asyncio
 import json
 from typing import Any, Optional
 
 import psycopg2
 import psycopg2.pool
 import psycopg2.extras
-import numpy as np
 
 from src.config import config
 from src.common.logging import setup_logging
@@ -57,82 +57,7 @@ class KnowledgeRetriever:
         if self._connection_pool:
             self._connection_pool.putconn(conn)
 
-    @retry_with_backoff(max_retries=3, base_delay=1.0)
-    async def search(
-        self,
-        query: str,
-        k: Optional[int] = None,
-        filter_metadata: Optional[dict[str, Any]] = None,
-    ) -> list[dict[str, Any]]:
-        """
-        Search for relevant chunks using vector similarity.
-
-        Note: Embedding generation should be done externally.
-        This method expects pre-computed query embeddings.
-        Use search_with_embedding() for vector search.
-        """
-        # For now, fall back to keyword search
-        return await self._keyword_search(query, k or self.top_k, filter_metadata)
-
-    async def search_with_embedding(
-        self,
-        query_embedding: list[float],
-        k: Optional[int] = None,
-        filter_metadata: Optional[dict[str, Any]] = None,
-        threshold: float = config.rerank_threshold,
-    ) -> list[dict[str, Any]]:
-        """Search using pre-computed query embedding with HNSW vector cosine similarity."""
-        conn = self._get_conn()
-        try:
-            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-            # Convert embedding to PG vector array format
-            embedding_str = f"[{','.join(f'{x:.8f}' for x in query_embedding)}]"
-
-            query = """
-                SELECT
-                    id AS chunk_id,
-                    content,
-                    document_id,
-                    metadata,
-                    1 - (embedding <=> %(embedding)s::vector) AS score
-                FROM chunks
-                WHERE embedding IS NOT NULL
-            """
-
-            params = {"embedding": embedding_str}
-
-            if filter_metadata:
-                for key, value in filter_metadata.items():
-                    query += f" AND metadata->>'{key}' = %s"
-                    params[key] = str(value)
-
-            query += f" ORDER BY score DESC LIMIT %s"
-            params["limit"] = k or self.top_k
-
-            cur.execute(query, params)
-            results = cur.fetchall()
-
-            # Filter by threshold
-            filtered = [
-                dict(r)
-                for r in results
-                if float(r["score"]) >= threshold
-            ]
-
-            # Convert numpy types to native Python types
-            for r in filtered:
-                r["score"] = float(r["score"])
-                if isinstance(r.get("metadata"), str):
-                    r["metadata"] = json.loads(r["metadata"])
-
-            logger.info(f"Vector search returned {len(filtered)} results")
-            return filtered
-
-        finally:
-            self._put_conn(conn)
-
-    async def _keyword_search(
+    def _keyword_search(
         self,
         query: str,
         k: int = 10,
@@ -187,7 +112,59 @@ class KnowledgeRetriever:
         finally:
             self._put_conn(conn)
 
-    async def store_chunks(
+    def _search_with_embedding(
+        self,
+        query_embedding: list[float],
+        k: Optional[int] = None,
+        filter_metadata: Optional[dict[str, Any]] = None,
+        threshold: float = config.rerank_threshold,
+    ) -> list[dict[str, Any]]:
+        """Search using pre-computed query embedding with HNSW vector cosine similarity."""
+        conn = self._get_conn()
+        try:
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            # Convert embedding to PG vector array format
+            embedding_str = f"[{','.join(f'{x:.8f}' for x in query_embedding)}]"
+
+            query = """
+                SELECT
+                    id AS chunk_id,
+                    content,
+                    document_id,
+                    metadata,
+                    1 - (embedding <=> %(embedding)s::vector) AS score
+                FROM chunks
+                WHERE embedding IS NOT NULL
+            """
+
+            params = {"embedding": embedding_str}
+
+            if filter_metadata:
+                for key, value in filter_metadata.items():
+                    query += f" AND metadata->>'{key}' = %s"
+                    params[key] = str(value)
+
+            query += f" ORDER BY score DESC LIMIT %s"
+            params["limit"] = k or self.top_k
+
+            cur.execute(query, params)
+            results = cur.fetchall()
+
+            # Filter by threshold
+            filtered = [
+                dict(r)
+                for r in results
+                if float(r["score"]) >= threshold
+            ]
+
+            logger.info(f"Vector search returned {len(filtered)} results")
+            return filtered
+
+        finally:
+            self._put_conn(conn)
+
+    def _store_chunks(
         self,
         chunks: list[dict[str, Any]],
         document_id: str,
@@ -235,7 +212,7 @@ class KnowledgeRetriever:
         finally:
             self._put_conn(conn)
 
-    async def store_document(
+    def _store_document(
         self,
         doc_id: str,
         title: str,
@@ -258,3 +235,59 @@ class KnowledgeRetriever:
             conn.commit()
         finally:
             self._put_conn(conn)
+
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
+    async def search(
+        self,
+        query: str,
+        k: Optional[int] = None,
+        filter_metadata: Optional[dict[str, Any]] = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Search for relevant chunks using vector similarity.
+
+        Note: Embedding generation should be done externally.
+        This method expects pre-computed query embeddings.
+        Use search_with_embedding() for vector search.
+        """
+        # For now, fall back to keyword search
+        return await asyncio.to_thread(
+            self._keyword_search, query, k or self.top_k, filter_metadata
+        )
+
+    async def search_with_embedding(
+        self,
+        query_embedding: list[float],
+        k: Optional[int] = None,
+        filter_metadata: Optional[dict[str, Any]] = None,
+        threshold: float = config.rerank_threshold,
+    ) -> list[dict[str, Any]]:
+        """Search using pre-computed query embedding with HNSW vector cosine similarity."""
+        return await asyncio.to_thread(
+            self._search_with_embedding,
+            query_embedding, k, filter_metadata, threshold,
+        )
+
+    async def store_chunks(
+        self,
+        chunks: list[dict[str, Any]],
+        document_id: str,
+        embeddings: Optional[list[list[float]]] = None,
+    ) -> int:
+        """Store document chunks in the database."""
+        return await asyncio.to_thread(
+            self._store_chunks, chunks, document_id, embeddings
+        )
+
+    async def store_document(
+        self,
+        doc_id: str,
+        title: str,
+        source_path: str,
+        file_type: str,
+        content: str,
+    ) -> None:
+        """Store a document record."""
+        await asyncio.to_thread(
+            self._store_document, doc_id, title, source_path, file_type, content
+        )

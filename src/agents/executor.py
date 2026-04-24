@@ -361,7 +361,10 @@ Return your response in JSON format:
             logger.info(f"Extracted code length: {len(code)}")
             
             if not code:
-             raise ValueError(f"No code extracted from LLM response. Raw output: {raw_output[:200]}")
+                raise ValueError(f"No code extracted from LLM response. Raw output: {raw_output[:200]}")
+
+            validation_text = self._parse_validation_result(raw_output)
+            return validation_text
 
         except Exception as e:
             logger.warning(f"Code validation LLM call failed: {e}")

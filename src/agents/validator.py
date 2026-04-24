@@ -1,8 +1,10 @@
+# src/agents/validator.py
 import re
 import py_compile
 import tempfile
 import os
-from typing import Any, Optional
+import json
+from typing import Any, Optional, Dict, List, Tuple
 
 from src.config import config
 from src.common.logging import setup_logging
@@ -26,12 +28,7 @@ Return your evaluation in strict JSON format with these exact keys:
 
 
 class ValidatorAgent:
-    """Agent responsible for validating code quality and requirement fulfillment.
-
-    Performs two levels of validation:
-    1. Syntax checking using py_compile
-    2. Semantic validation using LLM to assess requirement fulfillment
-    """
+    """Agent responsible for validating code quality and requirement fulfillment."""
 
     def __init__(
         self,
@@ -42,16 +39,7 @@ class ValidatorAgent:
         self.llm_model = llm_model
 
     async def validate(self, code: str, user_input: str, execution_result: Optional[dict] = None) -> dict:
-        """Validate code quality and requirement fulfillment.
-
-        Args:
-            code: The generated Python code to validate
-            user_input: The original user request
-            execution_result: Result from code execution (optional)
-
-        Returns:
-            dict with keys: passed (bool), feedback (str), suggestions (list)
-        """
+        """Validate code quality and requirement fulfillment."""
         logger.info("ValidatorAgent starting validation")
 
         # Step 1: Syntax check
@@ -84,12 +72,8 @@ class ValidatorAgent:
             "suggestions": suggestions,
         }
 
-    def _check_syntax(self, code: str) -> tuple[bool, str]:
-        """Check code syntax using py_compile.
-
-        Returns:
-            Tuple of (is_valid, feedback_message)
-        """
+    def _check_syntax(self, code: str) -> Tuple[bool, str]:
+        """Check code syntax using py_compile."""
         if not code or not code.strip():
             return False, "Code is empty"
 
@@ -111,11 +95,7 @@ class ValidatorAgent:
 
     @retry_with_backoff(max_retries=2, base_delay=1.0)
     async def _validate_with_llm(self, code: str, user_input: str, execution_result: Optional[dict] = None) -> dict:
-        """Validate code semantics using LLM.
-
-        Returns:
-            dict with keys: passed, feedback, suggestions
-        """
+        """Validate code semantics using LLM."""
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
@@ -150,9 +130,9 @@ Execution Status: {exec_status}
 Please evaluate whether the code satisfies the user's request.
 Return your response in strict JSON format:
 {{
-    "passed": true/false,
-    "feedback": "Detailed explanation of why the code passed or failed validation",
-    "suggestions": ["List of specific improvement suggestions, empty list if passed"]
+"passed": true/false,
+"feedback": "Detailed explanation of why the code passed or failed validation",
+"suggestions": ["List of specific improvement suggestions, empty list if passed"]
 }}"""
 
         try:
@@ -166,40 +146,201 @@ Return your response in strict JSON format:
                 max_tokens=1024,
             )
             raw_output = response.choices[0].message.content or ""
-            return self._parse_validation_result(raw_output)
+            parsed_result = self._parse_validation_result_enhanced(raw_output)
+            return self._normalize_validation_result(parsed_result, raw_output)
         except Exception as e:
             logger.warning(f"LLM validation call failed: {e}, falling back to execution-based check")
             return self._fallback_validation(execution_result)
 
-    def _parse_validation_result(self, text: str) -> dict:
-        """Parse validation result from LLM response text.
+    def _parse_validation_result_enhanced(self, text: str) -> Dict[str, Any]:
+        """Enhanced multi-strategy JSON parsing."""
+        patterns = [
+            r'```json\s*([\s\S]*?)\s*```',
+            r'```\s*([\s\S]*?)\s*```',
+            r'({[\s\S]*?"passed"[\s\S]*?})',
+            r'({[^{}]*?"passed"[^{}]*?})',
+        ]
 
-        Extracts JSON from the response and validates the structure.
-        """
-        match = re.search(r"\{[^{}]*" + '"passed"' + r"[^{}]*\}", text, re.DOTALL)
-        if match:
-            try:
-                import json
-                result = json.loads(match.group())
-                return {
-                    "passed": bool(result.get("passed", False)),
-                    "feedback": str(result.get("feedback", "Validation result parsed.")),
-                    "suggestions": result.get("suggestions", []),
-                }
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.warning(f"Failed to parse JSON from LLM response: {e}")
+        for pattern in patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE | re.DOTALL)
+            for match in matches:
+                try:
+                    json_str = match.strip()
+                    json_str = re.sub(r',\s}', '}', json_str)
+                    json_str = re.sub(r',\s]', ']', json_str)
+                    result = json.loads(json_str)
+                    if "passed" in result:
+                        logger.debug(f"Successfully parsed JSON with pattern: {pattern}")
+                        return result
+                except json.JSONDecodeError:
+                    continue
 
+        try:
+            result = self._extract_via_regex(text)
+            if result:
+                logger.debug("Successfully extracted validation data via regex")
+                return result
+        except Exception as e:
+            logger.debug(f"Regex extraction failed: {e}")
+
+        try:
+            result = self._parse_from_natural_language(text)
+            if result:
+                logger.debug("Successfully parsed from natural language")
+                return result
+        except Exception as e:
+            logger.debug(f"Natural language parsing failed: {e}")
+
+        logger.warning(f"All parsing strategies failed for text: {text[:200]}")
         return {
             "passed": False,
-            "feedback": f"Could not parse validation result from LLM. Raw response: {text[:200]}",
-            "suggestions": ["Review the LLM response format"],
+            "feedback": f"Could not parse validation result. Raw: {text[:200]}",
+            "suggestions": ["Check LLM response format"]
         }
 
-    def _fallback_validation(self, execution_result: Optional[dict] = None) -> dict:
-        """Fallback validation when LLM call fails.
+    def _extract_via_regex(self, text: str) -> Optional[Dict[str, Any]]:
+        """Extract validation data using regex patterns."""
+        result = {}
 
-        Uses execution result as the basis for validation.
-        """
+        passed_patterns = [
+            r'"passed"\s*:\s*true',
+            r'"passed"\s*:\s*false',
+            r'passed\s*:\s*true',
+            r'passed\s*:\s*false',
+            r'passed["\s:]+(True|true|False|false)',
+        ]
+
+        for pattern in passed_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                value = match.group(0).split(':')[-1].strip().lower()
+                result["passed"] = 'true' in value
+                break
+
+        feedback_patterns = [
+            r'"feedback"\s*:\s*"([^"]*)"',
+            r'feedback["\s:]+["\s]*"([^"]*)"',
+            r'feedback["\s:]+([^"\n\r]+?)(?:,|\n|$)',
+        ]
+
+        for pattern in feedback_patterns:
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                result["feedback"] = match.group(1).strip()
+                break
+
+        suggestions_patterns = [
+            r'"suggestions"\s:\s\[(.*?)\]',
+            r'suggestions["\s:]+\[(.*?)\]',
+        ]
+
+        for pattern in suggestions_patterns:
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                suggestions_text = match.group(1)
+                suggestions = re.findall(r'"([^"]*)"', suggestions_text)
+                if suggestions:
+                    result["suggestions"] = suggestions
+                else:
+                    result["suggestions"] = [s.strip() for s in suggestions_text.split(',') if s.strip()]
+                break
+
+        if "passed" not in result:
+            return None
+        if "feedback" not in result:
+            result["feedback"] = "Validation result extracted without explicit feedback"
+        if "suggestions" not in result:
+            result["suggestions"] = []
+
+        return result
+
+    def _parse_from_natural_language(self, text: str) -> Optional[Dict[str, Any]]:
+        """Parse validation data from natural language text."""
+        text_lower = text.lower()
+
+        positive_indicators = [
+            "code is correct", "passes validation", "satisfies the request",
+            "meets requirements", "properly implements", "code works",
+            "passed", "successful", "valid"
+        ]
+        negative_indicators = [
+            "fails", "does not satisfy", "missing", "incorrect",
+            "bug", "error", "issue", "problem", "failed",
+            "invalid", "does not meet"
+        ]
+
+        passed = None
+        for indicator in positive_indicators:
+            if indicator in text_lower:
+                passed = True
+                break
+
+        if passed is None:
+            for indicator in negative_indicators:
+                if indicator in text_lower:
+                    passed = False
+                    break
+
+        if passed is None:
+            return None
+
+            feedback = text[:300]
+        suggestions = []
+        bullet_patterns = [
+            r'[-•*]\s*([^.\n]+[.]?)',
+            r'\d+\.\s*([^.\n]+[.]?)',
+        ]
+
+        for pattern in bullet_patterns:
+            matches = re.findall(pattern, text)
+            if matches:
+                suggestions = matches[:3]
+                break
+
+        return {"passed": passed, "feedback": feedback, "suggestions": suggestions}
+
+    def _normalize_validation_result(self, result: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
+        """Normalize and validate the parsed result structure."""
+        normalized = {}
+
+        passed_value = result.get("passed")
+        if isinstance(passed_value, bool):
+            normalized["passed"] = passed_value
+        elif isinstance(passed_value, str):
+            normalized["passed"] = passed_value.lower() in ['true', '1', 'yes', 'pass']
+        else:
+            feedback = str(result.get("feedback", "")).lower()
+            if any(word in feedback for word in ['success', 'correct', 'valid']):
+                normalized["passed"] = True
+            elif any(word in feedback for word in ['fail', 'error', 'incorrect']):
+                normalized["passed"] = False
+            else:
+                logger.warning("Could not determine passed status, defaulting to False")
+                normalized["passed"] = False
+
+        feedback = result.get("feedback", "")
+        if not feedback or not isinstance(feedback, str):
+            feedback = f"Validation result: {'Passed' if normalized['passed'] else 'Failed'}"
+            if "Execution Output" in raw_text:
+                feedback += " (based on execution results)"
+        normalized["feedback"] = feedback.strip()
+
+        suggestions = result.get("suggestions", [])
+        if not isinstance(suggestions, list):
+            if isinstance(suggestions, str):
+                suggestions = [suggestions]
+            else:
+                suggestions = []
+        normalized["suggestions"] = suggestions
+
+        return normalized
+
+    def _parse_validation_result(self, text: str) -> dict:
+        """Legacy parsing method - kept for backward compatibility."""
+        return self._parse_validation_result_enhanced(text)
+
+    def _fallback_validation(self, execution_result: Optional[dict] = None) -> dict:
+        """Fallback validation when LLM call fails."""
         if execution_result and execution_result.get("success"):
             return {
                 "passed": True,

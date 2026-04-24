@@ -30,7 +30,7 @@
 - load_tool_module()：动态加载工具模块
 
 ## 任务4：增强 Coder Agent
-文件：src/agents/coder.py
+文件：src/agents/executor.py
 
 添加功能：
 - PRIMARY_MODEL = "Qwen3.6-35B-A3B-UD-Q5_K_M"

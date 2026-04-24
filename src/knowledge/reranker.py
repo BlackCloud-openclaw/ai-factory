@@ -39,7 +39,7 @@ class Reranker:
                 )
                 self._model = "not_available"
 
-    async def rerank(
+    def rerank(
         self,
         query: str,
         results: list[dict[str, Any]],
@@ -96,14 +96,14 @@ class Reranker:
             sorted_results = sorted(results, key=lambda x: x.get("score", 0), reverse=True)
             return sorted_results[:top_k]
 
-    async def rerank_with_metadata(
+    def rerank_with_metadata(
         self,
         query: str,
         results: list[dict[str, Any]],
         top_k: Optional[int] = None,
     ) -> list[dict[str, Any]]:
         """Rerank results and filter out results below threshold."""
-        reranked = await self.rerank(query, results, top_k)
+        reranked = self.rerank(query, results, top_k)
 
         threshold = config.rerank_threshold
         filtered = [

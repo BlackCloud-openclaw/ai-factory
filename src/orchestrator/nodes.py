@@ -9,7 +9,6 @@ from src.orchestrator.state import AgentState
 from src.agents.research import ResearchAgent
 from src.agents.executor import ExecutorAgent
 from src.agents.memory import MemoryAgent
-from src.agents.validator import ValidatorAgent
 from src.common.logging import setup_logging
 
 logger = setup_logging("orchestrator.nodes")
@@ -239,13 +238,13 @@ async def plan_node(state: AgentState) -> dict[str, Any]:
     """Plan complex tasks by breaking them into subtasks."""
     logger.info(f"Planning complex task: {state.user_input[:200]}...")
 
-    from src.agents.planner import plan_task
+    from src.agents.planner import plan_task_async
 
     user_input = state.user_input
     memory_context_str = (
         json.dumps(state.memory_context) if state.memory_context else ""
     )
-    plan = plan_task(user_input, memory_context_str)
+    plan = await plan_task_async(user_input, memory_context_str)
 
     if plan:
         first_subtask_id = plan[0]["id"]

@@ -17,6 +17,26 @@ except ImportError:
     Style = None
 
 
+def gzip_compress(filepath: str, output_path: Optional[str] = None) -> str:
+    """Compress a file with gzip.
+
+    Args:
+        filepath: Path to the file to compress
+        output_path: Optional output path (default: filepath + ".gz")
+
+    Returns:
+        Path to the compressed file
+    """
+    if output_path is None:
+        output_path = filepath + ".gz"
+
+    with open(filepath, "rb") as f_in:
+        with gzip.open(output_path, "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
+    os.remove(filepath)
+    return output_path
+
+
 _LOG_COLORS = {}
 if HAS_COLORAMA:
     _LOG_COLORS = {
@@ -91,26 +111,6 @@ class CompressedRotatingFileHandler(RotatingFileHandler):
 
         if not self.delay:
             self.stream = self._open()
-
-
-def gzip_compress(filepath: str, output_path: Optional[str] = None) -> str:
-    """Compress a file with gzip.
-
-    Args:
-        filepath: Path to the file to compress
-        output_path: Optional output path (default: filepath + ".gz")
-
-    Returns:
-        Path to the compressed file
-    """
-    if output_path is None:
-        output_path = filepath + ".gz"
-
-    with open(filepath, "rb") as f_in:
-        with gzip.open(output_path, "wb") as f_out:
-            shutil.copyfileobj(f_in, f_out)
-    os.remove(filepath)
-    return output_path
 
 
 def setup_logging(

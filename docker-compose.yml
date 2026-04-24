@@ -13,7 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sh:/docker-entrypoint-initdb.d/01_init.sql
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
       interval: 5s

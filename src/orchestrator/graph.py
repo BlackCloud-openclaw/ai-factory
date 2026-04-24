@@ -47,7 +47,7 @@ def route_after_research(state: AgentState) -> str:
 def route_after_code(state: AgentState) -> str:
     exec_result = state.execution_result if hasattr(state, 'execution_result') else state.get('execution_result', {})
     if exec_result and not exec_result.get('success', False):
-        needs_retry = state.needs_retry if hasattr(state, 'needs_retry') else state.get('needs_retry', False)
+        needs_retry = state.should_retry()
         if needs_retry:
             return 'code'
     return 'validate'

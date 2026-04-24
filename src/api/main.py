@@ -44,9 +44,3 @@ app.include_router(router, prefix="/api/v1")
 async def health():
     """Root health check."""
     return {"status": "healthy", "service": "ai-factory"}
-
-
-@app.get("/ready")
-async def readiness():
-    """Readiness probe."""
-    return {"status": "ready"}

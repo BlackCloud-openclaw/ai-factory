@@ -35,7 +35,6 @@ class AgentState(BaseModel):
     # Retry control
     retry_count: int = 0
     max_retries: int = 3
-    needs_retry: bool = False
     remaining_subtasks: list = []
     max_retries_per_subtask: int = 3
 
@@ -60,4 +59,9 @@ class AgentState(BaseModel):
     current_subtask_index: int = 0
     current_subtask_id: str = ""
 
- 
+    # Retry flag (set by nodes, checked by routing functions)
+    needs_retry: bool = False
+
+    def should_retry(self) -> bool:
+        """Determine if the workflow should retry based on error state and retry limits."""
+        return self.retry_count < self.max_retries and self.error is not None

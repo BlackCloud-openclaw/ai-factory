@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import List, Dict, Any
@@ -49,3 +50,8 @@ def plan_task(user_input: str, memory_context: str = "") -> List[Dict[str, Any]]
                 "depends_on": [],
             }
         ]
+
+
+async def plan_task_async(user_input: str, memory_context: str = "") -> List[Dict[str, Any]]:
+    """Async wrapper around plan_task to avoid blocking the event loop."""
+    return await asyncio.to_thread(plan_task, user_input, memory_context)

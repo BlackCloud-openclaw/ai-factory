@@ -28,12 +28,27 @@ class TestOrchestratorState:
         assert new_state.intent == "test"
         assert state.user_input == "original"  # original unchanged
 
-    def test_needs_retry_property(self):
+    def test_should_retry_method(self):
         state = AgentState(error="fail", retry_count=0, max_retries=3)
-        assert state.needs_retry() is True
+        assert state.should_retry() is True
 
         state.retry_count = 3
-        assert state.needs_retry() is False
+        assert state.should_retry() is False
 
         state.error = None
-        assert state.needs_retry() is False
+        assert state.should_retry() is False
+
+    def test_should_retry_no_error(self):
+        state = AgentState(error=None, retry_count=0)
+        assert state.should_retry() is False
+
+    def test_should_retry_at_max(self):
+        state = AgentState(error="fail", retry_count=5, max_retries=3)
+        assert state.should_retry() is False
+
+    def test_needs_retry_field(self):
+        state = AgentState(needs_retry=True)
+        assert state.needs_retry is True
+
+        state.needs_retry = False
+        assert state.needs_retry is False
