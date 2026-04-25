@@ -1,31 +1,33 @@
 import json
-from typing import Any, Dict, Optional
-
-from langchain_core.messages import AIMessage, HumanMessage
+from typing import Any, Optional, List, Dict
 
 from src.knowledge.retrieval import KnowledgeRetriever
+from src.knowledge.reranker import Reranker
+from src.tools.web_search import web_search
 from src.config import config
 from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff
+from src.agents.base import BaseAgent
 from src.orchestrator.state import AgentState
 
 logger = setup_logging("agents.research")
 
-
-class ResearchAgent:
-    """Agent responsible for knowledge retrieval and LLM-based summarization."""
-
+class ResearchAgent(BaseAgent):
     def __init__(
         self,
         retriever: Optional[KnowledgeRetriever] = None,
+        reranker: Optional[Reranker] = None,
         llm_api_url: str = config.llm_api_url,
         llm_model: str = config.llm_model_name,
         top_k: int = config.rag_k,
+        enable_web_search: bool = True,
     ):
         self.retriever = retriever or KnowledgeRetriever()
+        self.reranker = reranker or Reranker()
         self.llm_api_url = llm_api_url
         self.llm_model = llm_model
         self.top_k = top_k
+        self.enable_web_search = enable_web_search
         self.system_prompt = (
             "You are a knowledgeable research assistant. "
             "Use the provided context to answer the user's question accurately. "
@@ -34,94 +36,105 @@ class ResearchAgent:
         )
 
     async def run(self, state: AgentState) -> Dict[str, Any]:
-        """Execute research based on the current agent state."""
+        """Unified interface: accept state, return incremental updates."""
         query = state.user_input or state.original_request
-        if not query:
-            logger.warning("ResearchAgent: no query found in state")
-            return {"research_results": [], "sources": []}
-
         logger.info(f"ResearchAgent running for query: {query[:150]}")
 
-        # Step 1: Retrieve relevant chunks from knowledge base
-        chunks = await self.retriever.search(query, k=self.top_k)
+        try:
+            # 1. Retrieve from local knowledge base
+            local_chunks = await self.retriever.search(query, k=self.top_k)
+            logger.info(f"Local KB returned {len(local_chunks)} chunks")
 
-        if not chunks:
-            logger.warning(f"No knowledge base results for query: {query}")
-            return {"research_results": [], "sources": []}
+            # 2. If web search is enabled and local results are insufficient, fetch from web
+            web_results = []
+            if self.enable_web_search and len(local_chunks) < 2:
+                try:
+                    web_results = await web_search(query, max_results=3)
+                    logger.info(f"Web search returned {len(web_results)} results")
+                except Exception as e:
+                    logger.warning(f"Web search failed: {e}")
 
-        # Step 2: Build context from retrieved chunks
-        context = self._build_context(chunks)
+            # 3. Combine and rerank
+            all_results = []
+            for c in local_chunks:
+                all_results.append({
+                    "content": c.get("content", ""),
+                    "score": c.get("score", 0.0),
+                    "source": c.get("metadata", {}).get("source_path", "local_kb"),
+                    "type": "local"
+                })
+            for w in web_results:
+                all_results.append({
+                    "content": f"Title: {w['title']}\nBody: {w['body']}",
+                    "score": 0.5,
+                    "source": w.get("href", w.get("source", "web")),
+                    "type": "web"
+                })
 
-        # Step 3: Generate summary via LLM
-        summary = await self._summarize(query, context)
+            if not all_results:
+                summary = "No relevant information found."
+                research_results = []
+                sources = []
+            else:
+                # 4. Rerank using cross-encoder (if available)
+                if self.reranker and len(all_results) > 1:
+                    try:
+                        all_results = await self.reranker.rerank(query, all_results, top_k=5)
+                        logger.info(f"Reranked results, kept top {len(all_results)}")
+                    except Exception as e:
+                        logger.warning(f"Reranker failed: {e}")
 
-        sources = [
-            {
-                "document_id": c.get("document_id", ""),
-                "score": c.get("score", 0.0),
-                "source_path": c.get("metadata", {}).get("source_path", "unknown"),
-            }
-            for c in chunks
-        ]
+                # 5. Build context and generate summary via LLM (with fallback)
+                context = self._build_context(all_results)
+                summary = await self._summarize(query, context) or "Summary generation failed, but search results are available."
+                research_results = []
+                sources = []
+                for r in all_results[:5]:
+                    research_results.append({
+                        "summary": r["content"][:500],
+                        "source": r["source"],
+                        "score": r.get("score", 0.0),
+                        "type": r.get("type", "unknown")
+                    })
+                    sources.append({"source_path": r["source"], "type": r.get("type")})
 
-        research_results = [
-            {
-                "summary": summary,
+            return {
+                "research_results": research_results,
                 "sources": sources,
-                "chunks": [
-                    {
-                        "content": c.get("content", "")[:500],
-                        "score": c.get("score", 0.0),
-                    }
-                    for c in chunks
-                ],
+                "final_answer": summary,
             }
-        ]
+        except Exception as e:
+            logger.error(f"ResearchAgent failed: {e}", exc_info=True)
+            return {
+                "research_results": [],
+                "sources": [],
+                "final_answer": f"Research encountered an error: {str(e)}",
+            }
 
-        result = {
-            "research_results": research_results,
-            "sources": sources,
-        }
-
-        logger.info(f"ResearchAgent completed. Found {len(chunks)} relevant chunks.")
-        return result
-
-    def _build_context(self, chunks: list[dict[str, Any]]) -> str:
-        """Build a context string from retrieved chunks."""
+    def _build_context(self, results: List[Dict[str, Any]]) -> str:
         parts = []
-        for i, chunk in enumerate(chunks, 1):
-            content = chunk.get("content", "")
-            source = chunk.get("metadata", {}).get("source_path", f"document_{i}")
-            parts.append(f"[Source: {source}]\n{content}")
+        for i, r in enumerate(results, 1):
+            src = r.get("source", f"source_{i}")
+            content = r.get("content", "")
+            parts.append(f"[{i}] Source: {src}\n{content}")
         return "\n\n---\n\n".join(parts)
 
-    @retry_with_backoff(max_retries=3, base_delay=1.0)
+    @retry_with_backoff(max_retries=2, base_delay=1.0)
     async def _summarize(self, query: str, context: str) -> str:
-        """Call LLM to generate a summary from retrieved context."""
         from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(
-            api_key="not-needed",  # llama.cpp doesn't require an API key
-            base_url=self.llm_api_url,
-        )
-
+        client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
         messages = [
             {"role": "system", "content": self.system_prompt},
-            {
-                "role": "user",
-                "content": (
-                    f"Question: {query}\n\n"
-                    f"Context:\n{context}\n\n"
-                    f"Please provide a concise and accurate answer based on the context."
-                ),
-            },
+            {"role": "user", "content": f"Question: {query}\n\nContext:\n{context}\n\nPlease provide a concise and accurate answer based on the context."}
         ]
-
-        response = await client.chat.completions.create(
-            model=self.llm_model,
-            messages=messages,
-            temperature=0.2,
-            max_tokens=config.llm_max_tokens,
-        )
-
-        return response.choices[0].message.content or "No summary generated."
+        try:
+            response = await client.chat.completions.create(
+                model=self.llm_model,
+                messages=messages,
+                temperature=0.2,
+                max_tokens=config.llm_max_tokens,
+            )
+            return response.choices[0].message.content or "No summary generated."
+        except Exception as e:
+            logger.warning(f"LLM summarization failed: {e}")
+            return f"Unable to generate summary due to LLM error. Raw context length: {len(context)} characters."

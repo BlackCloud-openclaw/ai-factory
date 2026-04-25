@@ -12,6 +12,8 @@ from src.execution.tools_registry import ToolsRegistry
 from src.config import config
 from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff, smart_retry
+from src.orchestrator.state import AgentState
+from src.agents.base import BaseAgent  # 可选，但推荐
 
 logger = setup_logging("agents.executor")
 
@@ -34,7 +36,7 @@ Output format:
 ```"""
 
 
-class ExecutorAgent:
+class ExecutorAgent(BaseAgent):
     """Agent responsible for code generation and sandbox execution.
 
     Supports dual-model fallback, code validation, and tool generation.
@@ -61,7 +63,7 @@ class ExecutorAgent:
             tools_dir=config.tools_dir
         )
 
-    async def run(self, context: Dict[str, Any], state: Any = None) -> Dict[str, Any]:
+    async def _generate_and_execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Generate code and execute it in sandbox.
 
         Args:
@@ -102,6 +104,26 @@ class ExecutorAgent:
             "file_path": file_path,
             "execution_result": execution_result,
         }
+        
+    async def run(self, state: AgentState) -> Dict[str, Any]:
+        """Unified interface: accept state, return incremental updates."""
+        logger.info("ExecutorAgent starting code generation")
+
+        context = {
+            "user_input": state.user_input,
+            "research_results": state.research_results,
+            "subtasks": state.subtasks,
+       }
+
+        # 调用原有的内部方法（需要将 _generate_and_execute 改成直接使用这个 context）
+        result = await self._generate_and_execute(context)
+        return {
+            "code_generated": result.get("code", ""),
+            "code_file_path": result.get("file_path", ""),
+            "execution_result": result.get("execution_result"),
+            "final_answer": result.get("code", ""),
+        }        
+
 
     async def generate_with_fallback(
         self,

@@ -188,7 +188,30 @@ class TaskScheduler:
                 "success": validation.get("passed", False),
                 "output": validation
             }
-
+            
+     
+        elif job.subtask_type == "research":
+            from src.agents.research import ResearchAgent
+            from src.orchestrator.state import AgentState
+            research_agent = ResearchAgent()
+            temp_state = AgentState(user_input=job.description, project_id=job.task_id)
+            try:
+                result = await research_agent.run(temp_state)
+                summary = result.get("final_answer", result.get("summary", ""))
+                return {
+                    "success": True,
+                    "type": "research",
+                    "output": summary,
+                    "research_results": result.get("research_results", [])
+                }
+            except Exception as e:
+                logger.error(f"ResearchAgent execution error: {e}", exc_info=True)
+                return {
+                    "success": False,
+                    "type": "research",
+                    "error": str(e)
+                }    
+           
         # 3. research 或其他类型（可扩展）
         else:
             # 这里可以添加对 research 等类型的处理
