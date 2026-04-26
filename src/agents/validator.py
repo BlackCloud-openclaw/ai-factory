@@ -4,6 +4,7 @@ import py_compile
 import tempfile
 import os
 import json
+import time
 from typing import Any, Optional, Dict, List, Tuple
 
 from src.config import config
@@ -42,10 +43,18 @@ class ValidatorAgent(BaseAgent):
     
     async def run(self, state: AgentState) -> Dict[str, Any]:
         """Unified interface: accept state, return validation result incremental update."""
+        agent_name = "ValidatorAgent"
+        state.step_count += 1
+        step = state.step_count
+        logger.info(f"Starting {agent_name}, step={step}")
+        start_time = time.time()
         code = state.code_generated
         user_input = state.user_input
         execution_result = state.execution_result
         result = await self.validate(code, user_input, execution_result)
+        duration = time.time() - start_time
+        status = "success" if result.get("passed") else "error"
+        logger.info(f"{agent_name} completed, step={step}, status={status}, duration={duration:.2f}")
         return {
             "validation_result": result,
             "final_answer": result.get("feedback", ""),

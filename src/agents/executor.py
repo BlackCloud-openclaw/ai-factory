@@ -14,11 +14,9 @@ from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff, smart_retry
 from src.orchestrator.state import AgentState
 from src.agents.base import BaseAgent  # 可选，但推荐
+from src.model_router import get_router
 
 logger = setup_logging("agents.executor")
-
-PRIMARY_MODEL = "Qwen3.6-35B-A3B-UD-Q5_K_M"
-FALLBACK_MODEL = "DeepSeek-R1-Distill-Qwen-32B-Q5_K_M"
 
 CODER_SYSTEM_PROMPT = """You are an expert Python programmer. Given a task description,
 generate clean, well-documented, and tested Python code.
@@ -107,6 +105,11 @@ class ExecutorAgent(BaseAgent):
         
     async def run(self, state: AgentState) -> Dict[str, Any]:
         """Unified interface: accept state, return incremental updates."""
+        agent_name = "ExecutorAgent"
+        state.step_count += 1
+        step = state.step_count
+        logger.info(f"Starting {agent_name}, step={step}")
+        start_time = time.time()
         logger.info("ExecutorAgent starting code generation")
 
         context = {
@@ -117,6 +120,9 @@ class ExecutorAgent(BaseAgent):
 
         # 调用原有的内部方法（需要将 _generate_and_execute 改成直接使用这个 context）
         result = await self._generate_and_execute(context)
+        duration = time.time() - start_time
+        status = "success" if result.get("execution_result", {}).get("success") else "error"
+        logger.info(f"{agent_name} completed, step={step}, status={status}, duration={duration:.2f}")
         return {
             "code_generated": result.get("code", ""),
             "code_file_path": result.get("file_path", ""),
@@ -124,27 +130,22 @@ class ExecutorAgent(BaseAgent):
             "final_answer": result.get("code", ""),
         }        
 
-
     async def generate_with_fallback(
         self,
         user_input: str,
         research_results: List[Dict[str, Any]],
         subtasks: List[str],
     ) -> str:
-        """Generate code using primary model, falling back to secondary model on failure.
+        """Generate code using dynamic model selection, falling back to fallback model."""
+        router = get_router()
+        primary = router.select("code", user_input)   # 根据关键词选择代码模型
+        fallback = router.get_fallback()
+        logger.info(f"Selected primary model: {primary}, fallback: {fallback}")
 
-        Args:
-            user_input: User's task description
-            research_results: Research results from KnowledgeRetriever
-            subtasks: List of subtasks to complete
-
-        Returns:
-            Generated Python code string, or empty string on complete failure
-        """
         try:
-            logger.info(f"Attempting code generation with primary model: {PRIMARY_MODEL}")
+            logger.info(f"Attempting code generation with primary model: {primary}")
             code = await self._generate_code_with_model(
-                model=PRIMARY_MODEL,
+                model=primary,
                 user_input=user_input,
                 research_results=research_results,
                 subtasks=subtasks,
@@ -153,15 +154,12 @@ class ExecutorAgent(BaseAgent):
                 logger.info("Code generation succeeded with primary model")
                 return code
         except Exception as e:
-            logger.warning(
-                f"Primary model {PRIMARY_MODEL} failed: {e}, "
-                f"trying fallback model {FALLBACK_MODEL}"
-            )
+            logger.warning(f"Primary model {primary} failed: {e}, trying fallback")
 
         try:
-            logger.info(f"Attempting code generation with fallback model: {FALLBACK_MODEL}")
+            logger.info(f"Attempting code generation with fallback model: {fallback}")
             code = await self._generate_code_with_model(
-                model=FALLBACK_MODEL,
+                model=fallback,
                 user_input=user_input,
                 research_results=research_results,
                 subtasks=subtasks,
@@ -170,13 +168,11 @@ class ExecutorAgent(BaseAgent):
                 logger.info("Code generation succeeded with fallback model")
                 return code
         except Exception as e:
-            logger.error(
-                f"Fallback model {FALLBACK_MODEL} also failed: {e}"
-            )
+            logger.error(f"Fallback model {fallback} also failed: {e}")
 
-        return ""
+        return ""    
 
-    @smart_retry(max_retries=3, backoff_factor=1.0, fallback_model=FALLBACK_MODEL)
+    @smart_retry(max_retries=3, backoff_factor=1.0, fallback_model=None)
     async def _generate_code_with_model(
         self,
         model: str,

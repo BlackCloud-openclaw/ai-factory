@@ -1,11 +1,13 @@
 import gzip
+import json
 import logging
 import os
 import shutil
 import sys
+from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 try:
     from colorama import Fore, Style, init as colorama_init
@@ -71,6 +73,31 @@ def _build_color_formatter() -> logging.Formatter:
         "%(asctime)s - %(name)s - %(levelname)-8s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+
+
+class JsonFormatter(logging.Formatter):
+    """JSON 格式日志输出，用于文件日志。"""
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_data: Dict[str, Any] = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "level": record.levelname,
+            "name": record.name,
+            "message": record.getMessage(),
+        }
+        if hasattr(record, "agent"):
+            log_data["agent"] = record.agent
+        if hasattr(record, "duration"):
+            log_data["duration"] = record.duration
+        if hasattr(record, "status"):
+            log_data["status"] = record.status
+        if hasattr(record, "step"):
+            log_data["step"] = record.step
+        if hasattr(record, "task_id"):
+            log_data["task_id"] = record.task_id
+        if record.exc_info and record.exc_info[1]:
+            log_data["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_data, ensure_ascii=False)
 
 
 class CompressedRotatingFileHandler(RotatingFileHandler):
@@ -165,11 +192,7 @@ def setup_logging(
         encoding="utf-8",
     )
     file_handler.setLevel(logging.DEBUG)
-    file_formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)-8s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    file_handler.setFormatter(file_formatter)
+    file_handler.setFormatter(JsonFormatter())
     logger.addHandler(file_handler)
 
     logger.info(f"Logging initialized: level={config.log_level}, file={log_file}")

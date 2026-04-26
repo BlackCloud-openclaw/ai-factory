@@ -1,0 +1,262 @@
+diff --git a/src/agents/executor.py b/src/agents/executor.py
+index 9e8fc7b..8efe871 100755
+--- a/src/agents/executor.py
++++ b/src/agents/executor.py
+@@ -107,6 +107,11 @@ class ExecutorAgent(BaseAgent):
+         
+     async def run(self, state: AgentState) -> Dict[str, Any]:
+         """Unified interface: accept state, return incremental updates."""
++        agent_name = "ExecutorAgent"
++        state.step_count += 1
++        step = state.step_count
++        logger.info(f"Starting {agent_name}, step={step}")
++        start_time = time.time()
+         logger.info("ExecutorAgent starting code generation")
+ 
+         context = {
+@@ -117,6 +122,9 @@ class ExecutorAgent(BaseAgent):
+ 
+         # 调用原有的内部方法（需要将 _generate_and_execute 改成直接使用这个 context）
+         result = await self._generate_and_execute(context)
++        duration = time.time() - start_time
++        status = "success" if result.get("execution_result", {}).get("success") else "error"
++        logger.info(f"{agent_name} completed, step={step}, status={status}, duration={duration:.2f}")
+         return {
+             "code_generated": result.get("code", ""),
+             "code_file_path": result.get("file_path", ""),
+diff --git a/src/agents/memory.py b/src/agents/memory.py
+index 8f57108..e0d9bd7 100755
+--- a/src/agents/memory.py
++++ b/src/agents/memory.py
+@@ -27,8 +27,15 @@ class MemoryAgent:
+         This is the unified entry point that returns the memory context
+         to be merged into the agent state. It does NOT perform any saves.
+         """
++        agent_name = "MemoryAgent"
++        state.step_count += 1
++        step = state.step_count
++        logger.info(f"Starting {agent_name}, step={step}")
++        start_time = time.time()
+         project_id = state.project_id or state.metadata.get("session_id", "default")
+         context = await self.list_all(project_id)
++        duration = time.time() - start_time
++        logger.info(f"{agent_name} completed, step={step}, status=success, duration={duration:.2f}")
+         return {"memory_context": context}
+ 
+     async def store(self, project_id: str, key: str, value: Any, metadata: dict = None) -> str:
+diff --git a/src/agents/planner.py b/src/agents/planner.py
+index 34b6cb8..888459e 100755
+--- a/src/agents/planner.py
++++ b/src/agents/planner.py
+@@ -59,6 +59,10 @@ class PlannerAgent(BaseAgent):
+         self.llm_model = llm_model
+ 
+     async def run(self, state: AgentState) -> Dict[str, Any]:
++        agent_name = "PlannerAgent"
++        state.step_count += 1
++        step = state.step_count
++        logger.info(f"Starting {agent_name}, step={step}")
+         user_request = state.original_request or state.user_input
+         logger.info(f"Planning task: {user_request[:100]}...")
+         try:
+@@ -69,6 +73,7 @@ class PlannerAgent(BaseAgent):
+             # 计算执行顺序（拓扑排序）
+             execution_order = self._topological_sort(plan.subtasks)
+             plan_dict["execution_order"] = execution_order
++            logger.info(f"{agent_name} completed, step={step}, status=success, duration=0")
+             return {
+                 "task_plan": plan_dict,
+                 "plan_id": plan.plan_id,
+@@ -76,7 +81,7 @@ class PlannerAgent(BaseAgent):
+                 "original_request": user_request,  # 确保传递
+             }
+         except Exception as e:
+-            logger.error(f"LLM plan generation failed: {e}")
++            logger.error(f"{agent_name} failed, step={step}, error={e}")
+             logger.warning("Using fallback plan with single subtask")
+             fallback_subtask = Subtask(
+                 id="task_1",
+diff --git a/src/agents/research.py b/src/agents/research.py
+index 877679f..c239e1e 100755
+--- a/src/agents/research.py
++++ b/src/agents/research.py
+@@ -1,4 +1,5 @@
+ import json
++import time
+ from typing import Any, Optional, List, Dict
+ 
+ from src.knowledge.retrieval import KnowledgeRetriever
+@@ -37,6 +38,11 @@ class ResearchAgent(BaseAgent):
+ 
+     async def run(self, state: AgentState) -> Dict[str, Any]:
+         """Unified interface: accept state, return incremental updates."""
++        agent_name = "ResearchAgent"
++        state.step_count += 1
++        step = state.step_count
++        logger.info(f"Starting {agent_name}, step={step}")
++        start_time = time.time()
+         query = state.user_input or state.original_request
+         logger.info(f"ResearchAgent running for query: {query[:150]}")
+ 
+@@ -99,12 +105,13 @@ class ResearchAgent(BaseAgent):
+                     sources.append({"source_path": r["source"], "type": r.get("type")})
+ 
+             return {
+-                "research_results": research_results,
+-                "sources": sources,
+-                "final_answer": summary,
+-            }
++                    "research_results": research_results,
++                    "sources": sources,
++                    "final_answer": summary,
++                }
+         except Exception as e:
+-            logger.error(f"ResearchAgent failed: {e}", exc_info=True)
++            duration = time.time() - start_time
++            logger.error(f"{agent_name} failed, step={step}, error={e}", exc_info=True)
+             return {
+                 "research_results": [],
+                 "sources": [],
+diff --git a/src/agents/validator.py b/src/agents/validator.py
+index 858a700..164d415 100755
+--- a/src/agents/validator.py
++++ b/src/agents/validator.py
+@@ -4,6 +4,7 @@ import py_compile
+ import tempfile
+ import os
+ import json
++import time
+ from typing import Any, Optional, Dict, List, Tuple
+ 
+ from src.config import config
+@@ -42,10 +43,18 @@ class ValidatorAgent(BaseAgent):
+     
+     async def run(self, state: AgentState) -> Dict[str, Any]:
+         """Unified interface: accept state, return validation result incremental update."""
++        agent_name = "ValidatorAgent"
++        state.step_count += 1
++        step = state.step_count
++        logger.info(f"Starting {agent_name}, step={step}")
++        start_time = time.time()
+         code = state.code_generated
+         user_input = state.user_input
+         execution_result = state.execution_result
+         result = await self.validate(code, user_input, execution_result)
++        duration = time.time() - start_time
++        status = "success" if result.get("passed") else "error"
++        logger.info(f"{agent_name} completed, step={step}, status={status}, duration={duration:.2f}")
+         return {
+             "validation_result": result,
+             "final_answer": result.get("feedback", ""),
+diff --git a/src/api/endpoints/execute.py b/src/api/endpoints/execute.py
+index 7360bd1..e24f03b 100755
+--- a/src/api/endpoints/execute.py
++++ b/src/api/endpoints/execute.py
+@@ -60,7 +60,14 @@ async def execute(request: ExecuteRequest) -> AgentResponse:
+         )
+ 
+         workflow = get_workflow()
+-        result = await workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100})
++        try:
++            result = await asyncio.wait_for(
++                workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100}),
++                timeout=600,
++            )
++        except asyncio.TimeoutError:
++            logger.error(f"Execution timed out after 600s for session={session_id}")
++            raise HTTPException(status_code=504, detail="Request timed out (10 minutes)")
+ 
+         execution_result = result.get("execution_result")
+         sources = []
+@@ -109,7 +116,14 @@ async def execute_stream(request: ExecuteRequest) -> dict:
+         )
+ 
+         workflow = get_workflow()
+-        result = await workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100})
++        try:
++            result = await asyncio.wait_for(
++                workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100}),
++                timeout=600,
++            )
++        except asyncio.TimeoutError:
++            logger.error(f"Streaming execution timed out after 600s for session={session_id}")
++            raise HTTPException(status_code=504, detail="Request timed out (10 minutes)")
+ 
+         return {
+             "session_id": session_id,
+diff --git a/src/common/logging.py b/src/common/logging.py
+index 2bb2116..8d7594a 100755
+--- a/src/common/logging.py
++++ b/src/common/logging.py
+@@ -1,11 +1,13 @@
+ import gzip
++import json
+ import logging
+ import os
+ import shutil
+ import sys
++from datetime import datetime, timezone
+ from logging.handlers import RotatingFileHandler
+ from pathlib import Path
+-from typing import Optional
++from typing import Any, Dict, Optional
+ 
+ try:
+     from colorama import Fore, Style, init as colorama_init
+@@ -73,6 +75,31 @@ def _build_color_formatter() -> logging.Formatter:
+     )
+ 
+ 
++class JsonFormatter(logging.Formatter):
++    """JSON 格式日志输出，用于文件日志。"""
++
++    def format(self, record: logging.LogRecord) -> str:
++        log_data: Dict[str, Any] = {
++            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
++            "level": record.levelname,
++            "name": record.name,
++            "message": record.getMessage(),
++        }
++        if hasattr(record, "agent"):
++            log_data["agent"] = record.agent
++        if hasattr(record, "duration"):
++            log_data["duration"] = record.duration
++        if hasattr(record, "status"):
++            log_data["status"] = record.status
++        if hasattr(record, "step"):
++            log_data["step"] = record.step
++        if hasattr(record, "task_id"):
++            log_data["task_id"] = record.task_id
++        if record.exc_info and record.exc_info[1]:
++            log_data["exception"] = self.formatException(record.exc_info)
++        return json.dumps(log_data, ensure_ascii=False)
++
++
+ class CompressedRotatingFileHandler(RotatingFileHandler):
+     """Rotating file handler that compresses old log files with gzip."""
+ 
+@@ -165,11 +192,7 @@ def setup_logging(
+         encoding="utf-8",
+     )
+     file_handler.setLevel(logging.DEBUG)
+-    file_formatter = logging.Formatter(
+-        "%(asctime)s - %(name)s - %(levelname)-8s - %(message)s",
+-        datefmt="%Y-%m-%d %H:%M:%S",
+-    )
+-    file_handler.setFormatter(file_formatter)
++    file_handler.setFormatter(JsonFormatter())
+     logger.addHandler(file_handler)
+ 
+     logger.info(f"Logging initialized: level={config.log_level}, file={log_file}")
+diff --git a/src/orchestrator/state.py b/src/orchestrator/state.py
+index 97ec5c8..532d84a 100755
+--- a/src/orchestrator/state.py
++++ b/src/orchestrator/state.py
+@@ -46,6 +46,7 @@ class AgentState(BaseModel):
+     retry_count: int = 0
+     max_retries: int = 3
+     max_retries_per_subtask: int = 3
++    step_count: int = 0
+     remaining_subtasks: List = []                # 用于 advance_subtask
+     current_subtask_index: int = 0
+     current_subtask_id: str = ""

@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     # PostgreSQL + pgvector
     postgres_host: str = "localhost"
     postgres_port: int = 5432
-    postgres_db: str = "openclaw"
-    postgres_user: str = "openclaw"
-    postgres_password: str = "openclaw123"
+    postgres_db: str = "ai_factory"
+    postgres_user: str = "woami"
+    postgres_password: str = "kali"
     postgres_pool_size: int = 10
     postgres_max_overflow: int = 20
 

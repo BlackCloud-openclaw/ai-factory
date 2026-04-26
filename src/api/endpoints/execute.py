@@ -60,7 +60,14 @@ async def execute(request: ExecuteRequest) -> AgentResponse:
         )
 
         workflow = get_workflow()
-        result = await workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100})
+        try:
+            result = await asyncio.wait_for(
+                workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100}),
+                timeout=600,
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Execution timed out after 600s for session={session_id}")
+            raise HTTPException(status_code=504, detail="Request timed out (10 minutes)")
 
         execution_result = result.get("execution_result")
         sources = []
@@ -109,7 +116,14 @@ async def execute_stream(request: ExecuteRequest) -> dict:
         )
 
         workflow = get_workflow()
-        result = await workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100})
+        try:
+            result = await asyncio.wait_for(
+                workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100}),
+                timeout=600,
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Streaming execution timed out after 600s for session={session_id}")
+            raise HTTPException(status_code=504, detail="Request timed out (10 minutes)")
 
         return {
             "session_id": session_id,

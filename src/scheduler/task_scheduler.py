@@ -139,18 +139,19 @@ class TaskScheduler:
 
         # 1. code / write 类型：生成并执行代码
         if job.subtask_type in ("code", "write"):
-            code_context = {
-                "user_input": job.description,
-                "research_results": [],
-                "subtasks": [job.description]
-            }
-            exec_result = await self.executor.run(code_context, None)
+            from src.orchestrator.state import AgentState
+            temp_state = AgentState(
+                user_input=job.description,
+                research_results=[],
+                subtasks=[job.description]
+            )
+            exec_result = await self.executor.run(temp_state)
             success = exec_result.get("execution_result", {}).get("success", False)
             return {
                 "success": success,
-                "output": exec_result.get("code", ""),
+                "output": exec_result.get("code_generated", ""),  # 注意字段名
                 "execution_result": exec_result.get("execution_result")
-            }
+            }    
 
         # 2. validate 类型：从依赖的 code 任务中提取代码进行验证
         elif job.subtask_type == "validate":
@@ -301,6 +302,19 @@ class TaskScheduler:
                 continue
 
         final_jobs = await self._refresh_jobs(tid)
+        results = {}
+        for job in final_jobs.values():
+            if job.status == TaskStatus.SUCCESS.value and job.result:
+                try:
+                    results[job.subtask_id] = {
+                        "status": "success",
+                        "result": json.loads(job.result)
+                    }
+                except:
+                    results[job.subtask_id] = {"status": "success", "result": job.result}
+            elif job.status == TaskStatus.DEAD_LETTER.value:
+                results[job.subtask_id] = {"status": "failed", "error": job.error}
+    
         success_count = sum(1 for j in final_jobs.values() if j.status == TaskStatus.SUCCESS.value)
         fail_count = sum(1 for j in final_jobs.values() if j.status == TaskStatus.DEAD_LETTER.value)
         logger.info(f"Task {tid} completed: {success_count} success, {fail_count} failed")
@@ -309,4 +323,5 @@ class TaskScheduler:
             "total": len(final_jobs),
             "success": success_count,
             "failed": fail_count,
+            "results": results,      # <-- 这一行必须加上
         }

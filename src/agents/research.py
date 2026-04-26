@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Any, Optional, List, Dict
 
 from src.knowledge.retrieval import KnowledgeRetriever
@@ -37,6 +38,11 @@ class ResearchAgent(BaseAgent):
 
     async def run(self, state: AgentState) -> Dict[str, Any]:
         """Unified interface: accept state, return incremental updates."""
+        agent_name = "ResearchAgent"
+        state.step_count += 1
+        step = state.step_count
+        logger.info(f"Starting {agent_name}, step={step}")
+        start_time = time.time()
         query = state.user_input or state.original_request
         logger.info(f"ResearchAgent running for query: {query[:150]}")
 
@@ -99,12 +105,13 @@ class ResearchAgent(BaseAgent):
                     sources.append({"source_path": r["source"], "type": r.get("type")})
 
             return {
-                "research_results": research_results,
-                "sources": sources,
-                "final_answer": summary,
-            }
+                    "research_results": research_results,
+                    "sources": sources,
+                    "final_answer": summary,
+                }
         except Exception as e:
-            logger.error(f"ResearchAgent failed: {e}", exc_info=True)
+            duration = time.time() - start_time
+            logger.error(f"{agent_name} failed, step={step}, error={e}", exc_info=True)
             return {
                 "research_results": [],
                 "sources": [],

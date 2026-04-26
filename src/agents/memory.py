@@ -27,8 +27,15 @@ class MemoryAgent:
         This is the unified entry point that returns the memory context
         to be merged into the agent state. It does NOT perform any saves.
         """
+        agent_name = "MemoryAgent"
+        state.step_count += 1
+        step = state.step_count
+        logger.info(f"Starting {agent_name}, step={step}")
+        start_time = time.time()
         project_id = state.project_id or state.metadata.get("session_id", "default")
         context = await self.list_all(project_id)
+        duration = time.time() - start_time
+        logger.info(f"{agent_name} completed, step={step}, status=success, duration={duration:.2f}")
         return {"memory_context": context}
 
     async def store(self, project_id: str, key: str, value: Any, metadata: dict = None) -> str:

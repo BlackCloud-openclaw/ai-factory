@@ -100,16 +100,7 @@ def route_after_scheduler(state: AgentState) -> str:
 
     Routes to validate if there's code output, otherwise to save_memory.
     """
-    plan_status = getattr(state, 'plan_status', '')
-    code_generated = getattr(state, 'code_generated', '') or ''
-
-    if plan_status == "failed":
-        return 'save_memory'
-    elif code_generated and len(code_generated.strip()) > 10:
-        return 'validate'
-    else:
-        return 'save_memory'
-
+    return 'save_memory'
 
 def route_after_research(state: AgentState) -> str:
     subtasks = state.subtasks if hasattr(state, 'subtasks') else state.get('subtasks', [])

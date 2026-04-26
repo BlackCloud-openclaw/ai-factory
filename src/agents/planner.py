@@ -1,6 +1,7 @@
 # src/agents/planner.py
 import re
 import json
+import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
@@ -59,6 +60,11 @@ class PlannerAgent(BaseAgent):
         self.llm_model = llm_model
 
     async def run(self, state: AgentState) -> Dict[str, Any]:
+        agent_name = "PlannerAgent"
+        state.step_count += 1
+        step = state.step_count
+        logger.info(f"Starting {agent_name}, step={step}")
+        start_time = time.time()          # 记录开始时间
         user_request = state.original_request or state.user_input
         logger.info(f"Planning task: {user_request[:100]}...")
         try:
@@ -66,17 +72,19 @@ class PlannerAgent(BaseAgent):
             plan = self._parse_response(response)
             plan.original_request = user_request
             plan_dict = plan.dict()
-            # 计算执行顺序（拓扑排序）
             execution_order = self._topological_sort(plan.subtasks)
             plan_dict["execution_order"] = execution_order
+            duration = time.time() - start_time   # 计算耗时
+            logger.info(f"{agent_name} completed, step={step}, status=success, duration={duration:.2f}")
             return {
                 "task_plan": plan_dict,
                 "plan_id": plan.plan_id,
                 "subtasks": [st.description for st in plan.subtasks],
-                "original_request": user_request,  # 确保传递
+                "original_request": user_request,
             }
         except Exception as e:
-            logger.error(f"LLM plan generation failed: {e}")
+            duration = time.time() - start_time
+            logger.error(f"{agent_name} failed, step={step}, error={e}, duration={duration:.2f}")
             logger.warning("Using fallback plan with single subtask")
             fallback_subtask = Subtask(
                 id="task_1",

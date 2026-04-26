@@ -45,7 +45,8 @@ class AgentState(BaseModel):
     # ===== 重试控制 =====
     retry_count: int = 0
     max_retries: int = 3
-    max_retries_per_subtask: int = 3
+    max_retries_per_subtask: int = 2
+    step_count: int = 0
     remaining_subtasks: List = []                # 用于 advance_subtask
     current_subtask_index: int = 0
     current_subtask_id: str = ""
