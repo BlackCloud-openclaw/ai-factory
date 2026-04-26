@@ -15,6 +15,8 @@ from src.common.retry import retry_with_backoff, smart_retry
 from src.orchestrator.state import AgentState
 from src.agents.base import BaseAgent  # 可选，但推荐
 from src.model_router import get_router
+from src.execution.llm_router_pool import get_llm_router_pool
+from src.model_router import get_router
 
 logger = setup_logging("agents.executor")
 
@@ -130,109 +132,49 @@ class ExecutorAgent(BaseAgent):
             "final_answer": result.get("code", ""),
         }        
 
-    async def generate_with_fallback(
-        self,
-        user_input: str,
-        research_results: List[Dict[str, Any]],
-        subtasks: List[str],
-    ) -> str:
-        """Generate code using dynamic model selection, falling back to fallback model."""
-        router = get_router()
-        primary = router.select("code", user_input)   # 根据关键词选择代码模型
-        fallback = router.get_fallback()
-        logger.info(f"Selected primary model: {primary}, fallback: {fallback}")
-
-        try:
-            logger.info(f"Attempting code generation with primary model: {primary}")
-            code = await self._generate_code_with_model(
-                model=primary,
-                user_input=user_input,
-                research_results=research_results,
-                subtasks=subtasks,
-            )
-            if code:
-                logger.info("Code generation succeeded with primary model")
-                return code
-        except Exception as e:
-            logger.warning(f"Primary model {primary} failed: {e}, trying fallback")
-
-        try:
-            logger.info(f"Attempting code generation with fallback model: {fallback}")
-            code = await self._generate_code_with_model(
-                model=fallback,
-                user_input=user_input,
-                research_results=research_results,
-                subtasks=subtasks,
-            )
-            if code:
-                logger.info("Code generation succeeded with fallback model")
-                return code
-        except Exception as e:
-            logger.error(f"Fallback model {fallback} also failed: {e}")
-
-        return ""    
-
-    @smart_retry(max_retries=3, backoff_factor=1.0, fallback_model=None)
-    async def _generate_code_with_model(
-        self,
-        model: str,
-        user_input: str,
-        research_results: List[Dict[str, Any]],
-        subtasks: List[str],
-    ) -> str:
-        """Generate code using a specific LLM model.
-
-        Args:
-            model: Name of the LLM model to use
-            user_input: User's task description
-            research_results: Research results
-            subtasks: List of subtasks
-
-        Returns:
-            Generated Python code string
-
-        Raises:
-            Exception: If LLM call fails
-        """
+    async def _call_llm_for_code(self, model: str, user_input: str, research_results, subtasks) -> str:
+        """供池子调用的实际 LLM 请求函数（包装原 _generate_code_with_model 的逻辑）"""
         from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(
-            api_key="not-needed",
-            base_url=self.llm_api_url,
-        )
-
+        client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
         research_context = self._build_research_context(research_results)
         task_description = f"Task: {user_input}\n\nSubtasks: {'; '.join(subtasks)}"
-
         if research_context:
-            prompt = f"""{task_description}
-
-Research Context:
-{research_context}
-
-Please generate Python code that fulfills the above task, using the research context where applicable."""
+            prompt = f"{task_description}\n\nResearch Context:\n{research_context}\n\nPlease generate Python code."
         else:
-            prompt = f"{task_description}\n\nPlease generate Python code that fulfills the above task."
-
+            prompt = f"{task_description}\n\nPlease generate Python code."
         messages = [
             {"role": "system", "content": CODER_SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ]
-
         response = await client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=0.2,
             max_tokens=config.llm_max_tokens,
         )
-
         raw_output = response.choices[0].message.content or ""
         code = self._extract_code(raw_output)
-
         if not code:
             raise ValueError("No code extracted from LLM response")
-
         return code
+        
+    async def generate_with_fallback(self, user_input: str, research_results, subtasks) -> str:
+        router = get_router()
+        candidates = router.get_candidates(user_input)
+        pool = get_llm_router_pool()
+        last_exception = None
+        for model in candidates:
+            try:
+                logger.info(f"Attempting code generation with model: {model}")
+                code = await pool.call(model, self._call_llm_for_code, user_input, research_results, subtasks)
+                if code:
+                    logger.info(f"Code generation succeeded with model: {model}")
+                    return code
+            except Exception as e:
+                logger.warning(f"Model {model} failed: {e}, trying next candidate")
+                last_exception = e
+        logger.error(f"All candidate models failed: {last_exception}")
+        return ""
 
     def _build_research_context(
         self, research_results: List[Dict[str, Any]]

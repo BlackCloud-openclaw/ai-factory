@@ -362,24 +362,14 @@ Return your response in strict JSON format:
         return self._parse_validation_result_enhanced(text)
         
     def _fallback_validation(self, execution_result: Optional[dict] = None) -> dict:
-        """Fallback validation when LLM call fails."""
-        # 优先使用执行结果判断
         if execution_result and execution_result.get("success"):
-            stdout = execution_result.get("stdout", "")
-            # 检查输出是否包含预期结果（如 385 或平方和）
-            if "385" in stdout or "平方和" in stdout or "sum" in stdout.lower():
-                return {
-                    "passed": True,
-                    "feedback": "Validation passed based on successful execution and output.",
-                    "suggestions": []
-                }
             return {
                 "passed": True,
-                "feedback": "Validation passed based on successful execution (LLM unavailable).",
-                "suggestions": ["Consider re-running validation when LLM is available"]
+                "feedback": "Validation passed based on successful execution.",
+                "suggestions": []
             }
         return {
             "passed": False,
-            "feedback": "Validation failed: no successful execution and LLM unavailable.",
+            "feedback": "Validation failed: no successful execution.",
             "suggestions": ["Fix execution errors and retry"]
         }

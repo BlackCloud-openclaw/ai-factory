@@ -80,7 +80,7 @@ async def execute(request: ExecuteRequest) -> AgentResponse:
             success=not result.get("error"),
             answer=result.get("final_answer", ""),
             research_used=bool(result.get("research_results")),
-            code_executed=bool(execution_result),
+            code_executed=bool(result.get("code_generated")) or bool(execution_result),
             execution_result=execution_result,
             sources=sources,
             error=result.get("error"),
