@@ -3,6 +3,7 @@ import asyncio
 import time
 import subprocess
 import psutil
+import httpx
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
 
@@ -94,6 +95,7 @@ class ModelSlot:
     def release(self):
         self._semaphore.release()
         self.active_tasks -= 1
+        # 注意：此处不更新 last_used，避免干扰空闲判断
 
 
 class LLMRouterPool:
@@ -115,6 +117,7 @@ class LLMRouterPool:
                 memory_gb=cfg.get("memory_gb", 30),
             )
 
+        # 启动后台清理任务（定期停止空闲超时的容器）
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     def register_model(
@@ -145,59 +148,84 @@ class LLMRouterPool:
         except Exception:
             return False
 
-    async def _start_container(self, container_name: str):
+    async def _start_container(self, container_name: str, port: int):
         logger.info(f"Starting container {container_name}")
         subprocess.run(["docker", "start", container_name], capture_output=True, check=False)
-        # 等待服务就绪（可轮询健康检查，此处简单等待）
-        await asyncio.sleep(5)
+
+        # 轮询 /v1/models 端点，最多等待 60 秒
+        health_url = f"http://localhost:{port}/v1/models"
+        async with httpx.AsyncClient() as client:
+            for _ in range(60):
+                try:
+                    resp = await client.get(health_url, timeout=2.0)
+                    if resp.status_code == 200:
+                        logger.info(f"Container {container_name} is ready")
+                        return
+                except Exception:
+                    pass
+                await asyncio.sleep(1)
+        logger.warning(f"Container {container_name} did not become ready within timeout")
 
     async def _stop_container(self, container_name: str):
         logger.info(f"Stopping idle container {container_name}")
         subprocess.run(["docker", "stop", container_name], capture_output=True, check=False)
 
-    async def _ensure_memory_for_model(self, model_name: str) -> bool:
-        """确保有足够内存启动模型，否则尝试驱逐其他空闲容器"""
-        slot = self.model_slots.get(model_name)
-        if not slot:
-            return True  # 未配置内存估算，跳过检查
+    async def stop_idle_containers(self, idle_seconds: int = 60):
+        """主动停止所有空闲且无活动任务的容器（用于内存熔断时调用）"""
+        now = time.time()
+        for slot in self.model_slots.values():
+            if slot.container_name and await self._is_container_running(slot.container_name):
+                if slot.active_tasks == 0 and (now - slot.last_used) > idle_seconds:
+                    await self._stop_container(slot.container_name)
 
-        required_gb = slot.memory_gb
-        required_available = (required_gb + MEMORY_SAFETY_MARGIN_GB) * 1024 * 1024 * 1024
-
-        mem = psutil.virtual_memory()
-        if mem.available >= required_available:
-            return True
-
-        logger.warning(
-            f"Low memory: available={mem.available // (1024**3)}GB, need at least {required_gb + MEMORY_SAFETY_MARGIN_GB}GB. "
-            f"Attempting to evict idle containers."
-        )
-
-        # 收集运行中的其他模型容器（按最后使用时间排序）
+    async def _evict_idle_containers(self, model_name: str, required_available: int) -> bool:
+        """尝试驱逐空闲容器，返回是否释放了足够内存"""
+        EVICTION_IDLE_THRESHOLD = 60
+        now = time.time()
         candidates = []
         for name, s in self.model_slots.items():
             if name == model_name:
                 continue
             if s.container_name and await self._is_container_running(s.container_name):
-                # 只驱逐没有活动任务且空闲时间较长的容器
-                if s.active_tasks == 0:
+                if s.active_tasks == 0 and (now - s.last_used) > EVICTION_IDLE_THRESHOLD:
                     candidates.append((s.last_used, name, s))
-
-        candidates.sort(key=lambda x: x[0])  # 按 last_used 升序（最久未使用优先）
-
+        candidates.sort(key=lambda x: x[0])
         for _, name, s in candidates:
             logger.info(f"Evicting idle container {s.container_name} for model {name} to free memory")
             await self._stop_container(s.container_name)
-            await asyncio.sleep(1)  # 等待内存回收
+            await asyncio.sleep(3)  # 等待内存释放
+            mem = psutil.virtual_memory()
+            if mem.available >= required_available:
+                return True
+        return False
+
+    async def _ensure_memory_for_model(self, model_name: str, max_wait_seconds: int = 300) -> bool:
+        """确保有足够内存启动模型，否则尝试驱逐并等待内存释放"""
+        slot = self.model_slots.get(model_name)
+        if not slot:
+            return True
+
+        required_gb = slot.memory_gb
+        required_available = (required_gb + MEMORY_SAFETY_MARGIN_GB) * 1024 * 1024 * 1024
+
+        start_time = time.time()
+        while True:
             mem = psutil.virtual_memory()
             if mem.available >= required_available:
                 return True
 
-        logger.error(
-            f"Insufficient memory even after eviction. Required: {required_gb + MEMORY_SAFETY_MARGIN_GB}GB, "
-            f"available: {mem.available // (1024**3)}GB"
-        )
-        return False
+            if time.time() - start_time > max_wait_seconds:
+                logger.error(f"Memory insufficient after waiting {max_wait_seconds}s. Required: {required_gb+MEMORY_SAFETY_MARGIN_GB}GB, available: {mem.available//(1024**3)}GB")
+                return False
+
+            # 尝试驱逐空闲容器
+            evicted = await self._evict_idle_containers(model_name, required_available)
+            if evicted:
+                continue
+
+            # 没有可驱逐的容器，等待其他任务释放内存
+            logger.info(f"Waiting for memory to be freed... (required {required_gb+MEMORY_SAFETY_MARGIN_GB}GB, available {mem.available//(1024**3)}GB)")
+            await asyncio.sleep(2)
 
     async def _ensure_model_ready(self, model_name: str):
         """确保模型容器正在运行，如果未运行则先检查内存并启动"""
@@ -209,16 +237,16 @@ class LLMRouterPool:
             # 启动前检查内存
             if not await self._ensure_memory_for_model(model_name):
                 raise RuntimeError(f"Not enough memory to start model {model_name}")
-            await self._start_container(slot.container_name)
+            await self._start_container(slot.container_name, slot.host_port)
 
     async def _cleanup_loop(self):
         """定期停止空闲超时的容器"""
         while True:
             await asyncio.sleep(60)
             now = time.time()
-            for name, slot in self.model_slots.items():
-                if slot.active_tasks == 0 and (now - slot.last_used) > self.idle_timeout and slot.container_name:
-                    if await self._is_container_running(slot.container_name):
+            for slot in self.model_slots.values():
+                if slot.container_name and await self._is_container_running(slot.container_name):
+                    if slot.active_tasks == 0 and (now - slot.last_used) > self.idle_timeout:
                         await self._stop_container(slot.container_name)
 
     def get_base_url(self, model_name: str) -> str:
@@ -226,6 +254,28 @@ class LLMRouterPool:
         if slot and slot.host_port:
             return f"http://localhost:{slot.host_port}"
         return "http://localhost:8081"
+
+    def get_model_load(self, model_name: str) -> float:
+        """返回单个模型的负载（0-1）"""
+        slot = self.model_slots.get(model_name)
+        if slot and slot.max_concurrent > 0:
+            return slot.active_tasks / slot.max_concurrent
+        return 1.0
+
+    def select_best_model(self, candidates: List[str]) -> Optional[str]:
+        """从候选列表中选择负载最低且未满载的模型，返回模型名；如果全部满载则返回 None"""
+        best = None
+        best_load = 1.0
+        for name in candidates:
+            slot = self.model_slots.get(name)
+            if slot is None:
+                continue
+            if slot.active_tasks < slot.max_concurrent:
+                load = slot.active_tasks / slot.max_concurrent
+                if load < best_load:
+                    best_load = load
+                    best = name
+        return best
 
     async def call(
         self,
@@ -284,16 +334,15 @@ class LLMRouterPool:
 
     async def get_stats(self) -> Dict[str, Any]:
         stats = {}
-        async with self._lock:
-            for name, slot in self.model_slots.items():
-                stats[name] = {
-                    "active_tasks": slot.active_tasks,
-                    "max_concurrent": slot.max_concurrent,
-                    "last_used": slot.last_used,
-                    "container": slot.container_name,
-                    "port": slot.host_port,
-                    "memory_gb": slot.memory_gb,
-                }
+        for name, slot in self.model_slots.items():
+            stats[name] = {
+                "active_tasks": slot.active_tasks,
+                "max_concurrent": slot.max_concurrent,
+                "last_used": slot.last_used,
+                "container": slot.container_name,
+                "port": slot.host_port,
+                "memory_gb": slot.memory_gb,
+            }
         return stats
 
     async def shutdown(self):

@@ -2,14 +2,18 @@
 
 import uuid
 import asyncio
+import time
 from typing import Optional
 
+import psutil
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.orchestrator.graph import compile_workflow
 from src.common.models import AgentResponse
 from src.common.logging import setup_logging
+from src.execution.llm_router_pool import get_llm_router_pool
+from src.api.scheduler import get_scheduler
 
 logger = setup_logging("api.execute")
 
@@ -17,6 +21,9 @@ execute_router = APIRouter()
 
 # Compiled workflow (lazy loaded)
 _workflow = None
+
+# 内存熔断冷却（上次清理时间）
+_last_memory_cleanup = 0
 
 
 def get_workflow():
@@ -33,108 +40,91 @@ class ExecuteRequest(BaseModel):
     max_retries: Optional[int] = None
 
 
-@execute_router.post("")
-async def execute(request: ExecuteRequest) -> AgentResponse:
-    """
-    Execute a user request through the AI Factory pipeline.
-
-    The workflow: analyze -> research/code -> validate -> (retry if needed) -> final answer
-    """
-    if not request.user_input.strip():
-        raise HTTPException(status_code=400, detail="user_input cannot be empty")
+async def _run_workflow(request: ExecuteRequest) -> dict:
+    """实际执行工作流的协程，供调度器调用"""
+    from src.orchestrator.state import AgentState
 
     session_id = request.session_id or uuid.uuid4().hex[:8]
     project_id = request.project_id or session_id
     max_retries = request.max_retries or 3
 
-    logger.info(f"Executing request for session={session_id}, project={project_id}: {request.user_input[:150]}")
+    initial_state = AgentState(
+        user_input=request.user_input,
+        project_id=project_id,
+        max_retries=max_retries,
+        metadata={"session_id": session_id, "project_id": project_id},
+    )
 
-    try:
-        from src.orchestrator.state import AgentState
-
-        initial_state = AgentState(
-            user_input=request.user_input,
-            project_id=project_id,
-            max_retries=max_retries,
-            metadata={"session_id": session_id, "project_id": project_id},
-        )
-
-        workflow = get_workflow()
-        try:
-            result = await asyncio.wait_for(
-                workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100}),
-                timeout=600,
-            )
-        except asyncio.TimeoutError:
-            logger.error(f"Execution timed out after 600s for session={session_id}")
-            raise HTTPException(status_code=504, detail="Request timed out (10 minutes)")
-
-        execution_result = result.get("execution_result")
-        sources = []
-        for rr in result.get("research_results", []):
-            if isinstance(rr, dict):
-                for src in rr.get("sources", []):
-                    sources.append(src)
-
-        return AgentResponse(
-            success=not result.get("error"),
-            answer=result.get("final_answer", ""),
-            research_used=bool(result.get("research_results")),
-            code_executed=bool(result.get("code_generated")) or bool(execution_result),
-            execution_result=execution_result,
-            sources=sources,
-            error=result.get("error"),
-        )
-
-    except Exception as e:
-        logger.error(f"Execution failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    workflow = get_workflow()
+    # 总超时 3600 秒（1小时）
+    result = await asyncio.wait_for(
+        workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100}),
+        timeout=3600,
+    )
+    return result
 
 
-@execute_router.post("/stream")
-async def execute_stream(request: ExecuteRequest) -> dict:
+@execute_router.post("")
+async def execute(request: ExecuteRequest) -> AgentResponse:
     """
-    Stream execution results as they become available.
-    Returns a simplified streaming response.
+    Execute a user request through the AI Factory pipeline.
     """
     if not request.user_input.strip():
         raise HTTPException(status_code=400, detail="user_input cannot be empty")
 
     session_id = request.session_id or uuid.uuid4().hex[:8]
     project_id = request.project_id or session_id
+    logger.info(f"Executing request for session={session_id}, project={project_id}: {request.user_input[:150]}")
 
-    logger.info(f"Streaming execution for session={session_id}, project={project_id}")
+    # ========== 内存熔断（两级保护） ==========
+    global _last_memory_cleanup
+    mem = psutil.virtual_memory()
+    pool = get_llm_router_pool()
 
+    # 软熔断：内存使用率 > 88%，尝试清理空闲容器
+    if mem.percent > 88:
+        now = time.time()
+        if now - _last_memory_cleanup > 30:   # 每 30 秒最多清理一次
+            await pool.stop_idle_containers()
+            _last_memory_cleanup = now
+            mem = psutil.virtual_memory()     # 重新获取内存状态
+
+    # 硬熔断：内存使用率 > 92%，直接拒绝新请求
+    if mem.percent > 92:
+        logger.warning(f"Memory overloaded: {mem.percent}%, rejecting request")
+        raise HTTPException(status_code=503, detail="System memory overloaded, please retry later")
+
+    # ========== 通过优先级调度器提交任务 ==========
+    # 根据用户输入简单判断优先级（数字越小优先级越高）
+    lower_input = request.user_input.lower()
+    if any(kw in lower_input for kw in ["写代码", "函数", "斐波那契", "计算"]):
+        priority = 1   # 代码生成高优先级
+    elif any(kw in lower_input for kw in ["写小说", "故事", "雨夜"]):
+        priority = 3   # 写作低优先级
+    else:
+        priority = 2
+
+    scheduler = get_scheduler()
     try:
-        from src.orchestrator.state import AgentState
-
-        initial_state = AgentState(
-            user_input=request.user_input,
-            project_id=project_id,
-            max_retries=3,
-            metadata={"session_id": session_id, "project_id": project_id},
-        )
-
-        workflow = get_workflow()
-        try:
-            result = await asyncio.wait_for(
-                workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100}),
-                timeout=600,
-            )
-        except asyncio.TimeoutError:
-            logger.error(f"Streaming execution timed out after 600s for session={session_id}")
-            raise HTTPException(status_code=504, detail="Request timed out (10 minutes)")
-
-        return {
-            "session_id": session_id,
-            "success": not result.get("error"),
-            "final_answer": result.get("final_answer", ""),
-            "research_used": bool(result.get("research_results")),
-            "code_executed": bool(result.get("execution_result")),
-            "retry_count": result.get("retry_count", 0),
-            "error": result.get("error"),
-        }
-
+        result = await scheduler.submit(priority, _run_workflow, request)
     except Exception as e:
-        logger.error(f"Streaming execution failed: {e}", exc_info=True)
+        logger.error(f"Scheduler submission failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    # ========== 构建响应 ==========
+    execution_result = result.get("execution_result")
+    sources = []
+    for rr in result.get("research_results", []):
+        if isinstance(rr, dict):
+            for src in rr.get("sources", []):
+                sources.append(src)
+
+    return AgentResponse(
+        success=not result.get("error"),
+        answer=result.get("final_answer", ""),
+        research_used=bool(result.get("research_results")),
+        code_executed=bool(result.get("code_generated")) or bool(execution_result),
+        execution_result=execution_result,
+        sources=sources,
+        error=result.get("error"),
+    )

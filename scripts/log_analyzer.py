@@ -28,12 +28,28 @@ def load_logs():
                 pass  # skip malformed lines
 
 
+def percentile(data, p):
+    """Calculate the p-th percentile (0-100) of a list of numbers."""
+    if not data:
+        return None
+    sorted_data = sorted(data)
+    n = len(sorted_data)
+    rank = (p / 100.0) * (n - 1)
+    lower = int(rank)
+    upper = lower + 1
+    if upper >= n:
+        return sorted_data[lower]
+    weight = rank - lower
+    return sorted_data[lower] * (1 - weight) + sorted_data[upper] * weight
+
+
 def analyze():
     agent_durations = defaultdict(list)
     agent_errors = defaultdict(int)
     step_counts = defaultdict(list)
     total_requests = 0
     success_requests = 0
+    all_durations = []   # 收集所有请求的耗时用于 P99
 
     for log in load_logs():
         if log.get("level") == "INFO" and "completed" in log.get("message", ""):
@@ -41,6 +57,7 @@ def analyze():
             duration = log.get("duration")
             if agent and duration is not None:
                 agent_durations[agent].append(duration)
+                all_durations.append(duration)
                 total_requests += 1
                 if log.get("status") == "success":
                     success_requests += 1
@@ -66,9 +83,16 @@ def analyze():
     for step in sorted(step_counts.keys()):
         print(f"Step {step:2} : {len(step_counts[step])} occurrences")
 
-    print(f"\n=== Overall ===")
-    print(f"Total completed requests: {total_requests}")
-    print(f"Success rate: {success_requests/total_requests*100:.1f}%" if total_requests else "N/A")
+    # 计算全局 P99 耗时
+    if all_durations:
+        p99 = percentile(all_durations, 99)
+        print(f"\n=== Overall ===")
+        print(f"Total completed requests: {total_requests}")
+        print(f"Success rate: {success_requests/total_requests*100:.1f}%" if total_requests else "N/A")
+        print(f"P99 duration: {p99:.2f}s")
+    else:
+        print("\n=== Overall ===")
+        print("No completed requests found.")
 
 
 if __name__ == "__main__":
