@@ -12,8 +12,6 @@ logger = setup_logging("execution.llm_pool")
 
 @dataclass
 class PoolStats:
-    """Pool statistics."""
-
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
@@ -23,18 +21,7 @@ class PoolStats:
 
 
 class LLMPool:
-    """LLM connection pool with concurrent request management.
-
-    Uses a semaphore to limit concurrent LLM calls and a bounded queue
-    to prevent overwhelming the LLM backend.
-    """
-
-    def __init__(
-        self,
-        max_concurrent: int = 4,
-        max_queue_size: int = 20,
-        timeout: int = 120,
-    ):
+    def __init__(self, max_concurrent: int = 4, max_queue_size: int = 20, timeout: int = 120):
         self.max_concurrent = max_concurrent
         self.max_queue_size = max_queue_size
         self.timeout = timeout
@@ -46,28 +33,7 @@ class LLMPool:
         self._started_at = time.time()
         self._running = True
 
-    async def execute(
-        self,
-        func: Callable,
-        *args: Any,
-        model: Optional[str] = None,
-        **kwargs: Any,
-    ) -> Any:
-        """Execute an LLM call with concurrency control.
-
-        Args:
-            func: Async callable to execute (e.g., openai.ChatCompletion.create)
-            *args: Positional arguments for the callable
-            model: Optional model name override
-            **kwargs: Keyword arguments for the callable
-
-        Returns:
-            Result of the callable
-
-        Raises:
-            asyncio.TimeoutError: If execution exceeds timeout
-            asyncio.QueueFull: If queue is full and request is rejected
-        """
+    async def execute(self, func: Callable, *args: Any, model: Optional[str] = None, **kwargs: Any) -> Any:
         if not self._running:
             self._stats.rejected_requests += 1
             raise RuntimeError("LLM pool is shut down")
@@ -84,10 +50,7 @@ class LLMPool:
                     if model:
                         kwargs["model"] = model
 
-                    result = await asyncio.wait_for(
-                        func(*args, **kwargs),
-                        timeout=self.timeout,
-                    )
+                    result = await asyncio.wait_for(func(*args, **kwargs), timeout=self.timeout)
 
                     async with self._lock:
                         self._stats.successful_requests += 1
@@ -98,7 +61,7 @@ class LLMPool:
                         self._stats.timed_out_requests += 1
                     raise
 
-                except Exception as e:
+                except Exception:
                     async with self._lock:
                         self._stats.failed_requests += 1
                     raise
@@ -109,13 +72,7 @@ class LLMPool:
                 self._stats.active_requests -= 1
 
     def get_stats(self) -> Dict[str, Any]:
-        """Return pool statistics.
-
-        Returns:
-            Dictionary with pool stats
-        """
         uptime = time.time() - self._started_at
-
         return {
             "max_concurrent": self.max_concurrent,
             "max_queue_size": self.max_queue_size,
@@ -127,24 +84,13 @@ class LLMPool:
             "timed_out_requests": self._stats.timed_out_requests,
             "rejected_requests": self._stats.rejected_requests,
             "active_requests": self._stats.active_requests,
-            "success_rate": (
-                round(
-                    self._stats.successful_requests
-                    / max(self._stats.total_requests, 1)
-                    * 100,
-                    1,
-                )
-                if self._stats.total_requests
-                else 0.0
-            ),
+            "success_rate": round(self._stats.successful_requests / max(self._stats.total_requests, 1) * 100, 1) if self._stats.total_requests else 0.0,
         }
 
     async def shutdown(self) -> None:
-        """Shutdown the pool."""
         self._running = False
         logger.info("LLM pool shutting down")
 
     def reset_stats(self) -> None:
-        """Reset all statistics."""
         self._stats = PoolStats()
         self._started_at = time.time()

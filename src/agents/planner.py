@@ -8,9 +8,11 @@ from pydantic import BaseModel, Field
 
 from src.config import config
 from src.common.logging import setup_logging
-from src.common.retry import retry_with_backoff
 from src.agents.base import BaseAgent
 from src.orchestrator.state import AgentState
+from src.model_router import get_router
+from src.execution.llm_router_pool import get_llm_router_pool
+from src.config import config
 
 logger = setup_logging("agents.planner")
 
@@ -20,7 +22,7 @@ class Subtask(BaseModel):
     description: str
     type: str = "code"
     dependencies: List[str] = Field(default_factory=list)
-    required_tools: List[str] = Field(default_factory=list)  # 兼容原计划
+    required_tools: List[str] = Field(default_factory=list)
 
 class TaskPlan(BaseModel):
     plan_id: str
@@ -28,6 +30,7 @@ class TaskPlan(BaseModel):
     subtasks: List[Subtask]
     created_at: datetime = Field(default_factory=datetime.now)
 
+# 注意：所有 JSON 示例中的大括号必须转义为双括号，只有 {user_request} 是真正的占位符
 PLANNER_PROMPT = """You are a Task Planner. Break down the user request into a sequence of subtasks (each with a type, description, and dependencies). Use only these types: code, research, validate.
 
 Return ONLY a valid JSON object with this structure:
@@ -55,26 +58,25 @@ User request: {user_request}
 """
 
 class PlannerAgent(BaseAgent):
-    def __init__(self, llm_api_url: str = config.llm_api_url, llm_model: str = config.llm_model_name):
-        self.llm_api_url = llm_api_url
-        self.llm_model = llm_model
+    def __init__(self):
+        pass
 
     async def run(self, state: AgentState) -> Dict[str, Any]:
         agent_name = "PlannerAgent"
         state.step_count += 1
         step = state.step_count
         logger.info(f"Starting {agent_name}, step={step}")
-        start_time = time.time()          # 记录开始时间
+        start_time = time.time()
         user_request = state.original_request or state.user_input
         logger.info(f"Planning task: {user_request[:100]}...")
         try:
-            response = await self._call_llm(user_request)
+            response = await self._call_llm_with_fallback(user_request)
             plan = self._parse_response(response)
             plan.original_request = user_request
             plan_dict = plan.dict()
             execution_order = self._topological_sort(plan.subtasks)
             plan_dict["execution_order"] = execution_order
-            duration = time.time() - start_time   # 计算耗时
+            duration = time.time() - start_time
             logger.info(f"{agent_name} completed, step={step}, status=success, duration={duration:.2f}")
             return {
                 "task_plan": plan_dict,
@@ -106,13 +108,28 @@ class PlannerAgent(BaseAgent):
                 "subtasks": [user_request],
             }
 
-    @retry_with_backoff(max_retries=2, base_delay=1.0)
-    async def _call_llm(self, user_request: str) -> str:
+    async def _call_llm_with_fallback(self, user_request: str) -> str:
+        router = get_router()
+        candidates = router.get_candidates(user_request)
+        pool = get_llm_router_pool()
+        try:
+            return await pool.call_with_fallback(
+                candidates,
+                self._plan_request,
+                user_request,
+                timeout=config.llm_timeout_planning
+            )
+        except Exception as e:
+            logger.error(f"All candidate models failed for planning: {e}")
+            raise
+
+    async def _plan_request(self, model: str, user_request: str, base_url: Optional[str] = None) -> str:
         from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
+        api_url = base_url or config.llm_api_url
+        client = AsyncOpenAI(api_key="not-needed", base_url=api_url)
         prompt = PLANNER_PROMPT.format(user_request=user_request)
         response = await client.chat.completions.create(
-            model=self.llm_model,
+            model=model,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that outputs only JSON. No extra text."},
                 {"role": "user", "content": prompt}
@@ -128,29 +145,36 @@ class PlannerAgent(BaseAgent):
         return content
 
     def _parse_response(self, response: str) -> TaskPlan:
+        # 原有思路基础上，增加自动补全括号的逻辑
         response = response.strip()
+        # 提取代码块
         match = re.search(r'```json\s*([\s\S]*?)\s*```', response, re.DOTALL)
         if match:
             response = match.group(1).strip()
+        # 找到第一个 { 和匹配的 }，如果到最后都不匹配则补全
         start = response.find('{')
         if start == -1:
             raise ValueError("No JSON object found")
         brace_count = 0
         end = start
-        for i, ch in enumerate(response[start:]):
+        for i, ch in enumerate(response[start:], start):
             if ch == '{':
                 brace_count += 1
             elif ch == '}':
                 brace_count -= 1
                 if brace_count == 0:
-                    end = start + i + 1
+                    end = i
                     break
-        if end == start:
-            raise ValueError("Unbalanced braces")
-        json_str = response[start:end]
+        else:
+            # 未找到匹配的结束括号，尝试补全
+            end = len(response) - 1
+            # 补全缺失的 } 并继续解析
+            response = response[:end+1] + '}' * brace_count
+        json_str = response[start:end+1]
         json_str = re.sub(r',\s*}', '}', json_str)
         json_str = re.sub(r',\s*]', ']', json_str)
         data = json.loads(json_str)
+        # ... 后续不变
         subtasks = []
         for st in data.get("subtasks", []):
             subtasks.append(Subtask(

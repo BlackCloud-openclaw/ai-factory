@@ -1,6 +1,7 @@
 # src/scheduler/task_scheduler.py
 import asyncio
 import json
+import re
 import time
 import uuid
 from typing import Any, Dict, List, Optional
@@ -40,24 +41,29 @@ class TaskJob:
     started_at: Optional[float] = None
     completed_at: Optional[float] = None
 
+
 class TaskScheduler:
+    """任务调度器，使用全局连接池单例"""
+    _pool: Optional[asyncpg.Pool] = None   # 类级别共享连接池
+
     def __init__(self, dsn: Optional[str] = None, max_concurrent: int = 3, max_retries: int = 2):
         self.dsn = dsn or config.postgres_dsn
         self.max_concurrent = max_concurrent
         self.max_retries = max_retries
-        self._pool: Optional[asyncpg.Pool] = None
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self.current_task_id: str = ""
         self.executor = ExecutorAgent()
 
     async def _init_pool(self):
-        if not self._pool:
-            self._pool = await asyncpg.create_pool(self.dsn, min_size=1, max_size=10)
+        """初始化连接池（只执行一次）"""
+        if TaskScheduler._pool is None:
+            TaskScheduler._pool = await asyncpg.create_pool(self.dsn, min_size=1, max_size=10)
             await self._create_table()
-            logger.info("Task scheduler PostgreSQL pool initialized")
+            logger.info("Task scheduler PostgreSQL pool initialized (singleton)")
+        return TaskScheduler._pool
 
     async def _create_table(self):
-        async with self._pool.acquire() as conn:
+        async with TaskScheduler._pool.acquire() as conn:
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS task_jobs (
                     id TEXT PRIMARY KEY,
@@ -84,7 +90,8 @@ class TaskScheduler:
             task_id = f"task_{uuid.uuid4().hex[:12]}"
         self.current_task_id = task_id
         now = time.time()
-        async with self._pool.acquire() as conn:
+        pool = TaskScheduler._pool
+        async with pool.acquire() as conn:
             async with conn.transaction():
                 for st in plan.subtasks:
                     job_id = f"{task_id}_{st.id}"
@@ -100,7 +107,8 @@ class TaskScheduler:
     async def _refresh_jobs(self, task_id: str) -> Dict[str, TaskJob]:
         await self._init_pool()
         jobs = {}
-        async with self._pool.acquire() as conn:
+        pool = TaskScheduler._pool
+        async with pool.acquire() as conn:
             rows = await conn.fetch("SELECT * FROM task_jobs WHERE task_id = $1", task_id)
             for row in rows:
                 job = TaskJob(
@@ -124,7 +132,8 @@ class TaskScheduler:
         return jobs
 
     async def _update_job(self, job: TaskJob):
-        async with self._pool.acquire() as conn:
+        pool = TaskScheduler._pool
+        async with pool.acquire() as conn:
             await conn.execute("""
                 UPDATE task_jobs
                 SET status=$1, result=$2, error=$3, retry_count=$4,
@@ -134,10 +143,10 @@ class TaskScheduler:
                 job.updated_at, job.started_at, job.completed_at, job.id)
 
     async def _execute_subtask(self, job: TaskJob) -> Dict[str, Any]:
-        """执行子任务，支持 code、validate、research 等类型。"""
+        """执行子任务，支持 code、validate、research 等类型"""
         logger.info(f"Executing subtask {job.subtask_id} (type={job.subtask_type}): {job.description[:100]}")
 
-        # 1. code / write 类型：生成并执行代码
+        # 1. code / write 类型
         if job.subtask_type in ("code", "write"):
             from src.orchestrator.state import AgentState
             temp_state = AgentState(
@@ -149,16 +158,17 @@ class TaskScheduler:
             success = exec_result.get("execution_result", {}).get("success", False)
             return {
                 "success": success,
-                "output": exec_result.get("code_generated", ""),  # 注意字段名
+                "output": exec_result.get("code_generated", ""),
                 "execution_result": exec_result.get("execution_result")
-            }    
+            }
 
-        # 2. validate 类型：从依赖的 code 任务中提取代码进行验证
+        # 2. validate 类型
         elif job.subtask_type == "validate":
             if not job.dependencies:
                 return {"success": False, "error": "Validate task has no dependency"}
             dep_id = job.dependencies[0]
-            async with self._pool.acquire() as conn:
+            pool = TaskScheduler._pool
+            async with pool.acquire() as conn:
                 dep_row = await conn.fetchrow(
                     "SELECT result, status FROM task_jobs WHERE task_id = $1 AND subtask_id = $2",
                     job.task_id, dep_id
@@ -167,17 +177,39 @@ class TaskScheduler:
                 return {"success": False, "error": f"Dependency {dep_id} not successful or missing"}
 
             dep_result = json.loads(dep_row["result"]) if dep_row["result"] else {}
-            # 兼容多种字段名提取代码
-            code_to_validate = (
-                dep_result.get("output") or
-                dep_result.get("code") or
-                dep_result.get("execution_result", {}).get("code") or
-                ""
-            )
-            logger.info(f"Extracted code for validation (length={len(code_to_validate)}): {code_to_validate[:200]}...")
-            if not code_to_validate:
-                logger.warning(f"Dependency result content (first 500 chars): {dep_row['result'][:500] if dep_row['result'] else 'None'}")
 
+            # 增强代码提取逻辑
+            code_to_validate = None
+            # 路径1: dep_result.get("result", {}).get("output")
+            if not code_to_validate:
+                code_to_validate = dep_result.get("result", {}).get("output")
+            # 路径2: dep_result.get("output")
+            if not code_to_validate:
+                code_to_validate = dep_result.get("output")
+            # 路径3: dep_result.get("code_generated")
+            if not code_to_validate:
+                code_to_validate = dep_result.get("code_generated")
+            # 路径4: dep_result.get("execution_result", {}).get("code")
+            if not code_to_validate:
+                code_to_validate = dep_result.get("execution_result", {}).get("code")
+            # 路径5: 遍历所有字段，找包含代码特征的字符串
+            if not code_to_validate:
+                for key, value in dep_result.items():
+                    if isinstance(value, str) and ("def " in value or "```python" in value) and len(value) > 50:
+                        code_to_validate = value
+                        break
+            # 路径6: 从执行输出的 stdout 中提取代码块
+            if not code_to_validate and dep_result.get("execution_result", {}).get("stdout"):
+                stdout = dep_result["execution_result"]["stdout"]
+                match = re.search(r"```python\n(.*?)```", stdout, re.DOTALL)
+                if match:
+                    code_to_validate = match.group(1).strip()
+
+            if not code_to_validate:
+                logger.warning(f"Failed to extract code from dependency result, keys: {list(dep_result.keys())}")
+                return {"success": False, "error": "No code found in dependency result"}
+
+            logger.info(f"Extracted code for validation (length={len(code_to_validate)})")
             from src.agents.validator import ValidatorAgent
             validator = ValidatorAgent()
             validation = await validator.validate(
@@ -189,8 +221,8 @@ class TaskScheduler:
                 "success": validation.get("passed", False),
                 "output": validation
             }
-            
-     
+
+        # 3. research 类型
         elif job.subtask_type == "research":
             from src.agents.research import ResearchAgent
             from src.orchestrator.state import AgentState
@@ -211,11 +243,9 @@ class TaskScheduler:
                     "success": False,
                     "type": "research",
                     "error": str(e)
-                }    
-           
-        # 3. research 或其他类型（可扩展）
+                }
+
         else:
-            # 这里可以添加对 research 等类型的处理
             logger.info(f"Unhandled subtask type '{job.subtask_type}', treating as success")
             return {"success": True, "output": "Not implemented"}
 
@@ -314,7 +344,7 @@ class TaskScheduler:
                     results[job.subtask_id] = {"status": "success", "result": job.result}
             elif job.status == TaskStatus.DEAD_LETTER.value:
                 results[job.subtask_id] = {"status": "failed", "error": job.error}
-    
+
         success_count = sum(1 for j in final_jobs.values() if j.status == TaskStatus.SUCCESS.value)
         fail_count = sum(1 for j in final_jobs.values() if j.status == TaskStatus.DEAD_LETTER.value)
         logger.info(f"Task {tid} completed: {success_count} success, {fail_count} failed")
@@ -323,5 +353,12 @@ class TaskScheduler:
             "total": len(final_jobs),
             "success": success_count,
             "failed": fail_count,
-            "results": results,      # <-- 这一行必须加上
+            "results": results,
         }
+
+    async def shutdown(self):
+        """关闭连接池（应用退出时调用）"""
+        if TaskScheduler._pool:
+            await TaskScheduler._pool.close()
+            TaskScheduler._pool = None
+            logger.info("Task scheduler connection pool closed")

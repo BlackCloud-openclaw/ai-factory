@@ -1,3 +1,5 @@
+# src/agents/research.py
+import asyncio
 import json
 import time
 from typing import Any, Optional, List, Dict
@@ -10,6 +12,7 @@ from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff
 from src.agents.base import BaseAgent
 from src.orchestrator.state import AgentState
+from src.config import config
 
 logger = setup_logging("agents.research")
 
@@ -24,7 +27,8 @@ class ResearchAgent(BaseAgent):
         enable_web_search: bool = True,
     ):
         self.retriever = retriever or KnowledgeRetriever()
-        self.reranker = reranker or Reranker()
+        # 禁用 Reranker，避免网络依赖
+        self.reranker = None  # 原为 reranker or Reranker()
         self.llm_api_url = llm_api_url
         self.llm_model = llm_model
         self.top_k = top_k
@@ -37,7 +41,6 @@ class ResearchAgent(BaseAgent):
         )
 
     async def run(self, state: AgentState) -> Dict[str, Any]:
-        """Unified interface: accept state, return incremental updates."""
         agent_name = "ResearchAgent"
         state.step_count += 1
         step = state.step_count
@@ -47,11 +50,9 @@ class ResearchAgent(BaseAgent):
         logger.info(f"ResearchAgent running for query: {query[:150]}")
 
         try:
-            # 1. Retrieve from local knowledge base
             local_chunks = await self.retriever.search(query, k=self.top_k)
             logger.info(f"Local KB returned {len(local_chunks)} chunks")
 
-            # 2. If web search is enabled and local results are insufficient, fetch from web
             web_results = []
             if self.enable_web_search and len(local_chunks) < 2:
                 try:
@@ -60,7 +61,6 @@ class ResearchAgent(BaseAgent):
                 except Exception as e:
                     logger.warning(f"Web search failed: {e}")
 
-            # 3. Combine and rerank
             all_results = []
             for c in local_chunks:
                 all_results.append({
@@ -82,15 +82,16 @@ class ResearchAgent(BaseAgent):
                 research_results = []
                 sources = []
             else:
-                # 4. Rerank using cross-encoder (if available)
+                # Reranker 已禁用，跳过重排序
                 if self.reranker and len(all_results) > 1:
                     try:
-                        all_results = await self.reranker.rerank(query, all_results, top_k=5)
+                        all_results = await asyncio.to_thread(
+                            self.reranker.rerank, query, all_results, 5
+                        )
                         logger.info(f"Reranked results, kept top {len(all_results)}")
                     except Exception as e:
                         logger.warning(f"Reranker failed: {e}")
 
-                # 5. Build context and generate summary via LLM (with fallback)
                 context = self._build_context(all_results)
                 summary = await self._summarize(query, context) or "Summary generation failed, but search results are available."
                 research_results = []
@@ -105,10 +106,10 @@ class ResearchAgent(BaseAgent):
                     sources.append({"source_path": r["source"], "type": r.get("type")})
 
             return {
-                    "research_results": research_results,
-                    "sources": sources,
-                    "final_answer": summary,
-                }
+                "research_results": research_results,
+                "sources": sources,
+                "final_answer": summary,
+            }
         except Exception as e:
             duration = time.time() - start_time
             logger.error(f"{agent_name} failed, step={step}, error={e}", exc_info=True)
@@ -140,6 +141,7 @@ class ResearchAgent(BaseAgent):
                 messages=messages,
                 temperature=0.2,
                 max_tokens=config.llm_max_tokens,
+                timeout=config.llm_timeout_research,
             )
             return response.choices[0].message.content or "No summary generated."
         except Exception as e:

@@ -1,7 +1,6 @@
 # src/agents/executor.py
 import uuid
 import time
-import tempfile
 import os
 import re
 from typing import Any, Dict, List, Optional
@@ -14,6 +13,7 @@ from src.common.logging import setup_logging
 from src.orchestrator.state import AgentState
 from src.agents.base import BaseAgent
 from src.model_router import get_router
+from src.config import config
 
 logger = setup_logging("agents.executor")
 
@@ -103,17 +103,36 @@ class ExecutorAgent(BaseAgent):
         subtasks: List[str],
     ) -> str:
         router = get_router()
-        candidates = router.get_candidates(user_input)
+        code_candidates = router.get_candidates(user_input)   # 正常获取 code 列表
         pool = get_llm_router_pool()
+        
+        # 第一次尝试：code 模型列表
         try:
             return await pool.call_with_fallback(
-                candidates,
+                code_candidates,
                 self._call_llm_for_code,
-                user_input, research_results, subtasks
+                user_input, research_results, subtasks,
+                timeout=config.llm_timeout_coding
             )
         except Exception as e:
-            logger.error(f"All candidate models failed: {e}")
-            return ""
+            logger.warning(f"All code models failed: {e}, falling back to research models")
+        
+        # 第二次尝试：research 模型列表
+        research_candidates = router.candidates.get("research", [])
+        if research_candidates:
+            try:
+                return await pool.call_with_fallback(
+                    research_candidates,
+                    self._call_llm_for_code,
+                    user_input, research_results, subtasks,
+                    timeout=config.llm_timeout_coding                
+                )
+            except Exception as e:
+                logger.warning(f"Research models also failed: {e}")
+        else:
+            logger.warning("No research models available")
+        
+        return ""
 
     async def _call_llm_for_code(
         self,

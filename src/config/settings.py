@@ -21,14 +21,19 @@ class Settings(BaseSettings):
     postgres_max_overflow: int = 20
 
     # Sandbox
-    sandbox_timeout: int = 30
+    sandbox_timeout: int = 120
     sandbox_cpu_limit: float = 1.0
     sandbox_memory_limit: int = 512  # MB
     sandbox_network_enabled: bool = False
 
     # LLM Pool
     llm_max_concurrent: int = 4
-    llm_timeout: int = 120
+    llm_timeout: int = 600               # 全局默认超时提高到 600 秒
+    llm_timeout_planning: int = 300      # 规划任务 5分钟
+    llm_timeout_coding: int = 900        # 代码生成 15分钟
+    llm_timeout_validation: int = 180    # 验证 3分钟
+    llm_timeout_research: int = 120      # 研究 2分钟
+    
 
     # Tools
     tools_dir: str = "/tmp/ai_factory/tools"

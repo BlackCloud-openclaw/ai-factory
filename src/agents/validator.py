@@ -12,6 +12,7 @@ from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff
 from src.agents.base import BaseAgent
 from src.orchestrator.state import AgentState
+from src.config import config
 
 logger = setup_logging("agents.validator")
 
@@ -166,6 +167,7 @@ Return your response in strict JSON format:
                 ],
                 temperature=0.1,
                 max_tokens=1024,
+                timeout=config.llm_timeout_validation,
             )
             raw_output = response.choices[0].message.content or ""
             parsed_result = self._parse_validation_result_enhanced(raw_output)
