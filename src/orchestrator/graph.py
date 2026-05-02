@@ -131,6 +131,10 @@ def route_after_validate(state: AgentState) -> str:
     # 获取剩余子任务
     remaining = getattr(state, 'remaining_subtasks', [])
     
+    # ========== 新增：验证失败且还有重试次数时，回到 code 节点重新生成 ==========
+    if not validation_passed and retry_count < max_retries:
+        return "code"   # 让代码重新生成，并携带错误反馈
+    
     if validation_passed:
         return 'advance_subtask' if remaining else 'save_memory'
     else:
@@ -228,6 +232,7 @@ def create_workflow() -> StateGraph:
             "save_memory": "save_memory",
             "research": "research",
             "advance_subtask": "advance_subtask",
+            "code": "code",   # 新增：验证失败重试时回到 code 节点
         },
     )
 

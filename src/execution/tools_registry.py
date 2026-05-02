@@ -33,7 +33,10 @@ class ToolsRegistry:
     a dict with at least: name, description, module_path, function_name.
     """
 
-    def __init__(self, tools_dir: str = "/tmp/ai_factory/tools"):
+    def __init__(self, tools_dir: str = None):
+        if tools_dir is None:
+            base = Path(__file__).parent.parent.parent
+            tools_dir = base / "src" / "tools"
         self.tools_dir = Path(tools_dir)
         self.tools_dir.mkdir(parents=True, exist_ok=True)
 

@@ -12,7 +12,7 @@ from src.common.logging import setup_logging
 logger = setup_logging("execution.llm_router_pool")
 
 MODEL_CONFIG = {
-    "Qwen3-Coder-30B-A3B-Instruct-Q5_K_M": {
+    "Qwen2.5-Coder-32B-Instruct-Q5_K_M": {
         "container": "llamacpp-coder",
         "port": 8081,
         "max_concurrent": 1,
@@ -166,7 +166,7 @@ class LLMRouterPool:
                     resp = await client.post(inference_url, json=test_payload, timeout=5.0)
                     if resp.status_code == 200:
                         logger.info(f"Container {container_name} model is ready for inference")
-                        await asyncio.sleep(5)    # 额外缓冲，避免 503
+                        await asyncio.sleep(15)    # 额外缓冲，避免 503
                         return
                     elif resp.status_code == 503:
                         logger.info(f"Container {container_name} still loading (503), waiting...")
@@ -336,11 +336,13 @@ class LLMRouterPool:
         logger.error(f"Model {model_name} call failed after {max_retries} attempts: {type(last_exception).__name__}: {str(last_exception)}", exc_info=True)
         raise last_exception
 
-    async def call_with_fallback(self, model_candidates: List[str], func: Callable, *args,timeout:Optional[int]=None, **kwargs) -> Any:
+    async def call_with_fallback(self, model_candidates: List[str], func: Callable, *args,**kwargs) -> Any:
+        # 禁止外部传递 base_url，由内部决定
+        kwargs.pop('base_url', None)
         last_exception = None
         for model in model_candidates:
             try:
-                return await self.call(model, func, *args,timeout=timeout, **kwargs)
+                return await self.call(model, func, *args, **kwargs)
             except Exception as e:
                 logger.warning(f"Model {model} failed: {type(e).__name__}: {str(e)}", exc_info=True)
                 last_exception = e

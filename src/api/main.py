@@ -55,9 +55,9 @@ async def lifespan(app: FastAPI):
         pool = get_llm_router_pool()
         # 选择你最常用的 1-2 个模型，例如代码模型和写作模型
         warm_models = [
-            #"Qwen3.6-35B-A3B-UD-Q5_K_M", 
-            "Qwen3.6-27B-Q5_K_M",   
-            "Qwen3-Coder-30B-A3B-Instruct-Q5_K_M",
+            "Qwen3.6-35B-A3B-UD-Q5_K_M", 
+            #"Qwen3.6-27B-Q5_K_M",   
+            "Qwen2.5-Coder-32B-Instruct-Q5_K_M",
         ]
         logger.info(f"Warming up models: {warm_models}")
         # 使用 warmup_models 方法（顺序启动，避免内存瞬间占满）

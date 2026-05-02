@@ -5,6 +5,7 @@ import tempfile
 import os
 import json
 import time
+import ast
 from typing import Any, Optional, Dict, List, Tuple
 
 from src.config import config
@@ -17,18 +18,41 @@ from src.config import config
 logger = setup_logging("agents.validator")
 
 VALIDATOR_SYSTEM_PROMPT = """You are a code quality validator. Your job is to verify whether generated code:
-1. Correctly implements the user's requirements
-2. Is syntactically and logically correct
-3. Handles edge cases appropriately
-4. Follows Python best practices
 
-Analyze the code carefully against the user request and execution results.
-Return your evaluation in strict JSON format with these exact keys:
+1. Correctly implements the user's requirements (focus on main functionality)
+2. Is syntactically and logically correct (but for tool modules, if it executes successfully, consider it logically correct)
+3. Handles edge cases appropriately (only basic checks)
+4. Follows Python best practices (basic only)
+
+Return your evaluation in **strict JSON format** with these exact keys:
 {
     "passed": true/false,
-    "feedback": "detailed explanation of validation result",
-    "suggestions": ["list", "of", "improvement", "suggestions"]
-}"""
+    "feedback": "detailed explanation",
+    "suggestions": ["improvement1", "improvement2"]
+}
+
+== AI Factory ToolsRegistry Specification (MUST follow when the task is about creating a tool) ==
+
+If the user request asks for a tool that can be registered into AI Factory ToolsRegistry, the **only** criteria for passing are:
+
+- The code MUST include a function `get_tool_info()` returning a dict with keys: "name", "description", "module_path", "function_name", "parameters".
+- The module MUST implement the function named by `function_name` (the main function).
+- The code MUST NOT contain `if __name__ == "__main__":` block.
+- The code MUST NOT contain any test code (unittest, pytest, manual test calls).
+- The code MUST NOT define any class (only functions).
+- The code MUST NOT use decorators (e.g., `@register_tool`).
+- The code MUST NOT create a custom registry (e.g., `tools_registry = {}`).
+- **Imports are allowed ONLY from Python standard library** (e.g., `urllib`, `json`, `re`, `typing`, `datetime`, `math`, `os`, `sys`, `pathlib`, etc.). Reject imports like `requests`, `bs4`, `scrapy`, `aiohttp`, `httpx`.
+
+**Important**: Do NOT reject code for minor logical issues like exception handling details, as long as the code executes successfully and the main functionality works. The user will test the tool. If execution result shows success (no errors), you should generally pass the validation.
+
+If the user request is **not** about tool creation, ignore the above tool-specific rules and focus on functional correctness and code quality.
+
+You must consider execution results if provided (e.g., stdout/stderr). If the code executed successfully and no obvious fatal errors exist, it likely passes.
+
+Be strict about missing required functions, prohibited patterns (classes, test code, etc.), and non-standard library imports. Be lenient on code style and minor error handling improvements.
+
+Return ONLY valid JSON, no extra text."""
 
 
 class ValidatorAgent(BaseAgent):
@@ -94,6 +118,7 @@ class ValidatorAgent(BaseAgent):
             "feedback": feedback,
             "suggestions": suggestions,
         }
+        
 
     def _check_syntax(self, code: str) -> Tuple[bool, str]:
         """Check code syntax using py_compile."""
@@ -375,3 +400,5 @@ Return your response in strict JSON format:
             "feedback": "Validation failed: no successful execution.",
             "suggestions": ["Fix execution errors and retry"]
         }
+
+    

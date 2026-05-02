@@ -1,0 +1,40 @@
+# Web framework
+fastapi
+uvicorn[standard]
+pydantic-settings
+
+# Orchestration & LLM
+langgraph
+langchain-core
+langchain-community
+openai
+
+# RAG & Knowledge
+llama-index-core
+llama-index-embeddings-huggingface
+sentence-transformers
+
+# Database
+psycopg2-binary
+pgvector
+asyncpg
+
+# Docker
+docker
+
+# Utilities
+python-dotenv
+orjson
+psutil
+httpx
+ddgs
+slowapi
+colorama
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov
+
+# Code quality
+black

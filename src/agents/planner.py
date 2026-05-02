@@ -54,6 +54,9 @@ Return ONLY a valid JSON object with this structure:
     ]
 }}
 
+Special instruction for tool creation tasks:
+If the user request is about creating a tool that can be registered into AI Factory ToolsRegistry (keywords: 工具、tool、注册、ToolsRegistry), the validate subtask MUST NOT ask for testing code. Instead, the description should be: "验证代码是否符合 ToolsRegistry 规范：包含 get_tool_info() 和主函数，无测试代码、无类、无装饰器、无非标准库导入。"
+
 User request: {user_request}
 """
 

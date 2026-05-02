@@ -4,16 +4,16 @@ from typing import List, Optional
 # 每个任务类型只保留最可靠的模型（按你的环境调整）
 MODEL_CANDIDATES = {
     "code": [
-        "Qwen3-Coder-30B-A3B-Instruct-Q5_K_M",   # 代码专用
+        "Qwen2.5-Coder-32B-Instruct-Q5_K_M",   # 代码专用
     ],
     "writing": [
         "Qwen3.6-27B-Q5_K_M",                    # 写作专用
     ],
     "research": [
-        "DeepSeek-R1-Distill-Qwen-32B-Q5_K_M",   # 通用，适合研究
+        "DeepSeek-R1-Distill-Llama-70B-Q5_K_M",  # 通用，适合研究
     ],
     "validate": [
-        "Qwen3.5-9B-Q4_K_M",                     # 轻量，用于验证
+        "DeepSeek-R1-Distill-Qwen-32B-Q5_K_M",  # 轻量，用于验证
     ],
     "plan": [
         "Qwen3.6-35B-A3B-UD-Q5_K_M",

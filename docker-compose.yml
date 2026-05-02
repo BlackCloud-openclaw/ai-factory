@@ -60,17 +60,17 @@ services:
       - /home/data/llama-models:/models:ro
       - /home/data/docker/llama-models.ini:/presets/config.ini:ro
     environment:
-      - GGML_HIPBLAS=on
+      - GGML_HIPBLAS=on # 启用 AMD GPU 加速
       - LLAMA_SET_ROWS=1
       - ROCBLAS_USE_HIPBLASLT=1
       - HSA_ENABLE_SDMA=0
       - HSA_OVERRIDE_GFX_VERSION=11.0.0
     command: >-
-      -m /models/Qwen3-Coder-30B-A3B-Instruct-Q5_K_M.gguf
-      --preset /presets/config.ini
+      -m /models/Qwen2.5-Coder-32B-Instruct-Q5_K_M.gguf
+      --models-preset /presets/config.ini
       --host 0.0.0.0
       --port 8080
-      --flash-attn
+      --flash-attn on
       -ngl -1
       --threads 16
       --threads-batch 32
@@ -87,284 +87,54 @@ services:
     profiles: ["manual"]
     restart: unless-stopped
     ports:
-      - "8082:8080"
+      - "8082:8080"  # 将容器的8080端口映射到宿主机的8081端口
     volumes:
       - /home/data/llama-models:/models:ro
       - /home/data/docker/llama-models.ini:/presets/config.ini:ro
     environment:
-      - GGML_HIPBLAS=on
+      - GGML_HIPBLAS=on # 启用 AMD GPU 加速
       - LLAMA_SET_ROWS=1
       - ROCBLAS_USE_HIPBLASLT=1
       - HSA_ENABLE_SDMA=0
       - HSA_OVERRIDE_GFX_VERSION=11.0.0
     command: >-
       -m /models/Qwen3.6-27B-Q5_K_M.gguf
-      --preset /presets/config.ini
+      --models-preset /presets/config.ini
       --host 0.0.0.0
       --port 8080
-      --flash-attn
+      --flash-attn on
       -ngl -1
       --threads 16
       --threads-batch 32
       --no-mmap
-    devices:version: "3.9"
-
-services:
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: ai_factory_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: openclaw
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: openclaw123
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
-      interval: 5sversion: "3.9"
-
-services:version: "3.9"
-
-services:
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: ai_factory_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: openclaw
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: openclaw123
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_factory_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=openclaw
-      - POSTGRES_USER=openclaw
-      - POSTGRES_PASSWORD=openclaw123
-    depends_on:
-      postgres:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-volumes:
-  postgres_data:
-
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: ai_factory_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: openclaw
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: openclaw123
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_factory_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=openclaw
-      - POSTGRES_USER=openclaw
-      - POSTGRES_PASSWORD=openclaw123
-    depends_on:
-      postgres:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-volumes:
-  postgres_data:
-
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_factory_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=openclaw
-      - POSTGRES_USER=openclaw
-      - POSTGRES_PASSWORD=openclaw123
-    depends_on:
-      postgres:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-volumes:
-  postgres_data:
-
+    devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
     networks:
       - ai_factory_net
-
+      
   llamacpp-default:
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
     container_name: llamacpp-default
     profiles: ["manual"]
     restart: unless-stopped
     ports:
-      - "8083:8080"
+      - "8083:8080"  # 将容器的8080端口映射到宿主机的8081端口
     volumes:
       - /home/data/llama-models:/models:ro
       - /home/data/docker/llama-models.ini:/presets/config.ini:ro
     environment:
-      - GGML_HIPBLAS=on
+      - GGML_HIPBLAS=on # 启用 AMD GPU 加速
       - LLAMA_SET_ROWS=1
       - ROCBLAS_USE_HIPBLASLT=1
       - HSA_ENABLE_SDMA=0
       - HSA_OVERRIDE_GFX_VERSION=11.0.0
     command: >-
       -m /models/Qwen3.6-35B-A3B-UD-Q5_K_M.gguf
-      --preset /presets/config.ini
+      --models-preset /presets/config.ini
       --host 0.0.0.0
-      --port 8080version: "3.9"
-
-services:
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: ai_factory_postgresversion: "3.9"
-
-services:
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: ai_factory_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: openclaw
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: openclaw123
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_factory_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=openclaw
-      - POSTGRES_USER=openclaw
-      - POSTGRES_PASSWORD=openclaw123
-    depends_on:
-      postgres:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-volumes:
-  postgres_data:
-
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: openclaw
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: openclaw123
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_factory_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=openclaw
-      - POSTGRES_USER=openclaw
-      - POSTGRES_PASSWORD=openclaw123
-    depends_on:
-      postgres:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-volumes:
-  postgres_data:
-
-      --flash-attn
+      --port 8080
+      --flash-attn on
       -ngl -1
       --threads 16
       --threads-batch 32
@@ -374,29 +144,29 @@ volumes:
       - /dev/dri:/dev/dri
     networks:
       - ai_factory_net
-
+      
   llamacpp-fast:
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
     container_name: llamacpp-fast
     profiles: ["manual"]
     restart: unless-stopped
     ports:
-      - "8084:8080"
+      - "8084:8080"  # 将容器的8080端口映射到宿主机的8081端口
     volumes:
       - /home/data/llama-models:/models:ro
       - /home/data/docker/llama-models.ini:/presets/config.ini:ro
     environment:
-      - GGML_HIPBLAS=on
+      - GGML_HIPBLAS=on # 启用 AMD GPU 加速
       - LLAMA_SET_ROWS=1
       - ROCBLAS_USE_HIPBLASLT=1
       - HSA_ENABLE_SDMA=0
       - HSA_OVERRIDE_GFX_VERSION=11.0.0
     command: >-
       -m /models/Qwen3.5-9B-Q4_K_M.gguf
-      --preset /presets/config.ini
+      --models-preset /presets/config.ini
       --host 0.0.0.0
       --port 8080
-      --flash-attn
+      --flash-attn on
       -ngl -1
       --threads 16
       --threads-batch 32
@@ -405,168 +175,30 @@ volumes:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
     networks:
-      - ai_factory_net
-
+      - ai_factory_net   
+      
   llamacpp-reasoning:
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
-    container_name: llamacpp-reasoningversion: "3.9"
-
-services:
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: ai_factory_postgresversion: "3.9"
-
-services:
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: ai_factory_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: openclaw
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: openclaw123
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_factory_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=openclaw
-      - POSTGRES_USER=openclaw
-      - POSTGRES_PASSWORD=openclaw123
-    depends_on:
-      postgres:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-volumes:
-  postgres_data:
-
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: openclaw
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: openclaw123
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_factory_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=openclaw
-      - POSTGRES_USER=openclaw
-      - POSTGRES_PASSWORD=openclaw123
-    depends_on:
-      postgres:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-volumes:
-  postgres_data:
-
+    container_name: llamacpp-reasoning
     profiles: ["manual"]
     restart: unless-stopped
     ports:
-      - "8085:8080"
+      - "8085:8080"  # 将容器的8080端口映射到宿主机的8081端口
     volumes:
       - /home/data/llama-models:/models:ro
       - /home/data/docker/llama-models.ini:/presets/config.ini:ro
     environment:
-      - GGML_HIPBLAS=on
+      - GGML_HIPBLAS=on # 启用 AMD GPU 加速
       - LLAMA_SET_ROWS=1
       - ROCBLAS_USE_HIPBLASLT=1
       - HSA_ENABLE_SDMA=0
-      - HSA_OVERRIDE_GFX_VERSION=11.0.0version: "3.9"
-
-services:
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: ai_factory_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: openclaw
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: openclaw123
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_factory_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=openclaw
-      - POSTGRES_USER=openclaw
-      - POSTGRES_PASSWORD=openclaw123
-    depends_on:
-      postgres:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-volumes:
-  postgres_data:
-
+      - HSA_OVERRIDE_GFX_VERSION=11.0.0
     command: >-
       -m /models/DeepSeek-R1-Distill-Qwen-32B-Q5_K_M.gguf
-      --preset /presets/config.ini
+      --models-preset /presets/config.ini
       --host 0.0.0.0
       --port 8080
-      --flash-attn
+      --flash-attn on
       -ngl -1
       --threads 16
       --threads-batch 32
@@ -575,30 +207,30 @@ volumes:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
     networks:
-      - ai_factory_net
-
+      - ai_factory_net 
+      
   llamacpp-deepseek70b:
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
     container_name: llamacpp-deepseek70b
     profiles: ["manual"]
     restart: unless-stopped
     ports:
-      - "8086:8080"
+      - "8086:8080"  # 将容器的8080端口映射到宿主机的8081端口
     volumes:
       - /home/data/llama-models:/models:ro
       - /home/data/docker/llama-models.ini:/presets/config.ini:ro
     environment:
-      - GGML_HIPBLAS=on
+      - GGML_HIPBLAS=on # 启用 AMD GPU 加速
       - LLAMA_SET_ROWS=1
       - ROCBLAS_USE_HIPBLASLT=1
       - HSA_ENABLE_SDMA=0
       - HSA_OVERRIDE_GFX_VERSION=11.0.0
     command: >-
       -m /models/DeepSeek-R1-Distill-Llama-70B-Q5_K_M.gguf
-      --preset /presets/config.ini
+      --models-preset /presets/config.ini
       --host 0.0.0.0
       --port 8080
-      --flash-attn
+      --flash-attn on
       -ngl -1
       --threads 16
       --threads-batch 32
@@ -608,75 +240,29 @@ volumes:
       - /dev/dri:/dev/dri
     networks:
       - ai_factory_net
-
+      
   llamacpp-qwen122b:
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
-    container_name: llamacpp-qwen122bversion: "3.9"
-
-services:
-  postgres:
-    image: pgvector/pgvector:pg17
-    container_name: ai_factory_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: openclaw
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: openclaw123
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_factory_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8081}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen3.6-35B-A3B-UD-Q5_K_M}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=openclaw
-      - POSTGRES_USER=openclaw
-      - POSTGRES_PASSWORD=openclaw123
-    depends_on:
-      postgres:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-volumes:
-  postgres_data:
-
+    container_name: llamacpp-qwen122b
     profiles: ["manual"]
     restart: unless-stopped
     ports:
-      - "8087:8080"
+      - "8087:8080"  # 将容器的8080端口映射到宿主机的8081端口
     volumes:
       - /home/data/llama-models:/models:ro
       - /home/data/docker/llama-models.ini:/presets/config.ini:ro
     environment:
-      - GGML_HIPBLAS=on
+      - GGML_HIPBLAS=on # 启用 AMD GPU 加速
       - LLAMA_SET_ROWS=1
       - ROCBLAS_USE_HIPBLASLT=1
       - HSA_ENABLE_SDMA=0
       - HSA_OVERRIDE_GFX_VERSION=11.0.0
     command: >-
       -m /models/Qwen3.5-122B-A10B-Q4_K_M-00001-of-00003.gguf
-      --preset /presets/config.ini
+      --models-preset /presets/config.ini
       --host 0.0.0.0
       --port 8080
-      --flash-attn
+      --flash-attn on
       -ngl -1
       --threads 16
       --threads-batch 32
@@ -690,6 +276,4 @@ volumes:
 networks:
   ai_factory_net:
     driver: bridge
-
-volumes:
-  postgres_data:
+ 
