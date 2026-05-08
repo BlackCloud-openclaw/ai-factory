@@ -16,43 +16,37 @@ MODEL_CONFIG = {
         "container": "llamacpp-coder",
         "port": 8081,
         "max_concurrent": 1,
-        "memory_gb": 35,
+        "memory_gb": 28,          # 文件22G + 推理开销 → 28G
     },
-    "Qwen3.6-27B-Q5_K_M": {
+    "Qwen3.5-122B-A10B-Q4_K_M": {
         "container": "llamacpp-writing",
         "port": 8082,
         "max_concurrent": 1,
-        "memory_gb": 30,
-    },
-    "Qwen3.6-35B-A3B-UD-Q5_K_M": {
-        "container": "llamacpp-default",
-        "port": 8083,
-        "max_concurrent": 1,
-        "memory_gb": 40,
-    },
-    "Qwen3.5-9B-Q4_K_M": {
-        "container": "llamacpp-fast",
-        "port": 8084,
-        "max_concurrent": 1,
-        "memory_gb": 10,
-    },
-    "DeepSeek-R1-Distill-Qwen-32B-Q5_K_M": {
-        "container": "llamacpp-reasoning",
-        "port": 8085,
-        "max_concurrent": 1,
-        "memory_gb": 35,
+        "memory_gb": 90,          # 文件87G + 推理开销 → 90G
     },
     "DeepSeek-R1-Distill-Llama-70B-Q5_K_M": {
-        "container": "llamacpp-deepseek70b",
+        "container": "llamacpp-research",
+        "port": 8083,
+        "max_concurrent": 1,
+        "memory_gb": 60,          # 文件47G + 推理开销 → 60G
+    },
+    "DeepSeek-R1-Distill-Qwen-32B-Q5_K_M": {
+        "container": "llamacpp-validate",
+        "port": 8084,
+        "max_concurrent": 1,
+        "memory_gb": 28,          # 文件22G + 推理开销 → 28G
+    },
+    "Qwen3-32B-Q5_K_M": {
+        "container": "llamacpp-plan",
+        "port": 8085,
+        "max_concurrent": 1,
+        "memory_gb": 28,          # 文件22G + 推理开销 → 28G
+    },
+    "Qwen3.6-27B-Q5_K_M": {
+        "container": "llamacpp-default",
         "port": 8086,
         "max_concurrent": 1,
-        "memory_gb": 70,
-    },
-    "Qwen3.5-122B-A10B-Q4_K_M": {
-        "container": "llamacpp-qwen122b",
-        "port": 8087,
-        "max_concurrent": 1,
-        "memory_gb": 80,
+        "memory_gb": 24,          # 文件19G + 推理开销 → 24G
     },
 }
 

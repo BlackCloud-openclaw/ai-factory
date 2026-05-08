@@ -86,5 +86,5 @@ _scheduler: PriorityScheduler = None
 def get_scheduler() -> PriorityScheduler:
     global _scheduler
     if _scheduler is None:
-        _scheduler = PriorityScheduler(worker_count=3, max_retries=10, task_timeout=1800)
+        _scheduler = PriorityScheduler(worker_count=3, max_retries=10, task_timeout=3600)
     return _scheduler

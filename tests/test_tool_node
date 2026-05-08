@@ -1,0 +1,34 @@
+import pytest
+from unittest.mock import AsyncMock, patch
+from src.orchestrator.state import AgentState
+from src.orchestrator.nodes import tool_node_v2
+from src.writing.events import Event
+
+@pytest.mark.asyncio
+async def test_tool_node_v2_applies_event():
+    state = AgentState(
+        metadata={"novel_id": "test_novel"},
+        pending_tool_calls=[
+            {"tool": "update_character", "args": {"name": "林风", "realm": "筑基"}}
+        ],
+        current_state={}
+    )
+    # Mock database pool and event store
+    with patch("src.orchestrator.nodes.get_db_pool") as mock_pool:
+        mock_conn = AsyncMock()
+        mock_pool.return_value = mock_conn
+        # Mock EventStore.insert_event to return a sequence
+        with patch("src.orchestrator.nodes.EventStore") as MockEventStore:
+            mock_store = MockEventStore.return_value
+            mock_store.load_snapshot.return_value = ({}, 0)
+            mock_store.load_events.return_value = []
+            mock_store.insert_event.return_value = 1
+            # Mock ToolsRegistry
+            with patch("src.orchestrator.nodes.ToolsRegistry") as MockRegistry:
+                mock_tool = AsyncMock(return_value=Event.new("character_update", {"name": "林风", "updates": {"realm": "筑基"}}, "test_novel"))
+                MockRegistry.return_value.get_tool_function.return_value = mock_tool
+
+                result = await tool_node_v2(state)
+                assert result["pending_tool_calls"] == []
+                assert len(result["applied_events"]) == 1
+                assert result["current_state"]["characters"]["林风"]["realm"] == "筑基"

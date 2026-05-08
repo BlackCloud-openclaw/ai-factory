@@ -10,6 +10,7 @@ class AgentState(BaseModel):
     user_input: str = ""
     original_request: str = ""          # 与 user_input 等效，便于 planner 使用
     project_id: str = ""                # 记忆隔离
+    novel_id: Optional[str] = None      # 新增：当前小说ID（用于写作场景）
     metadata: Dict[str, Any] = {}
 
     # ===== 消息历史 =====
@@ -55,9 +56,37 @@ class AgentState(BaseModel):
     # ===== 节点跟踪与错误 =====
     current_node: str = ""
     error: Optional[str] = None
+    
+    # ===== 验证模式 =====
+    validation_mode: str = "code"   # 新增，默认代码验证模式
 
     # ===== 记忆上下文 =====
     memory_context: Dict[str, Any] = {}
+    
+    # ===== 事件溯源与状态缓存（用于小说写作）=====
+    pending_tool_calls: List[Dict[str, Any]] = []   # 待处理的工具调用
+    applied_events: List[Any] = []                  # 已应用的事件（可选）
+    current_state: Dict[str, Any] = {}              # 当前状态缓存
+    last_sequence_id: int = 0                       # 最新事件 sequence_id
+    
+    # ===== 小说写作专用字段 =====
+
+    chapter_id: Optional[str] = None
+    resume: bool = False                 # 新增：是否从上次中断处继续
+    task_type: str = "code"                     # code, novel_outline, scene_plan
+    outline: Optional[Dict[str, Any]] = None    # 小说大纲
+    current_volume: int = 1
+    current_chapter: int = 1
+    current_scene: int = 1
+    scene_plan: Optional[Dict[str, Any]] = None # 当前场景计划
+    scene_plan_list: List[Dict[str, Any]] = []   # 存储当前章的所有场景计划（列表）
+    # 当前卷/章的场景需求 （可选，可从大纲中读取）
+    total_chapters_in_volume: int = 0       # 当前卷的总章节数（由大纲确定）
+    total_scenes_in_chapter: int = 0        # 当前章的总场景数（由 plan_node 设置）
+    current_scene_index: int = 0                # 当前正在生成的场景索引（0-based）
+    _chapter_finished: bool = False   # 临时标志，表示当前章节已完成（用于路由）
+    writing_constraints: Optional[Dict[str, Any]] = None  # 写前约束
+    scene_text: str = ""                         # 生成的场景正文
 
     # ===== 兼容旧字段（保留，逐步废弃） =====
     skip_remaining: bool = False

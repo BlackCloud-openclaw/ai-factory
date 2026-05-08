@@ -86,6 +86,8 @@ def get_tool_info():
 """
 
 class ExecutorAgent(BaseAgent):
+    task_type = "code"
+    
     def __init__(
         self,
         sandbox: Optional[CodeSandbox] = None,
@@ -156,17 +158,19 @@ class ExecutorAgent(BaseAgent):
         user_input: str,
         research_results: List[Dict[str, Any]],
         subtasks: List[str],
-        previous_validation: Optional[Dict[str, Any]] = None,   # 新增
+        previous_validation: Optional[Dict[str, Any]] = None,
     ) -> str:
+        from src.model_router import get_router
+        from src.execution.llm_router_pool import get_llm_router_pool
+
         router = get_router()
-        code_candidates = router.get_candidates(user_input)   # 正常获取 code 列表
         pool = get_llm_router_pool()
-            
+
         # 确保 previous_validation 是字典
         if previous_validation is None:
-            previous_validation = {}    
-            
-        # 如果有上一次验证失败的信息，构造一个附加提示
+            previous_validation = {}
+
+        # 构造验证失败提示
         previous_error_prompt = ""
         if previous_validation and not previous_validation.get("passed", True):
             feedback = previous_validation.get("feedback", "")
@@ -175,37 +179,40 @@ class ExecutorAgent(BaseAgent):
                 previous_error_prompt = f"\n\n[上一次生成的代码验证失败，错误信息: {feedback}]"
                 if suggestions:
                     previous_error_prompt += f"\n[改进建议: {'; '.join(suggestions)}]"
-                previous_error_prompt += "\n请根据上述错误信息重新生成正确的代码。"    
-                
+                previous_error_prompt += "\n请根据上述错误信息重新生成正确的代码。"
+
         # 创建绑定了 extra_prompt 的函数
         bound_func = partial(self._call_llm_for_code, extra_prompt=previous_error_prompt)
-        
-        # 第一次尝试：code 模型列表
-        try:
-            return await pool.call_with_fallback(
-                code_candidates,
-                bound_func,
-                user_input, research_results, subtasks,
-                timeout=config.llm_timeout_coding,
-            )
-        except Exception as e:
-            logger.warning(f"All code models failed: {e}, falling back to research models")
-        
-        # 第二次尝试：research 模型列表
-        research_candidates = router.candidates.get("research", [])
+
+        # 1. 首先尝试 code 模型（固定）
+        code_model = router.get_model_for_task("code")
+        code_candidates = [code_model] if code_model else []
+        if code_candidates:
+            try:
+                return await pool.call_with_fallback(
+                    code_candidates,
+                    bound_func,
+                    user_input, research_results, subtasks,
+                    timeout=config.llm_timeout_coding,
+                )
+            except Exception as e:
+                logger.warning(f"Code model {code_model} failed: {e}, falling back to research model")
+
+        # 2. 降级：尝试 research 模型（固定）
+        research_model = router.get_model_for_task("research")
+        research_candidates = [research_model] if research_model else []
         if research_candidates:
             try:
                 return await pool.call_with_fallback(
                     research_candidates,
-                    bound_func,  # 使用同一个绑定了 extra_prompt 的函数
+                    bound_func,
                     user_input, research_results, subtasks,
-                    timeout=config.llm_timeout_coding                
+                    timeout=config.llm_timeout_coding,
                 )
             except Exception as e:
-                logger.warning(f"Research models also failed: {e}")
-        else:
-            logger.warning("No research models available")
-        
+                logger.warning(f"Research model also failed: {e}")
+
+        logger.error("No valid model available for code generation")
         return ""
 
     async def _call_llm_for_code(

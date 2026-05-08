@@ -13,6 +13,7 @@ from src.orchestrator.state import AgentState
 from src.model_router import get_router
 from src.execution.llm_router_pool import get_llm_router_pool
 from src.config import config
+from src.prompts.planner_prompts import PROMPT_REGISTRY
 
 logger = setup_logging("agents.planner")
 
@@ -63,53 +64,96 @@ User request: {user_request}
 class PlannerAgent(BaseAgent):
     def __init__(self):
         pass
-
+                
     async def run(self, state: AgentState) -> Dict[str, Any]:
         agent_name = "PlannerAgent"
         state.step_count += 1
         step = state.step_count
         logger.info(f"Starting {agent_name}, step={step}")
         start_time = time.time()
-        user_request = state.original_request or state.user_input
-        logger.info(f"Planning task: {user_request[:100]}...")
+
+        task_type = getattr(state, 'task_type', 'code')
+        builder = PROMPT_REGISTRY.get(task_type)
+        if not builder:
+            builder = PROMPT_REGISTRY["code"]   # fallback
+
+        prompt = builder.build(state)
+
         try:
-            response = await self._call_llm_with_fallback(user_request)
-            plan = self._parse_response(response)
-            plan.original_request = user_request
-            plan_dict = plan.dict()
-            execution_order = self._topological_sort(plan.subtasks)
-            plan_dict["execution_order"] = execution_order
+            response = await self._plan_request_with_prompt(prompt, task_type)
+            result = builder.parse_response(response)
+            logger.debug(f"Raw LLM response for task_type={task_type}: {response[:500]}")
+
+            # 如果 scene_plan 是列表，包装为字典
+            if task_type == "scene_plan" and isinstance(result, list):
+                result = {"scenes": result}
+
             duration = time.time() - start_time
             logger.info(f"{agent_name} completed, step={step}, status=success, duration={duration:.2f}")
             return {
-                "task_plan": plan_dict,
-                "plan_id": plan.plan_id,
-                "subtasks": [st.description for st in plan.subtasks],
-                "original_request": user_request,
+                "plan_result": result,
+                "task_plan": result if task_type == "code" else None,
+                "outline": result if task_type == "novel_outline" else None,
+                "scene_plan": result if task_type == "scene_plan" else None,
+                "error": None,
             }
         except Exception as e:
             duration = time.time() - start_time
             logger.error(f"{agent_name} failed, step={step}, error={e}, duration={duration:.2f}")
-            logger.warning("Using fallback plan with single subtask")
-            fallback_subtask = Subtask(
-                id="task_1",
-                name="Execute request",
-                description=user_request,
-                type="code",
-                dependencies=[]
-            )
-            fallback_plan = TaskPlan(
-                plan_id="fallback",
-                original_request=user_request,
-                subtasks=[fallback_subtask]
-            )
-            plan_dict = fallback_plan.dict()
-            plan_dict["execution_order"] = ["task_1"]
-            return {
-                "task_plan": plan_dict,
-                "plan_id": "fallback",
-                "subtasks": [user_request],
-            }
+            return {"plan_result": {}, "error": str(e)}
+
+   
+    async def _plan_request_with_prompt(self, prompt: str, task_type: str) -> str:
+        """直接发送自定义 prompt 给 LLM，返回原始响应。
+        
+        Args:
+            prompt: 构造好的提示词
+            task_type: 任务类型 (code, novel_outline, scene_plan等)
+        """
+        from src.model_router import get_router
+        from src.execution.llm_router_pool import get_llm_router_pool
+        from src.config import config
+
+        router = get_router()
+        pool = get_llm_router_pool()
+
+        # 根据任务类型确定使用的模型
+        if task_type in ("scene_plan", "novel_outline"):
+            # 计划和提纲生成使用 plan 模型
+            model_name = router.get_model_for_task("plan")
+            candidates = [model_name]
+        elif task_type == "code":
+            model_name = router.get_model_for_task("code")
+            candidates = [model_name]
+        else:
+            # 降级：使用默认模型
+            model_name = router.get_model_for_task("default")
+            candidates = [model_name]
+
+        async def _call_llm(model, *args, **kwargs):
+            logger.info(f"Planner using model: {model}")
+            from openai import AsyncOpenAI
+            api_url = kwargs.get('base_url', config.llm_api_url)
+            client = AsyncOpenAI(api_key="not-needed", base_url=api_url)
+            try:
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2,
+                    max_tokens=2048
+                )
+                message = response.choices[0].message
+                content = message.content or ""
+                if not content and hasattr(message, "reasoning_content"):
+                    content = message.reasoning_content or ""
+                logger.info(f"LLM response length: {len(content)}")
+                return content
+            except Exception as e:
+                logger.error(f"LLM call failed: {e}")
+                raise
+
+        return await pool.call_with_fallback(candidates, _call_llm, timeout=config.llm_timeout_planning)
+    
 
     async def _call_llm_with_fallback(self, user_request: str) -> str:
         router = get_router()

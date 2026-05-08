@@ -14,6 +14,7 @@ from src.common.models import AgentResponse
 from src.common.logging import setup_logging
 from src.execution.llm_router_pool import get_llm_router_pool
 from src.api.scheduler import get_scheduler
+from src.db import get_db_pool
 
 # 全局并发控制（最多同时运行 2 个工作流）
 _global_workflow_semaphore = asyncio.Semaphore(2)
@@ -41,22 +42,71 @@ class ExecuteRequest(BaseModel):
     session_id: Optional[str] = None
     project_id: Optional[str] = None
     max_retries: Optional[int] = None
+    # 新增小说相关字段
+    task_type: str = "code"           # "code" / "novel_outline" / "scene_plan"
+    novel_id: Optional[str] = None    # 用于续写时指定哪部小说
+    resume: bool = False              # 是否从上次中断处继续
 
 
 async def _run_workflow(request: ExecuteRequest) -> dict:
     """实际执行工作流的协程，供调度器调用"""
     from src.orchestrator.state import AgentState
+    from src.db import get_db_pool
+    import json
 
     session_id = request.session_id or uuid.uuid4().hex[:8]
     project_id = request.project_id or session_id
     max_retries = request.max_retries or 3
 
+    # 构建初始状态
     initial_state = AgentState(
         user_input=request.user_input,
         project_id=project_id,
         max_retries=max_retries,
         metadata={"session_id": session_id, "project_id": project_id},
+        task_type=request.task_type,
+        novel_id=request.novel_id,
+        resume=request.resume,
     )
+
+    # 如果是场景计划或续写，且提供了 novel_id，则从数据库加载大纲
+    if request.task_type in ("scene_plan", "novel_outline") and request.novel_id:
+        pool = get_db_pool()
+        if pool:
+            try:
+                async with pool.acquire() as conn:
+                    row = await conn.fetchrow(
+                        """SELECT outline, current_volume, current_chapter, current_scene
+                        FROM novels WHERE novel_id = $1""",
+                        request.novel_id
+                    )
+                    if row:
+                        outline = json.loads(row["outline"])
+                        initial_state.outline = outline
+
+                        # 获取当前卷的索引（注意数据库存储的 current_volume 从 1 开始）
+                        current_vol = row["current_volume"] or 1
+                        volumes = outline.get("volumes", [])
+                        if 0 <= current_vol - 1 < len(volumes):
+                            total_chapters = len(volumes[current_vol - 1].get("chapters", []))
+                        else:
+                            total_chapters = 0
+                        initial_state.total_chapters_in_volume = total_chapters
+
+                        # 恢复进度
+                        initial_state.current_volume = current_vol
+                        initial_state.current_chapter = row["current_chapter"] or 1
+                        # current_scene 存储已完成场景数，current_scene_index 是 0‑based 索引
+                        completed_scenes = row["current_scene"] or 0
+                        initial_state.current_scene = completed_scenes
+                        initial_state.current_scene_index = completed_scenes
+
+                        logger.info(f"Loaded outline for novel {request.novel_id}, "
+                                    f"volume={initial_state.current_volume}, "
+                                    f"chapter={initial_state.current_chapter}, "
+                                    f"scene_index={initial_state.current_scene_index}")
+            except Exception as e:
+                logger.error(f"Failed to load outline for novel {request.novel_id}: {e}", exc_info=True)
 
     workflow = get_workflow()
     # 总超时 3600 秒（1小时）

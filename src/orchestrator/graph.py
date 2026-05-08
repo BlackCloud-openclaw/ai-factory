@@ -13,6 +13,8 @@ from src.orchestrator.nodes import (
     save_memory_node,
     scheduler_node,
     advance_subtask_node,
+    tool_node_v2,   # 新增导入
+    writer_node,          # 新增
 )
 from src.agents.planner import PlannerAgent
 from src.scheduler.task_scheduler import TaskScheduler
@@ -28,61 +30,35 @@ def route_after_analyze(state: AgentState) -> str:
     For simple tasks with no subtasks, routes to planning which may
     create a single-subtask plan and then route accordingly.
     """
+    # 如果已经有场景计划，直接进入写作节点，跳过 planning
+    task_type = getattr(state, 'task_type', 'code')
+    if task_type == "scene_plan" and state.scene_plan:
+        return "writer"
+    if task_type == "novel_outline" and state.outline:
+        return "save_memory"
     return "planning"
 
 
-def route_after_plan(state: AgentState) -> str:
-    """Decide which node to go to after planning.
-
-    Routes to scheduler for complex multi-subtask plans, or to individual
-    nodes for simple single-subtask plans.
-    """
-    # Check new task_plan field first (from graph.py plan_node)
-    plan = getattr(state, 'task_plan', None)
-    if not plan:
-        # Fallback to legacy plan field (from nodes.py plan_node)
-        plan = getattr(state, 'plan', None)
-    if not plan:
-        return END
-
-    # If plan is a dict (new format with subtasks list)
-    if isinstance(plan, dict):
-        subtasks = plan.get("subtasks", [])
-        if len(subtasks) > 1:
-            return "scheduler"
-        elif len(subtasks) == 1:
-            subtask_type = subtasks[0].get("type", "code")
-            route_map = {
-                "research": "research",
-                "code": "code",
-                "validate": "validate",
-                "write": "code",
-                "plan": "code",
-            }
-            return route_map.get(subtask_type, "code")
-        else:
-            return END
-    # Legacy format (list of subtask dicts)
-    elif isinstance(plan, list):
-        if len(plan) > 1:
-            return "scheduler"
-        elif len(plan) == 1:
-            subtask_type = plan[0].get("type", "code")
-            route_map = {
-                "research": "research",
-                "code": "code",
-                "validate": "validate",
-                "write": "code",
-                "plan": "code",
-            }
-            return route_map.get(subtask_type, "code")
-        else:
-            return END
-
-    return END
-
-
 def after_plan(state: AgentState) -> str:
+    """
+    决定规划后进入哪个节点。
+    优先处理工具调用，否则根据任务计划路由。
+    """
+    # 如果有待处理的工具调用，进入 tool_node
+    if state.pending_tool_calls:
+        return "tool_node"
+    
+    task_type = getattr(state, 'task_type', 'code')
+    
+    # 小说大纲生成后直接保存，不进入 code/scheduler
+    if task_type == "novel_outline":
+        return "save_memory"
+    
+    # 场景计划生成后进入写作节点
+    if task_type == "scene_plan" and state.scene_plan:
+        return "writer"
+    
+    # 原有代码生成流程
     task_plan = getattr(state, 'task_plan', None)
     if not task_plan:
         return 'save_memory'
@@ -117,33 +93,64 @@ def route_after_code(state: AgentState) -> str:
 
 
 def route_after_validate(state: AgentState) -> str:
-    # 获取验证结果
-    if hasattr(state, 'validation_result'):
-        validation_result = state.validation_result
-    else:
-        validation_result = state.get('validation_result', {}) if hasattr(state, 'get') else {}
-    validation_passed = validation_result.get('passed', False) if validation_result else False
-    
-    # 获取重试次数
+    if state.task_type == "scene_plan":
+        validation_result = state.validation_result or {}
+        passed = validation_result.get("passed", False)
+        retry_count = getattr(state, 'retry_count', 0)
+        max_retries = getattr(state, 'max_retries_per_subtask', 2)
+
+        if not passed and retry_count < max_retries:
+            return "writer"
+        elif passed:
+            # 如果场景计划列表为空且总场景数 > 0，说明本章所有场景已生成完毕，需要生成下一章的计划
+            if not state.scene_plan_list and getattr(state, "total_scenes_in_chapter", 0) > 0:
+                total_chapters = getattr(state, "total_chapters_in_volume", 0)
+                if state.current_chapter < total_chapters:
+                    logger.info("Chapter finished, moving to planning for next chapter.")
+                    return "planning"
+                else:
+                    logger.info("All chapters completed, ending.")
+                    return "save_memory"
+            # 正常情况：还有场景未生成
+            total_scenes = getattr(state, "total_scenes_in_chapter", 0)
+            if total_scenes > 0 and state.current_scene_index < total_scenes:
+                return "writer"
+            else:
+                # 没有剩余场景且 scene_plan_list 非空（理论上不会走到这里）兜底
+                return "save_memory"
+        else:
+            return "save_memory"
+
+    # 原有代码模式逻辑（保持不变）
+    validation_result = state.validation_result or {}
+    passed = validation_result.get("passed", False)
     retry_count = getattr(state, 'retry_count', 0)
     max_retries = getattr(state, 'max_retries_per_subtask', 2)
-    
-    # 获取剩余子任务
     remaining = getattr(state, 'remaining_subtasks', [])
-    
-    # ========== 新增：验证失败且还有重试次数时，回到 code 节点重新生成 ==========
-    if not validation_passed and retry_count < max_retries:
-        return "code"   # 让代码重新生成，并携带错误反馈
-    
-    if validation_passed:
-        return 'advance_subtask' if remaining else 'save_memory'
-    else:
-        return 'research' if retry_count < max_retries else 'save_memory'
+
+    if not passed and retry_count < max_retries:
+        return "code"
+    if passed:
+        return "advance_subtask" if remaining else "save_memory"
+    return "research" if retry_count < max_retries else "save_memory"
 
 
-async def plan_node(state: AgentState) -> Dict[str, Any]:
+async def plan_node(state: AgentState) -> dict[str, Any]:
     planner = PlannerAgent()
     updates = await planner.run(state)
+    if "error" not in updates:
+        updates["error"] = None
+
+    # 如果是 scene_plan 且生成了场景列表，设置总场景数
+    if state.task_type == "scene_plan" and updates.get("scene_plan"):
+        scene_plan_data = updates["scene_plan"]
+        if isinstance(scene_plan_data, dict) and "scenes" in scene_plan_data:
+            scenes = scene_plan_data["scenes"]
+            updates["scene_plan_list"] = scenes
+            updates["total_scenes_in_chapter"] = len(scenes)
+            if scenes:
+                updates["scene_plan"] = scenes[0]
+                updates["current_scene_index"] = 0
     return updates
 
 
@@ -162,6 +169,8 @@ def create_workflow() -> StateGraph:
     workflow.add_node("validate", validate_node)
     workflow.add_node("save_memory", save_memory_node)
     workflow.add_node("advance_subtask", advance_subtask_node)
+    workflow.add_node("tool_node", tool_node_v2)   # 新增 tool_node
+    workflow.add_node("writer", writer_node)
 
     # Set entry point
     workflow.set_entry_point("load_memory")
@@ -177,11 +186,13 @@ def create_workflow() -> StateGraph:
             "planning": "planning",
             "code": "code",
             "research": "research",
+            "writer": "writer",
+            "save_memory": "save_memory",
             END: END,
         },
     )
 
-    # Edges from planning (conditional)
+    # Edges from planning (conditional) - 修改为支持 tool_node
     workflow.add_conditional_edges(
         "planning",
         after_plan,
@@ -190,6 +201,8 @@ def create_workflow() -> StateGraph:
             "code": "code",
             "save_memory": "save_memory",
             "research": "research",
+            "tool_node": "tool_node",   # 新增
+            "writer": "writer",          # 新增
         },
     )
 
@@ -229,6 +242,8 @@ def create_workflow() -> StateGraph:
         "validate",
         route_after_validate,
         {
+            "writer": "writer",
+            "planning": "planning",       # 新增
             "save_memory": "save_memory",
             "research": "research",
             "advance_subtask": "advance_subtask",
@@ -241,6 +256,13 @@ def create_workflow() -> StateGraph:
 
     # advance_subtask -> code
     workflow.add_edge("advance_subtask", "code")
+
+    # tool_node -> planning (执行完工具后回到 planning 继续处理)
+    workflow.add_edge("tool_node", "planning")
+    
+    # writer 之后进入 validate（可选）或直接保存
+    #workflow.add_edge("writer", "save_memory")
+    workflow.add_edge("writer", "validate")   # 或 "save_memory"
 
     return workflow
 

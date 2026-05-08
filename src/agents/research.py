@@ -17,6 +17,8 @@ from src.config import config
 logger = setup_logging("agents.research")
 
 class ResearchAgent(BaseAgent):
+    task_type = "research"
+    
     def __init__(
         self,
         retriever: Optional[KnowledgeRetriever] = None,
@@ -130,6 +132,12 @@ class ResearchAgent(BaseAgent):
     @retry_with_backoff(max_retries=2, base_delay=1.0)
     async def _summarize(self, query: str, context: str) -> str:
         from openai import AsyncOpenAI
+        from src.model_router import get_router
+
+        # 获取 research 任务对应的模型
+        router = get_router()
+        model = router.get_model_for_task("research")
+
         client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
         messages = [
             {"role": "system", "content": self.system_prompt},
@@ -137,7 +145,7 @@ class ResearchAgent(BaseAgent):
         ]
         try:
             response = await client.chat.completions.create(
-                model=self.llm_model,
+                model=model,
                 messages=messages,
                 temperature=0.2,
                 max_tokens=config.llm_max_tokens,

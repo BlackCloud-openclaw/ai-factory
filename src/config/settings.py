@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     # LLM
     llm_api_url: str = "http://localhost:8081"
-    llm_model_name: str = "Qwen3.6-35B-A3B-UD-Q5_K_M"
+    llm_model_name: str = "Qwen3.6-27B-Q5_K_M"
     llm_temperature: float = 0.2
     llm_max_tokens: int = 4096
     llm_context_window: int = 32768
@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     llm_timeout_coding: int = 900        # 代码生成 15分钟
     llm_timeout_validation: int = 180    # 验证 3分钟
     llm_timeout_research: int = 120      # 研究 2分钟
+    llm_timeout_writing: int = 600        # 写作任务超时 10 分钟
     
 
     # Tools
@@ -55,7 +56,7 @@ class Settings(BaseSettings):
     max_retries: int = 3
 
     # Logging
-    log_level: str = "INFO"
+    log_level: str = "DEBUG"
     log_file: str = "logs/ai_factory.log"
     log_max_bytes: int = 10 * 1024 * 1024  # 10MB
     log_backup_count: int = 5

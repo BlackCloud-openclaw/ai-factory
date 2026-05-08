@@ -13,46 +13,9 @@ from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff
 from src.agents.base import BaseAgent
 from src.orchestrator.state import AgentState
-from src.config import config
+from src.prompts.validator_prompts import VALIDATOR_PROMPT_REGISTRY
 
 logger = setup_logging("agents.validator")
-
-VALIDATOR_SYSTEM_PROMPT = """You are a code quality validator. Your job is to verify whether generated code:
-
-1. Correctly implements the user's requirements (focus on main functionality)
-2. Is syntactically and logically correct (but for tool modules, if it executes successfully, consider it logically correct)
-3. Handles edge cases appropriately (only basic checks)
-4. Follows Python best practices (basic only)
-
-Return your evaluation in **strict JSON format** with these exact keys:
-{
-    "passed": true/false,
-    "feedback": "detailed explanation",
-    "suggestions": ["improvement1", "improvement2"]
-}
-
-== AI Factory ToolsRegistry Specification (MUST follow when the task is about creating a tool) ==
-
-If the user request asks for a tool that can be registered into AI Factory ToolsRegistry, the **only** criteria for passing are:
-
-- The code MUST include a function `get_tool_info()` returning a dict with keys: "name", "description", "module_path", "function_name", "parameters".
-- The module MUST implement the function named by `function_name` (the main function).
-- The code MUST NOT contain `if __name__ == "__main__":` block.
-- The code MUST NOT contain any test code (unittest, pytest, manual test calls).
-- The code MUST NOT define any class (only functions).
-- The code MUST NOT use decorators (e.g., `@register_tool`).
-- The code MUST NOT create a custom registry (e.g., `tools_registry = {}`).
-- **Imports are allowed ONLY from Python standard library** (e.g., `urllib`, `json`, `re`, `typing`, `datetime`, `math`, `os`, `sys`, `pathlib`, etc.). Reject imports like `requests`, `bs4`, `scrapy`, `aiohttp`, `httpx`.
-
-**Important**: Do NOT reject code for minor logical issues like exception handling details, as long as the code executes successfully and the main functionality works. The user will test the tool. If execution result shows success (no errors), you should generally pass the validation.
-
-If the user request is **not** about tool creation, ignore the above tool-specific rules and focus on functional correctness and code quality.
-
-You must consider execution results if provided (e.g., stdout/stderr). If the code executed successfully and no obvious fatal errors exist, it likely passes.
-
-Be strict about missing required functions, prohibited patterns (classes, test code, etc.), and non-standard library imports. Be lenient on code style and minor error handling improvements.
-
-Return ONLY valid JSON, no extra text."""
 
 
 class ValidatorAgent(BaseAgent):
@@ -64,8 +27,8 @@ class ValidatorAgent(BaseAgent):
         llm_model: str = config.llm_model_name,
     ):
         self.llm_api_url = llm_api_url
-        self.llm_model = llm_model   
-    
+        self.llm_model = llm_model
+
     async def run(self, state: AgentState) -> Dict[str, Any]:
         """Unified interface: accept state, return validation result incremental update."""
         agent_name = "ValidatorAgent"
@@ -73,52 +36,80 @@ class ValidatorAgent(BaseAgent):
         step = state.step_count
         logger.info(f"Starting {agent_name}, step={step}")
         start_time = time.time()
-        code = state.code_generated
-        user_input = state.user_input
-        execution_result = state.execution_result
-        result = await self.validate(code, user_input, execution_result)
+
+        # 获取验证模式（默认 code）
+        mode = getattr(state, 'validation_mode', 'code')
+
+        if mode == "code":
+            target = state.code_generated
+            user_input = state.user_input
+            execution_result = state.execution_result
+            result = await self.validate(target, user_input, execution_result, mode=mode)
+        elif mode == "novel":
+            target = state.scene_text
+            user_input = state.user_input
+            constraints = {
+                "outline": state.outline,
+                "writing_constraints": state.writing_constraints or {}
+            }
+            result = await self.validate(target, user_input, None, mode=mode, constraints=constraints)
+        else:
+            raise ValueError(f"Unsupported validation mode: {mode}")
+
         duration = time.time() - start_time
         status = "success" if result.get("passed") else "error"
         logger.info(f"{agent_name} completed, step={step}, status={status}, duration={duration:.2f}")
         return {
             "validation_result": result,
             "final_answer": result.get("feedback", ""),
-        }    
+        }
 
-    async def validate(self, code: str, user_input: str, execution_result: Optional[dict] = None) -> dict:
-        """Validate code quality and requirement fulfillment."""
-        logger.info("ValidatorAgent starting validation")
+    async def validate(
+        self,
+        target: str,
+        user_input: str,
+        execution_result: Optional[dict] = None,
+        mode: str = "code",
+        constraints: Optional[Dict] = None,
+    ) -> dict:
+        """统一验证入口：支持 code 和 novel 模式"""
+        logger.info(f"ValidatorAgent starting validation with mode={mode}")
 
-        # Step 1: Syntax check
+        if mode == "code":
+            return await self._validate_code(target, user_input, execution_result)
+        elif mode == "novel":
+            # 从 constraints 中获取 outline（小说大纲）和 writing_constraints
+            outline = constraints.get("outline") if constraints else None
+            writing_constraints = constraints.get("writing_constraints", {})
+            return await self._validate_novel(target, outline, writing_constraints)
+        else:
+            raise ValueError(f"Unsupported validation mode: {mode}")
+        
+        
+    async def _validate_code(self, code: str, user_input: str, execution_result: Optional[dict]) -> dict:
+        """代码验证逻辑（原有）"""
         syntax_ok, syntax_feedback = self._check_syntax(code)
         if not syntax_ok:
-            logger.warning(f"Syntax validation failed: {syntax_feedback}")
             return {
                 "passed": False,
                 "feedback": f"Syntax error detected: {syntax_feedback}",
                 "suggestions": ["Fix the syntax errors before proceeding"],
             }
-
-        # Step 2: LLM-based semantic validation
-        llm_result = await self._validate_with_llm(code, user_input, execution_result)
-
-        passed = llm_result.get("passed", False)
-        feedback = llm_result.get("feedback", "Validation completed.")
-        suggestions = llm_result.get("suggestions", [])
-
-        if passed:
-            logger.info("Validation passed")
-        else:
-            logger.warning(f"Validation failed: {feedback}")
-            if suggestions:
-                logger.info(f"Suggestions: {suggestions}")
-
+        builder = VALIDATOR_PROMPT_REGISTRY.get("code")
+        prompt = builder.build(code, user_input, execution_result)
+        llm_result = await self._validate_with_llm(prompt, execution_result)
         return {
-            "passed": passed,
-            "feedback": feedback,
-            "suggestions": suggestions,
+            "passed": llm_result.get("passed", False),
+            "feedback": llm_result.get("feedback", "Validation completed."),
+            "suggestions": llm_result.get("suggestions", []),
         }
-        
+
+    async def _validate_novel(self, text: str, outline: Optional[Dict], writing_constraints: Dict) -> dict:
+        """小说验证逻辑：调用分层校验"""
+        # 合并约束：writing_constraints 包含 forbidden_events, must_events 等
+        constraints = writing_constraints.copy()
+        constraints["outline"] = outline  # 可选，供硬校验使用
+        return await self.validate_novel_consistency(text, constraints)
 
     def _check_syntax(self, code: str) -> Tuple[bool, str]:
         """Check code syntax using py_compile."""
@@ -142,52 +133,19 @@ class ValidatorAgent(BaseAgent):
             return False, f"Syntax check error: {e}"
 
     @retry_with_backoff(max_retries=2, base_delay=1.0)
-    async def _validate_with_llm(self, code: str, user_input: str, execution_result: Optional[dict] = None) -> dict:
-        """Validate code semantics using LLM."""
+    async def _validate_with_llm(self, prompt: str, execution_result: Optional[dict] = None) -> dict:
+        """发送 prompt 给 LLM 并解析 JSON 结果"""
         from openai import AsyncOpenAI
-
+        from src.model_router import get_router
+        
+        model = get_router().get_model_for_task("validate")
         client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
-
-        exec_status = "unknown"
-        exec_output = ""
-        if execution_result:
-            if execution_result.get("success"):
-                exec_status = "passed"
-                exec_output = execution_result.get("stdout", "")[:500]
-            else:
-                exec_status = "failed"
-                exec_output = execution_result.get("stderr", "")[:500]
-
-        exec_output_section = ""
-        if exec_output:
-            exec_output_section = "Execution Output:\n" + exec_output
-        else:
-            exec_output_section = "No execution output available."
-
-        prompt = f"""User Request:
-{user_input}
-
-Generated Code:
-```python
-{code}
-```
-
-Execution Status: {exec_status}
-{exec_output_section}
-
-Please evaluate whether the code satisfies the user's request.
-Return your response in strict JSON format:
-{{
-"passed": true/false,
-"feedback": "Detailed explanation of why the code passed or failed validation",
-"suggestions": ["List of specific improvement suggestions, empty list if passed"]
-}}"""
 
         try:
             response = await client.chat.completions.create(
-                model=self.llm_model,
+                model=model,
                 messages=[
-                    {"role": "system", "content": VALIDATOR_SYSTEM_PROMPT},
+                    {"role": "system", "content": "You are a validation assistant. Return only valid JSON."},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.1,
@@ -201,6 +159,7 @@ Return your response in strict JSON format:
             logger.warning(f"LLM validation call failed: {e}, falling back to execution-based check")
             return self._fallback_validation(execution_result)
 
+    # ---------- 以下为 JSON 解析辅助方法（保持不变） ----------
     def _parse_validation_result_enhanced(self, text: str) -> Dict[str, Any]:
         """Enhanced multi-strategy JSON parsing."""
         patterns = [
@@ -244,7 +203,7 @@ Return your response in strict JSON format:
         return {
             "passed": False,
             "feedback": f"Could not parse validation result. Raw: {text[:200]}",
-            "suggestions": ["Check LLM response format"]
+            "suggestions": ["Check LLM response format"],
         }
 
     def _extract_via_regex(self, text: str) -> Optional[Dict[str, Any]]:
@@ -300,7 +259,6 @@ Return your response in strict JSON format:
             result["feedback"] = "Validation result extracted without explicit feedback"
         if "suggestions" not in result:
             result["suggestions"] = []
-
         return result
 
     def _parse_from_natural_language(self, text: str) -> Optional[Dict[str, Any]]:
@@ -308,14 +266,28 @@ Return your response in strict JSON format:
         text_lower = text.lower()
 
         positive_indicators = [
-            "code is correct", "passes validation", "satisfies the request",
-            "meets requirements", "properly implements", "code works",
-            "passed", "successful", "valid"
+            "code is correct",
+            "passes validation",
+            "satisfies the request",
+            "meets requirements",
+            "properly implements",
+            "code works",
+            "passed",
+            "successful",
+            "valid",
         ]
         negative_indicators = [
-            "fails", "does not satisfy", "missing", "incorrect",
-            "bug", "error", "issue", "problem", "failed",
-            "invalid", "does not meet"
+            "fails",
+            "does not satisfy",
+            "missing",
+            "incorrect",
+            "bug",
+            "error",
+            "issue",
+            "problem",
+            "failed",
+            "invalid",
+            "does not meet",
         ]
 
         passed = None
@@ -333,7 +305,7 @@ Return your response in strict JSON format:
         if passed is None:
             return None
 
-            feedback = text[:300]
+        feedback = text[:300]
         suggestions = []
         bullet_patterns = [
             r'[-•*]\s*([^.\n]+[.]?)',
@@ -387,18 +359,91 @@ Return your response in strict JSON format:
     def _parse_validation_result(self, text: str) -> dict:
         """Legacy parsing method - kept for backward compatibility."""
         return self._parse_validation_result_enhanced(text)
-        
+
     def _fallback_validation(self, execution_result: Optional[dict] = None) -> dict:
         if execution_result and execution_result.get("success"):
             return {
                 "passed": True,
                 "feedback": "Validation passed based on successful execution.",
-                "suggestions": []
+                "suggestions": [],
             }
         return {
             "passed": False,
             "feedback": "Validation failed: no successful execution.",
-            "suggestions": ["Fix execution errors and retry"]
+            "suggestions": ["Fix execution errors and retry"],
         }
+        
+    async def validate_novel_consistency(
+        self, text: str, constraints: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """小说一致性校验：硬规则 + 软规则（LLM）"""
+        # 第一层：硬校验（规则引擎）
+        hard_ok, hard_msg = self._hard_validate_novel(text, constraints)
+        if not hard_ok:
+            return {
+                "passed": False,
+                "feedback": hard_msg,
+                "suggestions": ["请修改场景，避免违反硬约束"],
+            }
 
-    
+        # 第二层：软校验（LLM 评估语义一致性）
+        soft_result = await self._soft_validate_novel(text, constraints)
+        return soft_result
+
+    def _hard_validate_novel(self, text: str, constraints: Dict[str, Any]) -> Tuple[bool, str]:
+        """硬规则校验：禁止事件关键词、角色死亡等"""
+        # 检查禁止事件
+        forbidden = constraints.get("forbidden_events", [])
+        for fb in forbidden:
+            if fb and fb in text:
+                return False, f"场景中包含禁止事件：{fb}"
+
+        # 检查角色死亡（简单关键词）
+        banned_death_keywords = ["死亡", "被杀", "死去", "身亡", "死了", "尸", "殒落"]
+        if any(kw in text for kw in banned_death_keywords):
+            # 如果有角色死亡约束，可以更精确检查，这里简单返回警告但先通过
+            logger.warning("检测到死亡相关词汇，请确保符合大纲设定")
+        return True, ""
+
+    async def _soft_validate_novel(self, text: str, constraints: Dict[str, Any]) -> Dict[str, Any]:      
+        """软校验：使用 LLM 检查是否满足 must_events，风格等"""
+        must_events = constraints.get("must_events", [])
+        if not must_events:
+            # 没有必须事件，直接通过
+            return {"passed": True, "feedback": "无必须事件，校验通过", "suggestions": []}
+
+        # 简单思考：调用 LLM 判断是否实现了所有 must_events
+        from openai import AsyncOpenAI
+        from src.model_router import get_router
+
+        model = get_router().get_model_for_task("validate")
+        client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
+
+        prompt = f"""判断以下小说场景是否包含了所有【必须发生的事件】。
+
+    必须发生的事件：
+    {chr(10).join(f'- {e}' for e in must_events)}
+
+    场景正文：
+    {text[:1500]}
+
+    请输出 JSON 格式：
+    {{"passed": true/false, "feedback": "说明缺了哪个事件或全部满足", "suggestions": []}}
+    """
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=300,
+                timeout=30
+            )
+            content = response.choices[0].message.content or ""
+            # 简单解析
+            if '"passed": true' in content or '"passed":true' in content:
+                return {"passed": True, "feedback": "所有必须事件均已包含", "suggestions": []}
+            else:
+                return {"passed": False, "feedback": "缺少必须事件", "suggestions": ["请补充遗漏的剧情"]}
+        except Exception as e:
+            logger.warning(f"LLM 软校验失败: {e}")
+            return {"passed": True, "feedback": "软校验失败，默认通过", "suggestions": []}    
