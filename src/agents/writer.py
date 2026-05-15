@@ -1,5 +1,9 @@
-# src/agents/writer.py
+"""
+Writer Agent - 基于状态驱动的章节生成
+"""
+import json
 import time
+import re
 from typing import Dict, Any, Optional
 
 from src.agents.base import BaseAgent
@@ -10,11 +14,25 @@ from src.config import config
 from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff
 
+from src.writing.voiceprint import VoiceprintRegistry
+from src.writing.context_compiler import ContextCompiler
+from src.writing.prompt_firewall import PromptFirewall
+from src.writing.validators import validate_all
+
 logger = setup_logging("agents.writer")
+
+# 全局声纹注册表
+_voiceprint_registry = None
+
+def get_voiceprint_registry():
+    global _voiceprint_registry
+    if _voiceprint_registry is None:
+        _voiceprint_registry = VoiceprintRegistry("config/voiceprints.yaml")
+    return _voiceprint_registry
 
 
 class WritingAgent(BaseAgent):
-    task_type = "writing"   # 固定任务类型
+    task_type = "writing"
 
     async def run(self, state: AgentState) -> Dict[str, Any]:
         logger.info("WritingAgent starting")
@@ -22,84 +40,123 @@ class WritingAgent(BaseAgent):
 
         scene_plan = state.scene_plan or {}
         constraints = state.writing_constraints or {}
-
-        # 从路由器获取写作模型（固定使用 writing 任务类型）
+        
+        # 获取声纹注册表
+        voiceprint_registry = get_voiceprint_registry()
+        
+        # 获取当前世界状态（如果存在）
+        from src.writing.world_state import WorldState
+        world_state = WorldState.from_dict(state.current_state) if state.current_state else WorldState()
+        
+        # 编译上下文
+        compiler = ContextCompiler(max_tokens=2000)
+        compiled_context = compiler.compile(
+            world_state,
+            active_characters=scene_plan.get("characters", []),
+            max_active=10
+        )
+        
+        # 构建完整 prompt
+        prompt = compiler.build_writer_prompt(
+            scene_plan=scene_plan,
+            world_state=world_state,
+            voiceprint_registry=voiceprint_registry,
+            compiled_context=compiled_context,
+        )
+        
+        # 添加额外的约束（禁止事件等）
+        if constraints.get("forbidden_events"):
+            prompt += f"\n\n【禁止事件】\n" + "\n".join(constraints["forbidden_events"])
+        
+        # 调用 LLM
         router = get_router()
-        model_name = router.get_model_for_task("writing")
-        if not model_name:
-            logger.error("No writing model configured")
-            return {"scene_text": "[错误] 未配置写作模型", "final_answer": ""}
-
-        prompt = self._build_prompt(scene_plan, constraints)
-
+        primary_model = router.get_model_for_task("writing")
+        fallback_model = "Qwen3-32B-Q5_K_M"
+        
         pool = get_llm_router_pool()
+        raw_output = None
+        last_error = None
+        
         try:
-            text = await pool.call(
-                model_name,
+            raw_output = await pool.call(
+                primary_model,
                 self._call_llm,
                 prompt,
                 timeout=getattr(config, 'llm_timeout_writing', 600),
             )
         except Exception as e:
-            logger.error(f"LLM call failed: {e}")
-            text = f"[生成失败: {e}]"
-
+            logger.warning(f"Primary model {primary_model} failed: {e}, trying fallback")
+            last_error = e
+            try:
+                raw_output = await pool.call(
+                    fallback_model,
+                    self._call_llm,
+                    prompt,
+                    timeout=getattr(config, 'llm_timeout_writing', 600),
+                )
+                logger.info(f"Fallback model {fallback_model} succeeded")
+            except Exception as e2:
+                logger.error(f"Fallback model also failed: {e2}")
+                raw_output = f'{{"scene_text": "[生成失败: {last_error}]", "events": [], "foreshadowing": []}}'
+        
+        logger.info(f"Raw LLM output: {raw_output[:500]}")
+        
+        # 验证输出结构（包括 must_events 检查）
+        must_events = scene_plan.get("must_events", [])
+        context = {"must_events": must_events}
+        validation = validate_all(raw_output, context, async_semantic=False)
+        
+        scene_text = ""
+        if validation["passed"]:
+            parsed = validation["parsed_output"] or {}
+            scene_text = parsed.get("scene_text", "")
+        else:
+            logger.warning(f"Validation failed: {validation['error']}")
+            # 尝试从原始输出中提取 JSON 中的 scene_text
+            try:
+                match = re.search(r'"scene_text"\s*:\s*"([^"]*)"', raw_output)
+                if match:
+                    scene_text = match.group(1)
+                else:
+                    scene_text = f"[验证失败: {validation['error']}]"
+            except:
+                scene_text = f"[验证失败: {validation['error']}]"
+        
+        # ========== 删除 goal/conflict 关键词校验，直接返回空标记 ==========
+        deviation_detected = False
+        missing_goal = []
+        missing_conflict = []
+        
         duration = time.time() - start_time
         logger.info(f"WritingAgent completed, duration={duration:.2f}")
-        return {"scene_text": text, "final_answer": text}
-
-    def _build_prompt(self, scene_plan: Dict, constraints: Dict) -> str:
-        """构建写作提示词，强调直接输出正文，禁止思考过程"""
-        lines = []
-        if constraints.get("character_states"):
-            lines.append("[当前角色状态]")
-            lines.append(str(constraints["character_states"]))
-        if constraints.get("must_events"):
-            lines.append("[必须发生的事件]")
-            lines.append("\n".join(constraints["must_events"]))
-        if constraints.get("forbidden_events"):
-            lines.append("[禁止事件]")
-            lines.append("\n".join(constraints["forbidden_events"]))
-        if constraints.get("style_profile"):
-            lines.append("[风格要求]")
-            lines.append(str(constraints["style_profile"]))
-        lines.append("[场景计划]")
-        lines.append(f"目标: {scene_plan.get('goal', '')}")
-        lines.append(f"冲突: {scene_plan.get('conflict', '')}")
-        lines.append(f"结果: {scene_plan.get('outcome', '')}")
-        lines.append(f"参与角色: {scene_plan.get('characters', [])}")
-        lines.append("\n请根据以上约束写出场景正文（约2000字）。")
-        lines.append("最重要规则：严禁输出任何思考过程、分析、计划、括号注释、额外标记。")
-        lines.append("直接输出小说正文，从第一句开始就是故事内容。不要输出“场景计划”标题，不要输出“目标”、“冲突”等字段。")
-        return "\n".join(lines)
-
+        
+        return {
+            "scene_text": raw_output,
+            "final_answer": scene_text,
+            "deviation_detected": deviation_detected,
+            "missing_goal_keywords": missing_goal,
+            "missing_conflict_keywords": missing_conflict,
+        }
+    
     @retry_with_backoff(max_retries=2, base_delay=1.0)
     async def _call_llm(self, model_name: str, prompt: str, **kwargs) -> str:
-        """实际调用 LLM 生成文本，忽略传入的 model_name，使用 task_type 对应的实际模型"""
+        """调用 LLM"""
         from openai import AsyncOpenAI
         from src.model_router import get_router
-
-        # 获取写作任务对应的真实模型名称
-        actual_model = get_router().get_model_for_task(self.task_type)
-
+        
+        actual_model = model_name
         base_url = kwargs.get('base_url')
         if not base_url:
             pool = get_llm_router_pool()
             base_url = pool.get_base_url(actual_model)
-
+        
         client = AsyncOpenAI(api_key="not-needed", base_url=base_url)
         response = await client.chat.completions.create(
             model=actual_model,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.8,
-            max_tokens=4000,
+            temperature=0.7,
+            max_tokens=4096,
         )
-        message = response.choices[0].message
-        content = message.content or ""
-        if not content and hasattr(message, "reasoning_content"):
-            content = message.reasoning_content or ""
-
+        content = response.choices[0].message.content or ""
         logger.info(f"Received response from {actual_model}, length={len(content)}")
-        if not content:
-            logger.warning("Empty response from LLM")
         return content

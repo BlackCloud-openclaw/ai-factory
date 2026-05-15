@@ -12,7 +12,8 @@ from src.config import config
 from src.api.routes import router
 from src.common.logging import setup_logging
 from src.execution.llm_router_pool import get_llm_router_pool
-from src.db import init_db_pool, close_db_pool   # 新增
+from src.db import init_db_pool, close_db_pool
+from src.api.endpoints.novel import router as novel_router
 
 logger = setup_logging("api.main")
 
@@ -49,6 +50,7 @@ async def lifespan(app: FastAPI):
         # 定义需要预热的模型列表
         warm_models = [ 
             "Qwen3-32B-Q5_K_M", 
+            "Qwen3-32B-Q5_K_M-writer",
         ]
         
         # 只清理不在预热列表中的空闲容器
@@ -100,6 +102,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 注册路由
 app.include_router(router, prefix="/api/v1")
+app.include_router(novel_router, prefix="/api/v1")   # 新增
 
 # 健康检查端点
 @app.get("/health")

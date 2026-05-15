@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Sequence, List, Dict, Optional
+from typing import Annotated, Any, List, Dict, Optional
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
@@ -46,7 +46,7 @@ class AgentState(BaseModel):
     # ===== 重试控制 =====
     retry_count: int = 0
     max_retries: int = 3
-    max_retries_per_subtask: int = 2
+    max_retries_per_subtask: int = 3
     step_count: int = 0
     remaining_subtasks: List = []                # 用于 advance_subtask
     current_subtask_index: int = 0
@@ -70,27 +70,29 @@ class AgentState(BaseModel):
     last_sequence_id: int = 0                       # 最新事件 sequence_id
     
     # ===== 小说写作专用字段 =====
-
     chapter_id: Optional[str] = None
     resume: bool = False                 # 新增：是否从上次中断处继续
     task_type: str = "code"                     # code, novel_outline, scene_plan
     outline: Optional[Dict[str, Any]] = None    # 小说大纲
     current_volume: int = 1
     current_chapter: int = 1
-    current_scene: int = 1
     scene_plan: Optional[Dict[str, Any]] = None # 当前场景计划
-    scene_plan_list: List[Dict[str, Any]] = []   # 存储当前章的所有场景计划（列表）
-    # 当前卷/章的场景需求 （可选，可从大纲中读取）
-    total_chapters_in_volume: int = 0       # 当前卷的总章节数（由大纲确定）
-    total_scenes_in_chapter: int = 0        # 当前章的总场景数（由 plan_node 设置）
-    current_scene_index: int = 0                # 当前正在生成的场景索引（0-based）
-    _chapter_finished: bool = False   # 临时标志，表示当前章节已完成（用于路由）
-    writing_constraints: Optional[Dict[str, Any]] = None  # 写前约束
-    scene_text: str = ""                         # 生成的场景正文
+    scene_plan_list: List[Dict[str, Any]] = Field(default_factory=list)
+    total_chapters_in_volume: int = 0
+    total_scenes_in_chapter: int = 0
+    current_scene_index: Optional[int] = None   # 0-based 已完成场景数（下一个要生成的场景索引）
+    _chapter_finished: bool = False
+    writing_constraints: Optional[Dict[str, Any]] = None
+    scene_text: str = ""
+
+    # 在 AgentState 类的末尾（其他字段附近）添加
+    deviation_detected: bool = False
+    missing_goal_keywords: List[str] = Field(default_factory=list)
+    missing_conflict_keywords: List[str] = Field(default_factory=list)
 
     # ===== 兼容旧字段（保留，逐步废弃） =====
     skip_remaining: bool = False
-    plan: List[Dict[str, Any]] = []              # 旧的计划格式
+    plan: List[Dict[str, Any]] = []
 
     def should_retry(self) -> bool:
         return self.retry_count < self.max_retries and self.error is not None

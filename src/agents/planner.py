@@ -12,7 +12,6 @@ from src.agents.base import BaseAgent
 from src.orchestrator.state import AgentState
 from src.model_router import get_router
 from src.execution.llm_router_pool import get_llm_router_pool
-from src.config import config
 from src.prompts.planner_prompts import PROMPT_REGISTRY
 
 logger = setup_logging("agents.planner")
@@ -31,7 +30,7 @@ class TaskPlan(BaseModel):
     subtasks: List[Subtask]
     created_at: datetime = Field(default_factory=datetime.now)
 
-# 注意：所有 JSON 示例中的大括号必须转义为双括号，只有 {user_request} 是真正的占位符
+# 用于普通代码/任务规划的 prompt（保留原样）
 PLANNER_PROMPT = """You are a Task Planner. Break down the user request into a sequence of subtasks (each with a type, description, and dependencies). Use only these types: code, research, validate.
 
 Return ONLY a valid JSON object with this structure:
@@ -64,7 +63,7 @@ User request: {user_request}
 class PlannerAgent(BaseAgent):
     def __init__(self):
         pass
-                
+
     async def run(self, state: AgentState) -> Dict[str, Any]:
         agent_name = "PlannerAgent"
         state.step_count += 1
@@ -73,9 +72,27 @@ class PlannerAgent(BaseAgent):
         start_time = time.time()
 
         task_type = getattr(state, 'task_type', 'code')
+
+        # ---------- 分步式大纲生成（长篇小说专用） ----------
+        if task_type == "novel_outline":
+            try:
+                outline = await self._generate_outline_step_by_step(state)
+                duration = time.time() - start_time
+                logger.info(f"{agent_name} completed (stepwise outline), step={step}, status=success, duration={duration:.2f}")
+                return {
+                    "plan_result": outline,
+                    "outline": outline,
+                    "error": None,
+                }
+            except Exception as e:
+                duration = time.time() - start_time
+                logger.error(f"{agent_name} failed (stepwise outline), step={step}, error={e}, duration={duration:.2f}")
+                return {"plan_result": {}, "error": str(e)}
+
+        # ---------- 其他任务类型（code, scene_plan 等）使用原有逻辑 ----------
         builder = PROMPT_REGISTRY.get(task_type)
         if not builder:
-            builder = PROMPT_REGISTRY["code"]   # fallback
+            builder = PROMPT_REGISTRY["code"]
 
         prompt = builder.build(state)
 
@@ -84,7 +101,6 @@ class PlannerAgent(BaseAgent):
             result = builder.parse_response(response)
             logger.debug(f"Raw LLM response for task_type={task_type}: {response[:500]}")
 
-            # 如果 scene_plan 是列表，包装为字典
             if task_type == "scene_plan" and isinstance(result, list):
                 result = {"scenes": result}
 
@@ -102,14 +118,75 @@ class PlannerAgent(BaseAgent):
             logger.error(f"{agent_name} failed, step={step}, error={e}, duration={duration:.2f}")
             return {"plan_result": {}, "error": str(e)}
 
-   
+    # ========== 分步式大纲生成核心逻辑 ==========
+    async def _generate_outline_step_by_step(self, state: AgentState) -> Dict[str, Any]:
+        user_input = state.user_input
+
+        # 1. 解析用户需求中的卷数和每卷章数（简单正则，可扩展）
+        volumes_match = re.search(r'(\d+)\s*卷', user_input)
+        total_volumes = int(volumes_match.group(1)) if volumes_match else 5
+        chapters_per_vol_match = re.search(r'每卷\s*(\d+)\s*章', user_input)
+        chapters_per_vol = int(chapters_per_vol_match.group(1)) if chapters_per_vol_match else 10
+        logger.info(f"Stepwise outline: total_volumes={total_volumes}, chapters_per_vol={chapters_per_vol}")
+
+        # 2. 生成卷列表（使用 volumes_outline builder）
+        volumes_builder = PROMPT_REGISTRY.get("volumes_outline")
+        if not volumes_builder:
+            raise ValueError("Missing 'volumes_outline' builder in PROMPT_REGISTRY")
+        prompt_vol = volumes_builder.build(state)
+        resp_vol = await self._plan_request_with_prompt(prompt_vol, "volumes_outline")
+        vol_result = volumes_builder.parse_response(resp_vol)
+        volumes = vol_result.get("volumes", [])
+        # 补足缺失的卷数（防止模型输出少于预期）
+        while len(volumes) < total_volumes:
+            new_vol = {
+                "volume_num": len(volumes)+1,
+                "title": f"第{len(volumes)+1}卷",
+                "target_realm": "元婴",
+                "core_conflict": "继续冒险提升实力"
+            }
+            volumes.append(new_vol)
+            logger.warning(f"Auto-filled missing volume {len(volumes)}")
+
+        full_outline = {
+            "title": "修仙长路",
+            "world_rules": ["灵力等级体系", "弱肉强食规则"],
+            "characters": [{"name": "林逸", "initial_state": {"realm": "炼气", "level": 1}}],
+            "volumes": []
+        }
+
+        # 3. 逐卷生成章节列表
+        chapters_builder = PROMPT_REGISTRY.get("chapters_outline")
+        if not chapters_builder:
+            raise ValueError("Missing 'chapters_outline' builder in PROMPT_REGISTRY")
+
+        for vol in volumes:
+            # 将当前卷信息临时放入 state.metadata，供 builder 使用
+            state.metadata["current_volume_info"] = vol
+            state.metadata["chapters_per_vol"] = chapters_per_vol
+            prompt_ch = chapters_builder.build(state)
+            resp_ch = await self._plan_request_with_prompt(prompt_ch, "chapters_outline")
+            ch_result = chapters_builder.parse_response(resp_ch)
+            chapters = ch_result.get("chapters", [])
+            # 补足缺失的章节
+            while len(chapters) < chapters_per_vol:
+                new_ch = {
+                    "chapter_num": len(chapters)+1,
+                    "title": f"第{len(chapters)+1}章",
+                    "must_events": [],
+                    "forbidden_events": []
+                }
+                chapters.append(new_ch)
+                logger.warning(f"Auto-filled missing chapter {len(chapters)} in volume {vol['volume_num']}")
+            vol["chapters"] = chapters
+            full_outline["volumes"].append(vol)
+
+        logger.info(f"Stepwise outline generated: {len(full_outline['volumes'])} volumes, total chapters={sum(len(v['chapters']) for v in full_outline['volumes'])}")
+        return full_outline
+
+    # ========== 以下是原有的辅助方法，保持不变 ==========
     async def _plan_request_with_prompt(self, prompt: str, task_type: str) -> str:
-        """直接发送自定义 prompt 给 LLM，返回原始响应。
-        
-        Args:
-            prompt: 构造好的提示词
-            task_type: 任务类型 (code, novel_outline, scene_plan等)
-        """
+        """直接发送自定义 prompt 给 LLM，返回原始响应。"""
         from src.model_router import get_router
         from src.execution.llm_router_pool import get_llm_router_pool
         from src.config import config
@@ -117,16 +194,13 @@ class PlannerAgent(BaseAgent):
         router = get_router()
         pool = get_llm_router_pool()
 
-        # 根据任务类型确定使用的模型
-        if task_type in ("scene_plan", "novel_outline"):
-            # 计划和提纲生成使用 plan 模型
+        if task_type in ("scene_plan", "novel_outline", "volumes_outline", "chapters_outline"):
             model_name = router.get_model_for_task("plan")
             candidates = [model_name]
         elif task_type == "code":
             model_name = router.get_model_for_task("code")
             candidates = [model_name]
         else:
-            # 降级：使用默认模型
             model_name = router.get_model_for_task("default")
             candidates = [model_name]
 
@@ -140,20 +214,21 @@ class PlannerAgent(BaseAgent):
                     model=model,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.2,
-                    max_tokens=2048
+                    max_tokens=8192
                 )
                 message = response.choices[0].message
                 content = message.content or ""
                 if not content and hasattr(message, "reasoning_content"):
                     content = message.reasoning_content or ""
-                logger.info(f"LLM response length: {len(content)}")
+                # ===== 添加日志 =====
+                logger.info(f"Planner raw response (first 2000 chars):\n{content[:2000]}")
+                logger.info(f"Planner response length: {len(content)}")
                 return content
             except Exception as e:
                 logger.error(f"LLM call failed: {e}")
                 raise
 
         return await pool.call_with_fallback(candidates, _call_llm, timeout=config.llm_timeout_planning)
-    
 
     async def _call_llm_with_fallback(self, user_request: str) -> str:
         router = get_router()
@@ -182,7 +257,7 @@ class PlannerAgent(BaseAgent):
                 {"role": "user", "content": prompt}
             ],
             temperature=0.2,
-            max_tokens=2048
+            max_tokens=8192
         )
         content = response.choices[0].message.content
         if not content:
@@ -192,13 +267,10 @@ class PlannerAgent(BaseAgent):
         return content
 
     def _parse_response(self, response: str) -> TaskPlan:
-        # 原有思路基础上，增加自动补全括号的逻辑
         response = response.strip()
-        # 提取代码块
         match = re.search(r'```json\s*([\s\S]*?)\s*```', response, re.DOTALL)
         if match:
             response = match.group(1).strip()
-        # 找到第一个 { 和匹配的 }，如果到最后都不匹配则补全
         start = response.find('{')
         if start == -1:
             raise ValueError("No JSON object found")
@@ -213,15 +285,12 @@ class PlannerAgent(BaseAgent):
                     end = i
                     break
         else:
-            # 未找到匹配的结束括号，尝试补全
             end = len(response) - 1
-            # 补全缺失的 } 并继续解析
             response = response[:end+1] + '}' * brace_count
         json_str = response[start:end+1]
         json_str = re.sub(r',\s*}', '}', json_str)
         json_str = re.sub(r',\s*]', ']', json_str)
         data = json.loads(json_str)
-        # ... 后续不变
         subtasks = []
         for st in data.get("subtasks", []):
             subtasks.append(Subtask(

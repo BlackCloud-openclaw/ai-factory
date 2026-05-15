@@ -1,0 +1,36 @@
+characters:
+  - character: 林逸
+    speech_style: 少年沉稳，偶尔冲动，短句为主，说话直接
+    common_phrases: ["哼", "有意思", "我偏不信", "好"]
+    sentence_length: short
+    vocabulary_tags: ["直白", "坚定"]
+    forbidden_words: ["呵呵", "哈哈"]
+    emotional_baseline:
+      喜: 0.6
+      怒: 0.3
+      哀: 0.1
+      乐: 0.5
+
+  - character: 长老
+    speech_style: 老成持重，多用四字词和典故，语速慢
+    common_phrases: ["尔等", "天意", "不可说", "善哉"]
+    sentence_length: medium
+    vocabulary_tags: ["文雅", "含蓄"]
+    forbidden_words: ["小子", "嘿嘿"]
+    emotional_baseline:
+      喜: 0.2
+      怒: 0.1
+      哀: 0.2
+      乐: 0.1
+
+  - character: 反派
+    speech_style: 阴险狡诈，阴阳怪气，多用反问
+    common_phrases: ["呵呵", "你猜", "不知死活", "有趣"]
+    sentence_length: short
+    vocabulary_tags: ["阴冷", "嘲讽"]
+    forbidden_words: ["朋友", "感谢"]
+    emotional_baseline:
+      喜: 0.1
+      怒: 0.5
+      哀: 0.1
+      乐: 0.4

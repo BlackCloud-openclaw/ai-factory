@@ -16,13 +16,13 @@ MODEL_CONFIG = {
         "container": "llamacpp-coder",
         "port": 8081,
         "max_concurrent": 1,
-        "memory_gb": 28,          # 文件22G + 推理开销 → 28G
+        "memory_gb": 30,          # 文件22G + 推理开销 → 30G
     },
-    "Qwen3.5-122B-A10B-Q4_K_M": {
+    "Qwen3-32B-Q5_K_M-writer": {
         "container": "llamacpp-writing",
         "port": 8082,
         "max_concurrent": 1,
-        "memory_gb": 90,          # 文件87G + 推理开销 → 90G
+        "memory_gb": 40,          # 文件45G + 推理开销 → 60G
     },
     "DeepSeek-R1-Distill-Llama-70B-Q5_K_M": {
         "container": "llamacpp-research",
@@ -34,25 +34,25 @@ MODEL_CONFIG = {
         "container": "llamacpp-validate",
         "port": 8084,
         "max_concurrent": 1,
-        "memory_gb": 28,          # 文件22G + 推理开销 → 28G
+        "memory_gb": 30,          # 文件22G + 推理开销 → 30G
     },
     "Qwen3-32B-Q5_K_M": {
         "container": "llamacpp-plan",
         "port": 8085,
         "max_concurrent": 1,
-        "memory_gb": 28,          # 文件22G + 推理开销 → 28G
+        "memory_gb": 40,          # 文件22G + 推理开销 → 30G
     },
     "Qwen3.6-27B-Q5_K_M": {
         "container": "llamacpp-default",
         "port": 8086,
         "max_concurrent": 1,
-        "memory_gb": 24,          # 文件19G + 推理开销 → 24G
+        "memory_gb": 26,          # 文件19G + 推理开销 → 26G
     },
 }
 
 MEMORY_SAFETY_MARGIN_GB = 2
 LARGE_MODELS = {
-    "Qwen3.5-122B-A10B-Q4_K_M",
+    "Qwen2.5-72B-Instruct-Q4_K_M",
     "DeepSeek-R1-Distill-Llama-70B-Q5_K_M",
 }
 

@@ -3,18 +3,26 @@
 import uuid
 import asyncio
 import time
-from typing import Optional
-
+import json
+import logging
 import psutil
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from src.orchestrator.state import AgentState
+from src.db import get_db_pool
 from src.orchestrator.graph import compile_workflow
 from src.common.models import AgentResponse
 from src.common.logging import setup_logging
 from src.execution.llm_router_pool import get_llm_router_pool
 from src.api.scheduler import get_scheduler
-from src.db import get_db_pool
+
+# 新架构事件存储和快照
+from src.writing.event_store import NarrativeEventStore
+from src.writing.snapshot import SnapshotManager
+from src.writing.world_state import WorldState
+from src.writing.delta import StateDelta
 
 # 全局并发控制（最多同时运行 2 个工作流）
 _global_workflow_semaphore = asyncio.Semaphore(2)
@@ -42,23 +50,18 @@ class ExecuteRequest(BaseModel):
     session_id: Optional[str] = None
     project_id: Optional[str] = None
     max_retries: Optional[int] = None
-    # 新增小说相关字段
     task_type: str = "code"           # "code" / "novel_outline" / "scene_plan"
     novel_id: Optional[str] = None    # 用于续写时指定哪部小说
     resume: bool = False              # 是否从上次中断处继续
 
 
 async def _run_workflow(request: ExecuteRequest) -> dict:
-    """实际执行工作流的协程，供调度器调用"""
-    from src.orchestrator.state import AgentState
-    from src.db import get_db_pool
-    import json
+    logger = logging.getLogger("api.execute")
 
     session_id = request.session_id or uuid.uuid4().hex[:8]
     project_id = request.project_id or session_id
     max_retries = request.max_retries or 3
 
-    # 构建初始状态
     initial_state = AgentState(
         user_input=request.user_input,
         project_id=project_id,
@@ -69,47 +72,98 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
         resume=request.resume,
     )
 
-    # 如果是场景计划或续写，且提供了 novel_id，则从数据库加载大纲
-    if request.task_type in ("scene_plan", "novel_outline") and request.novel_id:
-        pool = get_db_pool()
-        if pool:
-            try:
-                async with pool.acquire() as conn:
-                    row = await conn.fetchrow(
-                        """SELECT outline, current_volume, current_chapter, current_scene
-                        FROM novels WHERE novel_id = $1""",
-                        request.novel_id
-                    )
-                    if row:
-                        outline = json.loads(row["outline"])
-                        initial_state.outline = outline
+    pool = get_db_pool()
 
-                        # 获取当前卷的索引（注意数据库存储的 current_volume 从 1 开始）
-                        current_vol = row["current_volume"] or 1
-                        volumes = outline.get("volumes", [])
-                        if 0 <= current_vol - 1 < len(volumes):
-                            total_chapters = len(volumes[current_vol - 1].get("chapters", []))
-                        else:
-                            total_chapters = 0
-                        initial_state.total_chapters_in_volume = total_chapters
+    # ========== 断点续写模式（基于新架构） ==========
+    if request.resume and request.novel_id and pool:
+        try:
+            event_store = NarrativeEventStore(pool)
+            snap_mgr = SnapshotManager(pool)
 
-                        # 恢复进度
-                        initial_state.current_volume = current_vol
-                        initial_state.current_chapter = row["current_chapter"] or 1
-                        # current_scene 存储已完成场景数，current_scene_index 是 0‑based 索引
-                        completed_scenes = row["current_scene"] or 0
-                        initial_state.current_scene = completed_scenes
-                        initial_state.current_scene_index = completed_scenes
+            # 1. 加载最新快照
+            world_state, _, last_event_id = await snap_mgr.load_latest_snapshot(request.novel_id)
+            if world_state is None:
+                world_state = WorldState()
+                last_event_id = 0
 
-                        logger.info(f"Loaded outline for novel {request.novel_id}, "
-                                    f"volume={initial_state.current_volume}, "
-                                    f"chapter={initial_state.current_chapter}, "
-                                    f"scene_index={initial_state.current_scene_index}")
-            except Exception as e:
-                logger.error(f"Failed to load outline for novel {request.novel_id}: {e}", exc_info=True)
+            # 2. 加载快照之后的事件
+            events_with_id = await event_store.get_events_since(request.novel_id, since_event_id=last_event_id)
+
+            # 3. 重放事件，更新世界状态
+            for evt_id, evt in events_with_id:
+                delta = StateDelta(events=[evt])
+                world_state = delta.apply_to(world_state)
+                last_event_id = evt_id  # 记录最后应用的事件数据库ID
+
+            # 4. 保存当前状态到 initial_state
+            initial_state.current_state = world_state.to_dict()
+            initial_state.last_sequence_id = last_event_id
+
+            # 5. 从 novels 表读取元数据（大纲、进度等）
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    """SELECT outline, current_volume, current_chapter, current_scene_index, scene_plan_list
+                       FROM novels WHERE novel_id = $1""",
+                    request.novel_id
+                )
+                if row:
+                    if row["outline"]:
+                        initial_state.outline = json.loads(row["outline"])
+                    initial_state.current_volume = row["current_volume"] or 1
+                    initial_state.current_chapter = row["current_chapter"] or 1
+                    initial_state.current_scene_index = row["current_scene_index"] or 0
+                    if row["scene_plan_list"]:
+                        scene_plan_list = json.loads(row["scene_plan_list"])
+                        initial_state.scene_plan_list = scene_plan_list
+                        initial_state.total_scenes_in_chapter = len(scene_plan_list)
+
+                    # 从大纲中获取当前卷的总章节数（用于卷切换）
+                    if initial_state.outline and "volumes" in initial_state.outline:
+                        volumes = initial_state.outline["volumes"]
+                        vol_idx = initial_state.current_volume - 1
+                        if 0 <= vol_idx < len(volumes):
+                            total_chapters = len(volumes[vol_idx].get("chapters", []))
+                            initial_state.total_chapters_in_volume = total_chapters
+
+            logger.info(f"Resume: restored state for {request.novel_id}, "
+                        f"volume={initial_state.current_volume}, "
+                        f"chapter={initial_state.current_chapter}, "
+                        f"scene={initial_state.current_scene_index}, "
+                        f"last_event_id={last_event_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to resume state for novel {request.novel_id}: {e}", exc_info=True)
+            # 恢复失败时降级为非续写模式（仍可尝试全新生成）
+            initial_state.resume = False
+
+    # ========== 非续写模式：加载大纲和已有进度（仅初版，不依赖事件） ==========
+    elif not request.resume and request.task_type in ("scene_plan", "novel_outline") and request.novel_id and pool:
+        try:
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    """SELECT outline, current_volume, current_chapter, current_scene_index
+                       FROM novels WHERE novel_id = $1""",
+                    request.novel_id
+                )
+                if row:
+                    if row["outline"]:
+                        initial_state.outline = json.loads(row["outline"])
+                    initial_state.current_volume = row["current_volume"] or 1
+                    initial_state.current_chapter = row["current_chapter"] or 1
+                    initial_state.current_scene_index = row["current_scene_index"] or 0
+
+                    if initial_state.outline and "volumes" in initial_state.outline:
+                        volumes = initial_state.outline["volumes"]
+                        vol_idx = initial_state.current_volume - 1
+                        if 0 <= vol_idx < len(volumes):
+                            total_chapters = len(volumes[vol_idx].get("chapters", []))
+                            initial_state.total_chapters_in_volume = total_chapters
+
+                    logger.info(f"Loaded outline for novel {request.novel_id} (non-resume mode)")
+        except Exception as e:
+            logger.error(f"Failed to load outline for novel {request.novel_id}: {e}", exc_info=True)
 
     workflow = get_workflow()
-    # 总超时 3600 秒（1小时）
     result = await asyncio.wait_for(
         workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100}),
         timeout=3600,
@@ -119,62 +173,43 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
 
 @execute_router.post("")
 async def execute(request: ExecuteRequest) -> AgentResponse:
-    """
-    Execute a user request through the AI Factory pipeline.
-    """
     global _last_memory_cleanup
 
-    # 0. 基础校验
     if not request.user_input.strip():
         raise HTTPException(status_code=400, detail="user_input cannot be empty")
 
-    # 1. 快速内存检查（不占槽位）- 先尝试清理，若仍过高则拒绝
     mem = psutil.virtual_memory()
     if mem.percent > 90:
         pool = get_llm_router_pool()
         await pool.cleanup_all_idle_containers_force()
         mem = psutil.virtual_memory()
         if mem.percent > 90:
-            raise HTTPException(
-                status_code=503,
-                detail="System memory overloaded, please retry later"
-            )
+            raise HTTPException(status_code=503, detail="System memory overloaded, please retry later")
 
-    # 2. 获取执行槽位（限制并发工作流数量）
     async with _global_workflow_semaphore:
         session_id = request.session_id or uuid.uuid4().hex[:8]
         project_id = request.project_id or session_id
-        logger.info(
-            f"Executing request for session={session_id}, project={project_id}: {request.user_input[:150]}"
-        )
+        logger.info(f"Executing request for session={session_id}, project={project_id}: {request.user_input[:150]}")
 
-        # ========== 内存熔断（两级保护） ==========
         mem = psutil.virtual_memory()
         pool = get_llm_router_pool()
 
-        # 软熔断：内存使用率 > 90%，尝试清理空闲容器（二次保障）
         if mem.percent > 90:
             now = time.time()
-            if now - _last_memory_cleanup > 30:   # 每 30 秒最多清理一次
+            if now - _last_memory_cleanup > 30:
                 await pool.cleanup_all_idle_containers_force()
                 _last_memory_cleanup = now
                 mem = psutil.virtual_memory()
 
-        # 硬熔断：内存使用率 > 96%，直接拒绝新请求
         if mem.percent > 96:
             logger.warning(f"Memory overloaded: {mem.percent}%, rejecting request")
-            raise HTTPException(
-                status_code=503,
-                detail="System memory overloaded, please retry later"
-            )
+            raise HTTPException(status_code=503, detail="System memory overloaded, please retry later")
 
-        # ========== 通过优先级调度器提交任务 ==========
-        # 根据用户输入简单判断优先级（数字越小优先级越高）
         lower_input = request.user_input.lower()
         if any(kw in lower_input for kw in ["写代码", "函数", "斐波那契", "计算"]):
-            priority = 1   # 代码生成高优先级
+            priority = 1
         elif any(kw in lower_input for kw in ["写小说", "故事", "雨夜"]):
-            priority = 3   # 写作低优先级
+            priority = 3
         else:
             priority = 2
 
@@ -185,7 +220,6 @@ async def execute(request: ExecuteRequest) -> AgentResponse:
             logger.error(f"Scheduler submission failed: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-        # ========== 构建响应 ==========
         execution_result = result.get("execution_result")
         sources = []
         for rr in result.get("research_results", []):

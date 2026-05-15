@@ -30,6 +30,11 @@ httpx
 ddgs
 slowapi
 colorama
+aiohttp
+pyyaml
+numpy
+jieba
+requests
 
 # Testing
 pytest

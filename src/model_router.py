@@ -3,7 +3,7 @@ from typing import List, Optional
 
 MODEL_CANDIDATES = {
     "code": ["Qwen2.5-Coder-32B-Instruct-Q5_K_M"],
-    "writing": ["Qwen3.5-122B-A10B-Q4_K_M"],
+    "writing": ["Qwen3-32B-Q5_K_M-writer"],
     "research": ["DeepSeek-R1-Distill-Llama-70B-Q5_K_M"],
     "validate": ["DeepSeek-R1-Distill-Qwen-32B-Q5_K_M"],
     "plan": ["Qwen3-32B-Q5_K_M"],

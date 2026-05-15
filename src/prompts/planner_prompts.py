@@ -1,29 +1,44 @@
 # src/prompts/planner_prompts.py
 import json
 import re
+import logging
+import ast
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 from src.orchestrator.state import AgentState
 
+# src/prompts/planner_prompts.py
+
 def extract_json_from_response(text: str) -> Dict[str, Any]:
-    """从 LLM 响应中提取第一个完整的 JSON 对象或数组"""
+    """
+    从 LLM 响应中提取 JSON 对象或数组，具有极高的容错性。
+    支持修复缺失逗号、未转义引号、控制字符等问题，并支持按行/对象分割解析。
+    """
+
+    logger = logging.getLogger("agents.planner")
     text = text.strip()
-    # 尝试提取 markdown 代码块中的 JSON
+
+    # 1. 提取 markdown 代码块
     match = re.search(r'```(?:json)?\s*\n([\s\S]*?)\n\s*```', text, re.DOTALL)
     if match:
         text = match.group(1).strip()
-    # 找到第一个 { 或 [ 并匹配闭合
-    start = None
-    for i, ch in enumerate(text):
-        if ch in '{[':
-            start = i
-            break
-    if start is None:
-        raise ValueError("No JSON object or array found")
+
+    # 2. 尝试直接解析整个文本（最理想情况）
+    try:
+        return json.loads(text)
+    except Exception as e:
+        logger.debug(f"Direct parse failed: {e}")
+
+    # 3. 查找第一个数组 '[' 并提取完整数组
+    start = text.find('[')
+    if start == -1:
+        # 也可能是对象，以 '{' 开头
+        start = text.find('{')
+        if start == -1:
+            raise ValueError("No JSON array or object found")
     stack = []
     end = start
-    for i in range(start, len(text)):
-        ch = text[i]
+    for i, ch in enumerate(text[start:], start):
         if ch in '{[':
             stack.append(ch)
         elif ch == '}':
@@ -40,15 +55,77 @@ def extract_json_from_response(text: str) -> Dict[str, Any]:
             end = i
             break
     json_str = text[start:end+1]
-    # 尝试解析
+
+    # 4. 预处理：去除尾随逗号、转义字符串内部未转义的双引号
+    json_str = re.sub(r',\s*}', '}', json_str)
+    json_str = re.sub(r',\s*]', ']', json_str)
+
+    # 辅助函数：修复值内双引号
+    def fix_quotes(m):
+        key = m.group(1)
+        value = m.group(2)
+        value_fixed = value.replace('"', '\\"')
+        return f'"{key}": "{value_fixed}"'
+
+    # 多次执行直到稳定
+    for _ in range(5):
+        new_json = re.sub(r'"([^"\\]+)"\s*:\s*"([^"]*)"', fix_quotes, json_str)
+        if new_json == json_str:
+            break
+        json_str = new_json
+
+    # 5. 转义控制字符
+    def escape_control(m):
+        ch = m.group(0)
+        if ch in '\t\n\r':
+            return ch
+        return f'\\u{ord(ch):04x}'
+
+    # 保护已有转义反斜杠
+    json_str = json_str.replace('\\\\', '<<DBACK>>')
+    json_str = re.sub(r'[\x00-\x1F]', escape_control, json_str)
+    json_str = json_str.replace('<<DBACK>>', '\\\\')
+
+    # 6. 尝试解析整个 JSON
     try:
         return json.loads(json_str)
-    except json.JSONDecodeError as e:
-        # 尝试修复常见问题：尾随逗号、单引号等（简单处理）
-        json_str = re.sub(r',\s*}', '}', json_str)
-        json_str = re.sub(r',\s*]', ']', json_str)
-        json_str = re.sub(r"'", '"', json_str)  # 将单引号改为双引号（可能破坏内容）
-        return json.loads(json_str)
+    except Exception as e:
+        logger.warning(f"Whole JSON parse failed after fixes: {e}")
+
+    # 7. 最后手段：按对象分割解析（适用于数组）
+    if json_str.startswith('[') and json_str.endswith(']'):
+        content = json_str[1:-1].strip()
+        objects = []
+        brace_count = 0
+        start_idx = 0
+        for i, ch in enumerate(content):
+            if ch == '{':
+                if brace_count == 0:
+                    start_idx = i
+                brace_count += 1
+            elif ch == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    obj_str = content[start_idx:i+1]
+                    # 尝试修复该对象
+                    obj_str = re.sub(r',\s*}', '}', obj_str)
+                    try:
+                        obj = json.loads(obj_str)
+                        objects.append(obj)
+                    except:
+                        try:
+                            # 转为 Python 字面量
+                            obj = ast.literal_eval(obj_str)
+                            objects.append(obj)
+                        except:
+                            logger.warning(f"Skipping invalid object: {obj_str[:100]}")
+        if objects:
+            return objects  # 返回列表，调用者需处理
+        else:
+            raise ValueError("No valid objects found")
+    else:
+        raise ValueError("Not a JSON array")
+    
 
 class PromptBuilder(ABC):
     @abstractmethod
@@ -59,6 +136,8 @@ class PromptBuilder(ABC):
     def parse_response(self, response: str) -> Dict[str, Any]:
         pass
 
+
+# ---------- 代码生成任务 ----------
 class CodePromptBuilder(PromptBuilder):
     def build(self, state: AgentState) -> str:
         user_request = state.user_input
@@ -83,6 +162,8 @@ User request: {user_request}"""
     def parse_response(self, response: str) -> Dict[str, Any]:
         return extract_json_from_response(response)
 
+
+# ---------- 一次性大纲生成器（保留兼容） ----------
 class NovelOutlinePromptBuilder(PromptBuilder):
     def build(self, state: AgentState) -> str:
         user_input = state.user_input
@@ -117,38 +198,167 @@ User request: {user_input}"""
         return extract_json_from_response(response)
 
 
+# ---------- 分步式大纲生成器 ----------
+class OutlineVolumesPromptBuilder(PromptBuilder):
+    def build(self, state: AgentState) -> str:
+        user_input = state.user_input
+        return f"""你是一位小说策划专家。请根据用户需求，生成小说卷级别的概览（JSON数组）。
+每个元素包含：
+- volume_num: 卷序号（从1开始）
+- title: 卷标题（简洁有力）
+- target_realm: 主角在本卷结束时应该达到的境界
+- core_conflict: 本卷的核心冲突（一句话）
+
+用户需求：{user_input}
+
+输出格式严格为JSON数组，例如：
+[
+    {{"volume_num": 1, "title": "初入修仙界", "target_realm": "筑基", "core_conflict": "入门之争与机缘争夺"}},
+    {{"volume_num": 2, "title": "宗门试炼", "target_realm": "金丹", "core_conflict": "宗门大比与内奸阴谋"}}
+]
+请确保总卷数符合用户要求。"""
+
+    def parse_response(self, response: str) -> Dict[str, Any]:
+        data = extract_json_from_response(response)
+        if isinstance(data, list):
+            return {"volumes": data}
+        return {"volumes": []}
+
+
+class OutlineChaptersPromptBuilder(PromptBuilder):
+    def build(self, state: AgentState) -> str:
+        volume = state.metadata.get("current_volume_info", {})
+        chapters_per_vol = state.metadata.get("chapters_per_vol", 10)
+        return f"""根据下面卷的信息，生成该卷的 {chapters_per_vol} 章详细大纲。
+卷信息：卷{volume.get('volume_num')} 《{volume.get('title')}》
+目标境界：{volume.get('target_realm')}
+核心冲突：{volume.get('core_conflict')}
+
+输出JSON数组，每个元素包含：
+- chapter_num: 章节序号
+- title: 章节标题
+- must_events: 必须发生的事件（字符串数组）
+- forbidden_events: 禁止发生的事件（字符串数组）
+
+输出格式：
+[
+    {{"chapter_num": 1, "title": "初遇机缘", "must_events": ["捡到神秘玉佩"], "forbidden_events": []}},
+    ...
+]
+注意：长度必须恰好为 {chapters_per_vol} 章。"""
+
+    def parse_response(self, response: str) -> Dict[str, Any]:
+        data = extract_json_from_response(response)
+        if isinstance(data, list):
+            return {"chapters": data}
+        return {"chapters": []}
+
+
+# ---------- 场景计划生成器（新架构增强版） ----------
 class ScenePlanPromptBuilder(PromptBuilder):
     def build(self, state: AgentState) -> str:
         outline = state.outline
         chapter = state.current_chapter
-        return f"""根据以下大纲和当前章节号，生成该章节的 3~5 个场景计划（JSON 数组）。
+        volume = getattr(state, 'current_volume', 1)
+        
+        # 添加调试日志
+        import logging
+        logger = logging.getLogger("agents.planner")
+        logger.info(f"ScenePlanPrompt: volume={volume}, chapter={chapter}, outline exists: {outline is not None}")
+        
+        # 提取当前章节的 must_events
+        current_must_events = []
+        current_chapter_title = ""
+        if outline and isinstance(outline, dict) and "volumes" in outline:
+            volumes = outline.get("volumes", [])
+            vol_idx = volume - 1
+            if 0 <= vol_idx < len(volumes):
+                chapters = volumes[vol_idx].get("chapters", [])
+                ch_idx = chapter - 1
+                if 0 <= ch_idx < len(chapters):
+                    current_must_events = chapters[ch_idx].get("must_events", [])
+                    current_chapter_title = chapters[ch_idx].get("title", "")
+                    logger.info(f"Found must_events for chapter {chapter}: {current_must_events}")
+                else:
+                    logger.warning(f"Chapter index {ch_idx} out of range (chapters len={len(chapters)})")
+            else:
+                logger.warning(f"Volume index {vol_idx} out of range (volumes len={len(volumes)})")
+        else:
+            logger.warning(f"Outline structure invalid: {type(outline)}")
+        
+        must_events_text = "\n".join(f"- {e}" for e in current_must_events) if current_must_events else "（本章大纲未定义必须事件，请根据前情合理推进剧情）"
+        
+        base_prompt = f"""根据以下大纲和当前章节号，生成该章节的 3~5 个场景计划（JSON 数组）。
 
 大纲：{outline}
+当前卷：{volume}
 当前章号：{chapter}
+当前章标题：{current_chapter_title}
 
-每个场景计划是一个 JSON 对象，包含以下字段：
+**⚠️ 本章必须包含的剧情事件（必须覆盖以下所有 must_events）**：
+{must_events_text}
+
+**must_events 分配规则**：
+- 将上述必须事件**分配到不同场景**中，每个场景的 "must_events" 只能是这些事件的子集。
+- 所有场景的 must_events **合集必须完整覆盖**全部必须事件，且各场景之间**不能重复**相同事件。
+- 如果某场景不包含任何必须事件，`"must_events": []` 是允许的（例如示例中的场景3）。
+
+**场景计划格式要求**：
+每个场景是一个 JSON 对象，必须包含 "goal", "conflict", "outcome", "characters", "must_events" 字段。
+
+**剧情推进规则**：
+- 不要重复已经在前几章完成的事件（例如第1章的“捡到神秘玉佩”不应在第2章及以后重复出现）。
+- 剧情必须持续推进，不要停滞在同一个情节上。
+
+**示例**：
 {{
     "goal": "场景目标",
     "conflict": "冲突描述",
     "outcome": "结果",
-    "characters": ["角色1", "角色2"]
+    "characters": ["角色1", "角色2"],
+    "must_events": ["该场景需要体现的其中一个必须事件"]
 }}
 
-输出格式：一个 JSON 数组，例如 [{{...}}, {{...}}]。不要输出任何额外文本。"""
+**state_delta 示例**：
+{{
+    "character_updates": {{"林逸": {{"realm": "炼气三层", "hp": 95}}}},
+    "relationship_updates": {{"林逸|二叔": -10}},
+    "plot_flags": ["玉佩觉醒"]
+}}
+
+**depends_on 示例**：
+- 场景2依赖场景1的结果：`"depends_on": [1]`
+- 场景3无依赖：`"depends_on": []`
+
+输出格式：一个 JSON 数组，每个元素包含上述所有字段。不要输出任何额外文本。"""
+
+        # 注入压缩上下文（可选）
+        compressed_context = state.metadata.get("compressed_context")
+        if compressed_context:
+            base_prompt += f"\n\n【参考历史剧情摘要】\n{compressed_context}\n请根据以上历史信息，规划接下来的场景，保持剧情连贯。"
+
+        # 注入历史章节摘要（可选）
+        history_summaries = state.metadata.get("history_summaries")
+        if history_summaries:
+            summary_text = "\n\n【参考历史章节摘要】\n" + "\n---\n".join(history_summaries)
+            base_prompt += summary_text
+
+        return base_prompt
 
     def parse_response(self, response: str) -> Dict[str, Any]:
-        data = extract_json_from_response(response)   # 复用已有的 JSON 提取函数
+        data = extract_json_from_response(response)
         if isinstance(data, list):
             return {"scenes": data}
         elif isinstance(data, dict) and "scenes" in data:
             return data
         else:
-            # 降级：包装成单场景列表
             return {"scenes": [data] if isinstance(data, dict) else []}
-
-
+        
+# ---------- 注册表 ----------
 PROMPT_REGISTRY = {
     "code": CodePromptBuilder(),
     "novel_outline": NovelOutlinePromptBuilder(),
+    "volumes_outline": OutlineVolumesPromptBuilder(),
+    "chapters_outline": OutlineChaptersPromptBuilder(),
     "scene_plan": ScenePlanPromptBuilder(),
 }
