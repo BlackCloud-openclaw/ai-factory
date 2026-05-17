@@ -93,29 +93,35 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
             for evt_id, evt in events_with_id:
                 delta = StateDelta(events=[evt])
                 world_state = delta.apply_to(world_state)
-                last_event_id = evt_id  # 记录最后应用的事件数据库ID
+                last_event_id = evt_id
 
             # 4. 保存当前状态到 initial_state
             initial_state.current_state = world_state.to_dict()
             initial_state.last_sequence_id = last_event_id
 
-            # 5. 从 novels 表读取元数据（大纲、进度等）
+            # 5. 从 novels 表读取元数据（大纲、进度等），不再读取 scene_plan_list
             async with pool.acquire() as conn:
                 row = await conn.fetchrow(
-                    """SELECT outline, current_volume, current_chapter, current_scene_index, scene_plan_list
-                       FROM novels WHERE novel_id = $1""",
+                    """SELECT outline, current_volume, current_chapter, current_scene_index
+                    FROM novels WHERE novel_id = $1""",
                     request.novel_id
                 )
+                
                 if row:
                     if row["outline"]:
                         initial_state.outline = json.loads(row["outline"])
                     initial_state.current_volume = row["current_volume"] or 1
                     initial_state.current_chapter = row["current_chapter"] or 1
                     initial_state.current_scene_index = row["current_scene_index"] or 0
-                    if row["scene_plan_list"]:
-                        scene_plan_list = json.loads(row["scene_plan_list"])
-                        initial_state.scene_plan_list = scene_plan_list
-                        initial_state.total_scenes_in_chapter = len(scene_plan_list)
+                    
+                    # 续写模式下，场景计划应该从 scene_execution_units 加载，
+                    # 此处不设置，留空以便后续 plan_node 生成或续写时通过 /resume 接口处理。
+                    initial_state.metadata["scene_plan_list"] = []
+                    initial_state.metadata["total_scenes_in_chapter"] = 0
+                    initial_state.metadata["current_scene_index"] = initial_state.current_scene_index
+                    initial_state.metadata["current_scene_plan"] = None
+                    initial_state.scene_plan_list = []
+                    initial_state.total_scenes_in_chapter = 0
 
                     # 从大纲中获取当前卷的总章节数（用于卷切换）
                     if initial_state.outline and "volumes" in initial_state.outline:
@@ -133,7 +139,6 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
 
         except Exception as e:
             logger.error(f"Failed to resume state for novel {request.novel_id}: {e}", exc_info=True)
-            # 恢复失败时降级为非续写模式（仍可尝试全新生成）
             initial_state.resume = False
 
     # ========== 非续写模式：加载大纲和已有进度（仅初版，不依赖事件） ==========
@@ -151,6 +156,14 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
                     initial_state.current_volume = row["current_volume"] or 1
                     initial_state.current_chapter = row["current_chapter"] or 1
                     initial_state.current_scene_index = row["current_scene_index"] or 0
+                    
+                    # 非续写模式下，场景计划尚未生成，初始化为空
+                    initial_state.metadata["scene_plan_list"] = []
+                    initial_state.metadata["total_scenes_in_chapter"] = 0
+                    initial_state.metadata["current_scene_index"] = initial_state.current_scene_index
+                    initial_state.metadata["current_scene_plan"] = None
+                    initial_state.scene_plan_list = []
+                    initial_state.total_scenes_in_chapter = 0
 
                     if initial_state.outline and "volumes" in initial_state.outline:
                         volumes = initial_state.outline["volumes"]

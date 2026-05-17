@@ -7,13 +7,16 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 from src.orchestrator.state import AgentState
 
-# src/prompts/planner_prompts.py
 
 def extract_json_from_response(text: str) -> Dict[str, Any]:
     """
-    从 LLM 响应中提取 JSON 对象或数组，具有极高的容错性。
-    支持修复缺失逗号、未转义引号、控制字符等问题，并支持按行/对象分割解析。
+    从 LLM 响应中提取 JSON 对象或数组，具有极强的容错性。
+    支持修复缺失逗号、未转义引号、控制字符等问题，并支持按对象分割解析。
     """
+    import re
+    import json
+    import logging
+    import ast
 
     logger = logging.getLogger("agents.planner")
     text = text.strip()
@@ -29,52 +32,66 @@ def extract_json_from_response(text: str) -> Dict[str, Any]:
     except Exception as e:
         logger.debug(f"Direct parse failed: {e}")
 
-    # 3. 查找第一个数组 '[' 并提取完整数组
-    start = text.find('[')
-    if start == -1:
-        # 也可能是对象，以 '{' 开头
-        start = text.find('{')
-        if start == -1:
+    # 3. 查找第一个数组 '[' 或对象 '{'
+    start_idx = text.find('[')
+    if start_idx == -1:
+        start_idx = text.find('{')
+        if start_idx == -1:
             raise ValueError("No JSON array or object found")
+
+    # 4. 匹配完整的 JSON 结构（使用栈，处理嵌套）
     stack = []
-    end = start
-    for i, ch in enumerate(text[start:], start):
+    end = start_idx
+    for i, ch in enumerate(text[start_idx:], start_idx):
         if ch in '{[':
             stack.append(ch)
         elif ch == '}':
             if stack and stack[-1] == '{':
                 stack.pop()
             else:
-                break
+                # 可能的格式错误，尝试继续
+                if len(stack) == 0:
+                    end = i
+                    break
+                continue
         elif ch == ']':
             if stack and stack[-1] == '[':
                 stack.pop()
             else:
-                break
+                if len(stack) == 0:
+                    end = i
+                    break
+                continue
         if not stack:
             end = i
             break
-    json_str = text[start:end+1]
+    else:
+        # 未找到闭合，取整个剩余部分
+        end = len(text) - 1
 
-    # 4. 预处理：去除尾随逗号、转义字符串内部未转义的双引号
+    json_str = text[start_idx:end+1]
+
+    # 5. 预处理：去除尾随逗号
     json_str = re.sub(r',\s*}', '}', json_str)
     json_str = re.sub(r',\s*]', ']', json_str)
 
-    # 辅助函数：修复值内双引号
+    # 6. 修复字符串值内部未转义的双引号
+    # 匹配 "key": "任意内容（可能包含未转义双引号）"，并转义内容中的双引号
     def fix_quotes(m):
         key = m.group(1)
         value = m.group(2)
-        value_fixed = value.replace('"', '\\"')
+        # 将 value 中的双引号转义（但保留已经转义的 \\"）
+        value_fixed = re.sub(r'(?<!\\)"', r'\\"', value)
         return f'"{key}": "{value_fixed}"'
 
     # 多次执行直到稳定
-    for _ in range(5):
+    for _ in range(3):
         new_json = re.sub(r'"([^"\\]+)"\s*:\s*"([^"]*)"', fix_quotes, json_str)
         if new_json == json_str:
             break
         json_str = new_json
 
-    # 5. 转义控制字符
+    # 7. 转义控制字符（ASCII 0-31，除了 \t \n \r）
     def escape_control(m):
         ch = m.group(0)
         if ch in '\t\n\r':
@@ -86,43 +103,47 @@ def extract_json_from_response(text: str) -> Dict[str, Any]:
     json_str = re.sub(r'[\x00-\x1F]', escape_control, json_str)
     json_str = json_str.replace('<<DBACK>>', '\\\\')
 
-    # 6. 尝试解析整个 JSON
+    # 8. 尝试解析整个 JSON
     try:
         return json.loads(json_str)
     except Exception as e:
         logger.warning(f"Whole JSON parse failed after fixes: {e}")
 
-    # 7. 最后手段：按对象分割解析（适用于数组）
+    # 9. 最后手段：按对象分割解析（适用于数组）
     if json_str.startswith('[') and json_str.endswith(']'):
         content = json_str[1:-1].strip()
         objects = []
         brace_count = 0
-        start_idx = 0
+        start_obj = 0
+        in_string = False
         for i, ch in enumerate(content):
-            if ch == '{':
-                if brace_count == 0:
-                    start_idx = i
-                brace_count += 1
-            elif ch == '}':
-                brace_count -= 1
-                if brace_count == 0:
-                    obj_str = content[start_idx:i+1]
-                    # 尝试修复该对象
-                    obj_str = re.sub(r',\s*}', '}', obj_str)
-                    try:
-                        obj = json.loads(obj_str)
-                        objects.append(obj)
-                    except:
+            if ch == '"' and (i == 0 or content[i-1] != '\\'):
+                in_string = not in_string
+            if not in_string:
+                if ch == '{':
+                    if brace_count == 0:
+                        start_obj = i
+                    brace_count += 1
+                elif ch == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        obj_str = content[start_obj:i+1]
                         try:
-                            # 转为 Python 字面量
-                            obj = ast.literal_eval(obj_str)
+                            # 尝试修复该对象
+                            obj_str = re.sub(r',\s*}', '}', obj_str)
+                            obj = json.loads(obj_str)
                             objects.append(obj)
                         except:
-                            logger.warning(f"Skipping invalid object: {obj_str[:100]}")
+                            # 尝试用 ast 解析
+                            try:
+                                obj = ast.literal_eval(obj_str)
+                                objects.append(obj)
+                            except:
+                                logger.warning(f"Skipping invalid object: {obj_str[:100]}")
         if objects:
             return objects  # 返回列表，调用者需处理
         else:
-            raise ValueError("No valid objects found")
+            raise ValueError("No valid objects found after split parsing")
     else:
         raise ValueError("Not a JSON array")
     

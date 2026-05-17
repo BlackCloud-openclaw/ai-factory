@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     max_timeline_events: int = 100
     snapshot_interval_events: int = 1000
     auto_snapshot_on_chapter: bool = True
+    must_events_similarity_threshold: float = 0.3
 
     # 任务模型映射（可被环境变量覆盖为 JSON 字符串，未实现动态加载）
     task_model_map: Dict[str, List[str]] = {

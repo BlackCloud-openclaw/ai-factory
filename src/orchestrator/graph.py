@@ -77,42 +77,42 @@ def route_after_code(state: AgentState) -> str:
     return 'validate'
 
 
-def route_after_validate(state: AgentState) -> str:
+def route_after_validate(state: AgentState) -> str:   
     if state.task_type == "scene_plan":
+        total_scenes = getattr(state, 'total_scenes_in_chapter', 0)
+        current_scene_index = getattr(state, 'current_scene_index', 0)
         validation_result = state.validation_result or {}
         passed = validation_result.get("passed", False)
         should_retry = validation_result.get("should_retry", False)
         retry_count = getattr(state, 'retry_count', 0)
         max_retries = getattr(state, 'max_retries_per_subtask', 2)
+        current_chapter = state.current_chapter
+        total_chapters = getattr(state, 'total_chapters_in_volume', 0)
 
-        # 如果验证失败且需要重试
+        logger.info(f"route_after_validate: total_scenes={total_scenes}, current_scene_index={current_scene_index}, passed={passed}")
+
         if not passed and should_retry and retry_count < max_retries:
             new_retry_count = retry_count + 1
             logger.info(f"Scene validation failed, retrying ({new_retry_count}/{max_retries}): {validation_result.get('feedback', '')[:100]}")
             return "writer"
 
-        # 重试次数用尽但仍失败
         if not passed and retry_count >= max_retries:
             logger.warning(f"Scene validation failed after {max_retries} retries, skipping scene")
-            return "validate"  # 让 validate_node 处理跳过逻辑
+            return "validate"
 
-        # 验证通过，处理章节推进
         if passed:
             logger.info("Scene validation passed")
-            total_scenes = getattr(state, "total_scenes_in_chapter", 0)
-            if total_scenes > 0 and state.current_scene_index < total_scenes:
+            if total_scenes > 0 and current_scene_index < total_scenes:
                 return "writer"
-            total_chapters = getattr(state, "total_chapters_in_volume", 0)
-            if total_chapters > 0 and state.current_chapter <= total_chapters:
-                logger.info(f"Chapter finished, moving to planning for chapter {state.current_chapter} of {total_chapters}")
+            if total_chapters > 0 and current_chapter <= total_chapters:
+                logger.info(f"Chapter finished, moving to planning for chapter {current_chapter} of {total_chapters}")
                 return "planning"
             else:
                 logger.info("All chapters completed, ending.")
                 return "save_memory"
 
-        # 验证失败但不应该重试（致命错误）
         logger.warning(f"Validation failed without retry: {validation_result.get('feedback', '')}")
-        return "save_memory"
+        return "save_memory"    
 
     # 原有的代码验证逻辑（保持不变）
     validation_result = state.validation_result or {}

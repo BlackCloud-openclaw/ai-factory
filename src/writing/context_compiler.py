@@ -200,14 +200,48 @@ class ContextCompiler:
                     lines.append(constraint)
             lines.append("")
         
-        # 5. 结构化输出要求
+        # 5. 结构化输出要求（增强 events 字段指导）
         lines.append("【输出格式要求】")
         lines.append("你必须严格按照以下 JSON 格式输出，不要添加任何额外解释：")
         lines.append('{')
         lines.append('    "scene_text": "场景正文（纯文本，不要包含 JSON）",')
-        lines.append('    "events": [{"type": "realm_upgrade", "actor": "林逸", "to_realm": "筑基"}],')
+        lines.append('    "events": [  // 根据场景中发生的实际变化，选择合适的类型，不要总是写 realm_upgrade',)
+        lines.append('        {"type": "item_acquire", "actor": "林逸", "item": "神秘玉佩", "source": "捡到"},')
+        lines.append('        {"type": "relationship_change", "from_char": "林逸", "to_char": "二叔", "delta": -10},')
+        lines.append('        {"type": "location_enter", "actor": "林逸", "location": "禁地"},')
+        lines.append('        {"type": "plot_flag_set", "flag": "玉佩觉醒", "value": true}')
+        lines.append('    ],')
         lines.append('    "foreshadowing": ["后续可发展的伏笔1", "伏笔2"]')
         lines.append('}')
+        lines.append("")
+        
+        # 5.1 JSON 格式正确性强调（新增）
+        lines.append("⚠️ 特别注意 JSON 格式的正确性：")
+        lines.append("1. 字符串内的双引号必须转义，例如 \\\" 表示一个双引号字符。")
+        lines.append("2. 字符串内不得包含未转义的控制字符（如换行符、制表符），请使用 \\n、\\t 转义。")
+        lines.append("3. 不要在键或字符串值末尾留下多余逗号。")
+        lines.append("4. 确保所有花括号、方括号正确闭合。")
+        lines.append("")
+        
+        # 添加事件类型说明（仅作参考，不强制）
+        lines.append("【events 字段填写指南】")
+        lines.append("根据场景中实际发生的状态变化，从以下类型中选择，可以写多个事件：")
+        lines.append("- realm_upgrade: 境界突破（actor, to_realm）")
+        lines.append("- item_acquire: 获得物品（actor, item, quantity, source可选）")
+        lines.append("- item_lose: 失去物品（actor, item, quantity, reason）")
+        lines.append("- relationship_change: 关系变化（from_char, to_char, delta）")
+        lines.append("- location_enter: 进入新地点（actor, location）")
+        lines.append("- plot_flag_set: 设置剧情标记（flag, value）")
+        lines.append("- hp_changed / mp_changed: 血量/灵力变化（actor, delta, new_hp）")
+        lines.append("- combat_result: 战斗结果（winner, loser, result）")
+        lines.append("- dialogue: 关键对话（speaker, listener, summary）")
+        lines.append("- discovery: 发现重要线索（discoverer, discovery, importance）")
+        lines.append("- npc_introduce: 新角色登场（name, role）")
+        lines.append("")
+        lines.append("⚠️ 注意：")
+        lines.append("- 每个场景至少应包含1-2个事件，除非是纯过渡场景。")
+        lines.append("- 不要虚构不存在的事件类型，只使用上述列表中的类型。")
+        lines.append("- 如果没有任何状态变化，events 可以为空数组 []。")
         lines.append("")
         
         # 6. 写作规则（强调）
@@ -220,5 +254,7 @@ class ContextCompiler:
         lines.append("6. 直接输出 JSON，scene_text 字段内是小说正文")
         lines.append("7. 不要重复已经完成的事件")
         lines.append("8. 如果某个必须事件在之前章节已经发生过，在本章节中不要再次出现")
+        lines.append("9. **events 数组请根据实际剧情填写，不要总是写 realm_upgrade**")
+        lines.append("10. 输出前请检查 JSON 格式是否正确，确保没有语法错误。")
         
         return "\n".join(lines)

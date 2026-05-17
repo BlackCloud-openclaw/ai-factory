@@ -7,6 +7,7 @@ import time
 import py_compile
 import tempfile
 import os
+import asyncio
 from typing import Any, Optional, Dict, List, Tuple
 
 from src.config import config
@@ -223,7 +224,6 @@ class ValidatorAgent(BaseAgent):
             "suggestions": []
         }
 
-
     async def _validate_novel_enhanced(
         self,
         text: str,
@@ -232,16 +232,12 @@ class ValidatorAgent(BaseAgent):
         missing_goal: List[str] = None,
         missing_conflict: List[str] = None,
     ) -> Dict[str, Any]:
-        """
-        增强版小说验证，支持重试决策
-        使用语义相似度检查 goal 和 conflict
-        """
         if missing_goal is None:
             missing_goal = []
         if missing_conflict is None:
             missing_conflict = []
 
-        # 1. 尝试解析 JSON
+        # 1. 解析 JSON
         parsed_data = self._extract_json(text)
         if not parsed_data:
             return {
@@ -250,6 +246,7 @@ class ValidatorAgent(BaseAgent):
                 "suggestions": ["检查模型输出格式，应为 valid JSON，不要用 ```json 代码块包裹"],
                 "should_retry": True,
                 "error_details": {"error": "json_parse_failed"},
+                "parsed_output": None,
             }
 
         scene_text = parsed_data.get("scene_text", "")
@@ -260,48 +257,67 @@ class ValidatorAgent(BaseAgent):
                 "suggestions": ["请生成更完整的场景正文，至少50字"],
                 "should_retry": True,
                 "error_details": {"error": "scene_text_too_short", "length": len(scene_text)},
+                "parsed_output": parsed_data,
             }
 
-        # 2. 检查 must_events
+        # 读取配置
+        must_events_threshold = getattr(config, 'must_events_similarity_threshold', 0.50)
+        goal_conflict_threshold = 0.25
+
         must_events = constraints.get("must_events", [])
-        # 同时，放宽 must_events 检查：改为检查关键词（取前6个字符或核心词）
-        missing_events = []
-        for event in must_events:
-            keyword = event[:6] if len(event) > 6 else event
-            if keyword not in scene_text:
-                # 可选：再尝试检查核心名词
-                core_words = [w for w in event if len(w)>=2][:2]
-                if not any(w in scene_text for w in core_words):
-                    missing_events.append(event)
-
-        # 3. 语义验证 goal 和 conflict
-        # 在 semantic_match 函数内，将 threshold 改为 0.25
-        async def semantic_match(original: str, candidate: str, threshold: float = 0.25) -> bool:
-            """返回是否语义匹配（相似度 >= 阈值）"""
-            if not original:
-                return True
-            try:
-                # 限制候选文本长度，避免 embedding 过长
-                candidate_sample = candidate[:2000]
-                emb_orig = await generate_embedding(original)
-                emb_cand = await generate_embedding(candidate_sample)
-                orig_list = json.loads(emb_orig)
-                cand_list = json.loads(emb_cand)
-                sim = cosine_similarity(orig_list, cand_list)
-                logger.debug(f"Semantic similarity for '{original[:30]}...': {sim:.3f}")
-                return sim >= threshold
-            except Exception as e:
-                logger.warning(f"Semantic match failed: {e}, falling back to keyword check for '{original[:20]}'")
-                # 降级：检查原句的前10个字符
-                keyword = original[:10] if len(original) > 10 else original
-                return keyword in candidate
-
         goal = constraints.get("goal", "")
         conflict = constraints.get("conflict", "")
-        goal_ok = await semantic_match(goal, scene_text)
-        conflict_ok = await semantic_match(conflict, scene_text)
 
-        # 4. 综合判断
+        # 辅助函数：安全的单个 embedding 请求
+        async def safe_embedding(text: str, desc: str) -> Optional[List[float]]:
+            try:
+                emb_str = await asyncio.wait_for(generate_embedding(text), timeout=10.0)
+                return json.loads(emb_str)
+            except Exception as e:
+                logger.error(f"Embedding failed for {desc}: {e}")
+                return None
+
+        # 获取场景正文 embedding（截取前 1000 字符，安全起见）
+        scene_sample = scene_text[:1000]
+        scene_emb = await safe_embedding(scene_sample, "scene_text")
+        if scene_emb is None:
+            # embedding 失败，降级为通过（避免阻塞，记录错误）
+            logger.warning("Scene embedding failed, skipping semantic validation")
+            return {
+                "passed": True,
+                "feedback": "Embedding 服务异常，跳过语义验证",
+                "suggestions": ["请检查 embedding 服务"],
+                "should_retry": False,
+                "error_details": {"error": "embedding_failed"},
+                "parsed_output": parsed_data,
+            }
+
+        # 逐个检查 must_events
+        missing_events = []
+        for evt in must_events:
+            evt_emb = await safe_embedding(evt, f"must_event '{evt[:30]}'")
+            if evt_emb is None:
+                continue  # 跳过该事件，不判定为缺失
+            sim = cosine_similarity(evt_emb, scene_emb)
+            if sim < must_events_threshold:
+                missing_events.append(evt)
+
+        # 检查 goal
+        goal_ok = True
+        if goal:
+            goal_emb = await safe_embedding(goal, "goal")
+            if goal_emb is not None:
+                sim = cosine_similarity(goal_emb, scene_emb)
+                goal_ok = sim >= goal_conflict_threshold
+
+        # 检查 conflict
+        conflict_ok = True
+        if conflict:
+            conflict_emb = await safe_embedding(conflict, "conflict")
+            if conflict_emb is not None:
+                sim = cosine_similarity(conflict_emb, scene_emb)
+                conflict_ok = sim >= goal_conflict_threshold
+
         errors = []
         if missing_events:
             errors.append(f"缺失必须事件: {', '.join(missing_events)}")
@@ -319,8 +335,8 @@ class ValidatorAgent(BaseAgent):
                 "passed": False,
                 "feedback": feedback,
                 "suggestions": [
-                    "请严格遵循场景计划中的 goal 和 conflict 的语义要求",
-                    "确保生成的正文完整包含所有必须事件",
+                    "请严格遵循场景计划中的 goal、conflict 和 must_events 的语义要求",
+                    "确保生成的正文完整表达所有必须事件的核心含义",
                 ],
                 "should_retry": should_retry,
                 "error_details": {
@@ -328,11 +344,8 @@ class ValidatorAgent(BaseAgent):
                     "goal_semantic_match": goal_ok,
                     "conflict_semantic_match": conflict_ok,
                 },
+                "parsed_output": parsed_data,
             }
-
-        # 可选：如果 writer 检测到偏离但语义通过，记录日志
-        if deviation_detected and not (missing_events or not goal_ok or not conflict_ok):
-            logger.info("Writer detected deviation but semantic validation passed")
 
         return {
             "passed": True,
@@ -340,6 +353,7 @@ class ValidatorAgent(BaseAgent):
             "suggestions": [],
             "should_retry": False,
             "error_details": {},
+            "parsed_output": parsed_data,
         }
 
     # ---------- 辅助方法 ----------

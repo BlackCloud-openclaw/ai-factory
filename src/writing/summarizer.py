@@ -115,3 +115,40 @@ def cosine_similarity(a: list, b: list) -> float:
     if norm_a == 0 or norm_b == 0:
         return 0.0
     return dot / (norm_a * norm_b)
+
+async def batch_generate_embeddings(texts: List[str]) -> List[List[float]]:
+    """
+    批量生成 embedding，一次 HTTP 请求处理多个文本。
+    """
+    if not texts:
+        return []
+    
+    endpoint = config.embedding_endpoint
+    timeout = aiohttp.ClientTimeout(total=30)
+    
+    async with aiohttp.ClientSession() as session:
+        try:
+            # 尝试使用批量接口（如果服务支持）
+            # 标准 OpenAI 格式：{"input": ["text1", "text2", ...]}
+            async with session.post(endpoint, json={"input": texts}, timeout=timeout) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if "data" in data:
+                        # 按输入顺序排序（有些服务返回顺序可能乱）
+                        embeddings_dict = {item["index"]: item["embedding"] for item in data["data"]}
+                        return [embeddings_dict[i] for i in range(len(texts))]
+                    elif isinstance(data, list):
+                        # 直接返回列表
+                        return data
+                else:
+                    logger.error(f"Batch embedding failed: {resp.status}")
+        except Exception as e:
+            logger.error(f"Batch embedding request error: {e}")
+    
+    # 降级：逐个调用（保持兼容性）
+    logger.warning("Batch embedding failed, falling back to sequential")
+    results = []
+    for t in texts:
+        emb_str = await generate_embedding(t)
+        results.append(json.loads(emb_str))
+    return results

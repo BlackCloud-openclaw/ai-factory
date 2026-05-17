@@ -130,7 +130,6 @@ async def clean_database():
                             current_volume = 1,
                             current_chapter = 1,
                             current_scene_index = 0,
-                            scene_plan_list = NULL,
                             current_state = NULL,
                             last_sequence_id = 0,
                             revision = revision + 1,

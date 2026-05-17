@@ -1,5 +1,5 @@
 """
-Writer Agent - 基于状态驱动的章节生成
+Writer Agent - 基于状态驱动的章节生成（强制服从 state_delta）
 """
 import json
 import time
@@ -41,6 +41,10 @@ class WritingAgent(BaseAgent):
         scene_plan = state.scene_plan or {}
         constraints = state.writing_constraints or {}
         
+        # ========== 1. 提取强制 state_delta ==========
+        forced_delta = scene_plan.get("state_delta", {})
+        expected_events = forced_delta.get("events", [])
+        
         # 获取声纹注册表
         voiceprint_registry = get_voiceprint_registry()
         
@@ -63,6 +67,19 @@ class WritingAgent(BaseAgent):
             voiceprint_registry=voiceprint_registry,
             compiled_context=compiled_context,
         )
+        
+        # ========== 2. 添加强制 state_delta 指令 ==========
+        if expected_events:
+            prompt += "\n\n【🔒 强制状态变更（必须原样输出到 events 字段，不得增删改）】\n"
+            prompt += json.dumps(forced_delta, ensure_ascii=False, indent=2)
+            prompt += "\n你必须将以上 JSON 对象中的 'events' 数组原封不动地放入输出 JSON 的 'events' 字段中。\n"
+            prompt += "不允许添加、删除或修改任何事件。"
+        
+        # ========== 3. 注入验证反馈（如果存在）==========
+        feedback = state.metadata.get("writing_feedback", "")
+        if feedback:
+            prompt += f"\n\n【⚠️ 上一次生成失败，请根据以下反馈修正】\n{feedback}\n"
+            prompt += "请仔细阅读反馈，修正正文中的问题，并确保强制事件原样输出。"
         
         # 添加额外的约束（禁止事件等）
         if constraints.get("forbidden_events"):
@@ -107,9 +124,23 @@ class WritingAgent(BaseAgent):
         validation = validate_all(raw_output, context, async_semantic=False)
         
         scene_text = ""
+        parsed = validation.get("parsed_output")
+        deviation_detected = False
+        error_msg = None
+        
         if validation["passed"]:
             parsed = validation["parsed_output"] or {}
             scene_text = parsed.get("scene_text", "")
+            
+            # ========== 3. 后验证：强制检查 events 是否与 state_delta 一致 ==========
+            if expected_events:
+                actual_events = parsed.get("events", [])
+                # 简单对比：序列化后比较（更严格的可以递归比较）
+                if json.dumps(actual_events, sort_keys=True) != json.dumps(expected_events, sort_keys=True):
+                    deviation_detected = True
+                    error_msg = f"state_delta mismatch: expected {len(expected_events)} events, got {len(actual_events)}"
+                    logger.error(error_msg)
+                    # 可以选择重试，这里标记偏差，让上层 validate_node 处理重试
         else:
             logger.warning(f"Validation failed: {validation['error']}")
             # 尝试从原始输出中提取 JSON 中的 scene_text
@@ -122,8 +153,7 @@ class WritingAgent(BaseAgent):
             except:
                 scene_text = f"[验证失败: {validation['error']}]"
         
-        # ========== 删除 goal/conflict 关键词校验，直接返回空标记 ==========
-        deviation_detected = False
+        # ========== 4. 删除 goal/conflict 关键词校验，直接返回空标记 ==========
         missing_goal = []
         missing_conflict = []
         
@@ -136,6 +166,7 @@ class WritingAgent(BaseAgent):
             "deviation_detected": deviation_detected,
             "missing_goal_keywords": missing_goal,
             "missing_conflict_keywords": missing_conflict,
+            "error": error_msg,  # 可选，供上层使用
         }
     
     @retry_with_backoff(max_retries=2, base_delay=1.0)

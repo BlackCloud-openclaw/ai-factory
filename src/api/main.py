@@ -116,3 +116,14 @@ async def readiness():
 @app.get("/live")
 async def liveness():
     return {"status": "alive"}
+
+
+@app.get("/debug_routes")
+async def debug_routes():
+    routes = []
+    for route in app.routes:
+        routes.append({
+            "path": route.path,
+            "methods": list(route.methods) if route.methods else []
+        })
+    return routes

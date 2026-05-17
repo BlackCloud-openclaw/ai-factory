@@ -80,7 +80,7 @@ class AgentState(BaseModel):
     scene_plan_list: List[Dict[str, Any]] = Field(default_factory=list)
     total_chapters_in_volume: int = 0
     total_scenes_in_chapter: int = 0
-    current_scene_index: Optional[int] = None   # 0-based 已完成场景数（下一个要生成的场景索引）
+    current_scene_index: Optional[int] = 0   # 0-based 已完成场景数（下一个要生成的场景索引）
     _chapter_finished: bool = False
     writing_constraints: Optional[Dict[str, Any]] = None
     scene_text: str = ""

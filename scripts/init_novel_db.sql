@@ -1,16 +1,10 @@
--- ============================================================
--- AI Factory 小说模块完整数据库 Schema
--- 基于新架构（事件溯源、快照、向量检索等）
--- ============================================================
-
--- 启用 pgvector 扩展（如果尚未启用）
+-- 启用 pgvector 扩展
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ============================================================
--- 保留的原有表（仍在使用，但可逐步迁移）
+-- 小说模块表（保留原有）
 -- ============================================================
 
--- 小说主表（已包含 revision 乐观锁字段）
 CREATE TABLE IF NOT EXISTS novels (
     novel_id VARCHAR(32) PRIMARY KEY,
     title VARCHAR(255),
@@ -19,14 +13,12 @@ CREATE TABLE IF NOT EXISTS novels (
     current_chapter INT,
     current_scene_index INT,
     current_state JSONB,
-    scene_plan_list JSONB,
     last_sequence_id INT DEFAULT 0,
     revision INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 章节索引表（可选，用于外部查询）
 CREATE TABLE IF NOT EXISTS chapters (
     chapter_id VARCHAR(32) PRIMARY KEY,
     novel_id VARCHAR(32),
@@ -38,7 +30,6 @@ CREATE TABLE IF NOT EXISTS chapters (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 素材库（可选）
 CREATE TABLE IF NOT EXISTS materials (
     material_id SERIAL PRIMARY KEY,
     novel_id VARCHAR(32),
@@ -46,24 +37,18 @@ CREATE TABLE IF NOT EXISTS materials (
     content TEXT,
     source_url TEXT,
     type VARCHAR(32),
-    embedding vector(768),
+    embedding vector(512),
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- 章节摘要向量表（用于语义检索）
 CREATE TABLE IF NOT EXISTS chapter_summaries (
     chapter_id VARCHAR(32) PRIMARY KEY,
     novel_id VARCHAR(32),
     content TEXT,
-    embedding vector(768),
+    embedding vector(512),
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
--- 新架构表（事件溯源、快照、向量检索等）
--- ============================================================
-
--- 叙事事件表（新版事件溯源）
 CREATE TABLE IF NOT EXISTS narrative_events (
     id BIGSERIAL PRIMARY KEY,
     event_uuid UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
@@ -80,7 +65,6 @@ CREATE TABLE IF NOT EXISTS narrative_events (
 CREATE INDEX IF NOT EXISTS idx_narrative_events_novel ON narrative_events(novel_id, id);
 CREATE INDEX IF NOT EXISTS idx_narrative_events_chapter ON narrative_events(novel_id, volume_num, chapter_num);
 
--- 世界快照表
 CREATE TABLE IF NOT EXISTS world_snapshots (
     novel_id VARCHAR(32) NOT NULL,
     snapshot_id INT NOT NULL,
@@ -93,15 +77,13 @@ CREATE TABLE IF NOT EXISTS world_snapshots (
     PRIMARY KEY (novel_id, snapshot_id)
 );
 
--- 事件向量表（用于语义检索）
 CREATE TABLE IF NOT EXISTS event_embeddings (
     event_id BIGINT PRIMARY KEY REFERENCES narrative_events(id) ON DELETE CASCADE,
-    embedding vector(768) NOT NULL,
+    embedding vector(512) NOT NULL,
     summary TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_event_embeddings_vector ON event_embeddings USING hnsw (embedding vector_cosine_ops);
 
--- 因果图表（未来使用）
 CREATE TABLE IF NOT EXISTS narrative_causality (
     cause_event_id BIGINT NOT NULL,
     effect_event_id BIGINT NOT NULL,
@@ -109,7 +91,6 @@ CREATE TABLE IF NOT EXISTS narrative_causality (
     PRIMARY KEY (cause_event_id, effect_event_id)
 );
 
--- 压缩状态表（L2 记忆）
 CREATE TABLE IF NOT EXISTS compressed_states (
     novel_id VARCHAR(32) NOT NULL,
     volume_num INT NOT NULL,
@@ -118,7 +99,6 @@ CREATE TABLE IF NOT EXISTS compressed_states (
     PRIMARY KEY (novel_id, volume_num)
 );
 
--- 长期知识表（L3 记忆）
 CREATE TABLE IF NOT EXISTS lore_state (
     id VARCHAR(32) PRIMARY KEY DEFAULT 'global',
     world_rules JSONB DEFAULT '[]',
@@ -128,3 +108,93 @@ CREATE TABLE IF NOT EXISTS lore_state (
     cultivation_methods JSONB DEFAULT '{}',
     updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- ============================================================
+-- 知识库表（与 retrieval.py 中的 asyncpg 版本兼容）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS documents (
+    id VARCHAR(255) PRIMARY KEY,
+    title TEXT NOT NULL,
+    source_path TEXT NOT NULL,
+    file_type VARCHAR(20) NOT NULL,
+    content TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS chunks (
+    id SERIAL PRIMARY KEY,
+    document_id VARCHAR(255),
+    chunk_index INTEGER,
+    content TEXT NOT NULL,
+    embedding vector(512),
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(document_id, chunk_index)
+);
+
+-- 写作进度表（任务级进度，快速恢复使用）
+CREATE TABLE IF NOT EXISTS writing_progress (
+    project_id TEXT PRIMARY KEY,
+    current_volume INTEGER NOT NULL DEFAULT 1,
+    current_chapter INTEGER NOT NULL DEFAULT 1,
+    current_scene INTEGER NOT NULL DEFAULT 0,
+    chapter_completed BOOLEAN NOT NULL DEFAULT FALSE,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- 新增：场景执行单元表（执行计划持久化）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS scene_execution_units (
+    id BIGSERIAL PRIMARY KEY,
+    novel_id VARCHAR(32) NOT NULL,
+    volume_num INT NOT NULL,
+    chapter_num INT NOT NULL,
+    scene_index INT NOT NULL,          -- 0-based 场景索引
+
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',  -- pending, running, succeeded, failed, skipped
+
+    plan_json JSONB NOT NULL,          -- 完整的场景计划（goal, conflict, must_events, characters, state_delta 等）
+    planned_state_delta JSONB,         -- Planner 期望的状态变更（来自 plan_json.state_delta）
+    actual_state_delta JSONB,          -- Writer 实际生成的状态变更（聚合自 events）
+    applied_event_ids JSONB,           -- 最终应用到事件存储的事件 ID 列表（数组）
+
+    retry_count INT DEFAULT 0,
+    max_retries INT DEFAULT 2,
+    error_message TEXT,
+
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    UNIQUE(novel_id, volume_num, chapter_num, scene_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_seu_novel_chapter ON scene_execution_units(novel_id, volume_num, chapter_num);
+CREATE INDEX IF NOT EXISTS idx_seu_status ON scene_execution_units(status);
+CREATE INDEX IF NOT EXISTS idx_seu_updated ON scene_execution_units(updated_at);
+
+-- ============================================================
+-- 任务调度表（可选，保留）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS task_jobs (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    subtask_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    result TEXT,
+    error TEXT,
+    retry_count INT DEFAULT 0,
+    max_retries INT DEFAULT 2,
+    dependencies TEXT,
+    subtask_type TEXT,
+    description TEXT,
+    created_at DOUBLE PRECISION,
+    updated_at DOUBLE PRECISION,
+    started_at DOUBLE PRECISION,
+    completed_at DOUBLE PRECISION
+);
+
+CREATE INDEX IF NOT EXISTS chunks_embedding_idx ON chunks USING hnsw (embedding vector_cosine_ops);
