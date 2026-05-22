@@ -27,6 +27,14 @@ class StatePatch:
     scene_plan_list: Optional[List[Dict[str, Any]]] = None
     scene_plan: Optional[Dict[str, Any]] = None
     
+    total_chapters_in_volume: Optional[int] = None
+    
+    scene_text: Optional[str] = None
+    final_answer: Optional[str] = None
+    deviation_detected: Optional[bool] = None
+    missing_goal_keywords: Optional[List[str]] = None
+    missing_conflict_keywords: Optional[List[str]] = None
+    
     # 世界状态
     current_state: Optional[Dict[str, Any]] = None
     

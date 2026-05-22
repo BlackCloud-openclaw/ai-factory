@@ -20,6 +20,8 @@ from src.orchestrator.nodes import (
 from src.agents.planner import PlannerAgent
 from src.scheduler.task_scheduler import TaskScheduler
 from src.common.logging import setup_logging
+from src.orchestrator.phase_resolver import WorkflowPhaseResolver
+from src.orchestrator.state_patch import WorkflowPhase
 
 logger = setup_logging("orchestrator.graph")
 
@@ -84,50 +86,16 @@ def route_after_code(state: AgentState) -> str:
             return 'code'
     return 'validate'
 
-
 def route_after_validate(state: AgentState) -> str:
-    if state.task_type == "scene_plan":
-        total_scenes = getattr(state, 'total_scenes_in_chapter', 0)
-        current_scene_index = getattr(state, 'current_scene_index', 0)
-        validation_result = state.validation_result or {}
-        passed = validation_result.get("passed", False)
-        should_retry = validation_result.get("should_retry", False)
-        retry_count = getattr(state, 'retry_count', 0)
-        max_retries = getattr(state, 'max_retries_per_subtask', 2)
-
-        logger.info(f"route_after_validate: total_scenes={total_scenes}, current_scene_index={current_scene_index}, passed={passed}")
-
-        if not passed and should_retry and retry_count < max_retries:
-            return "writer"
-        if not passed and retry_count >= max_retries:
-            return "validate"
-        if passed:
-            logger.info("Scene validation passed")
-            # 直接从 state 读取 _chapter_finished
-            chapter_finished = getattr(state, '_chapter_finished', False)
-            if chapter_finished:
-                if state.total_chapters_in_volume > 0 and state.current_chapter <= state.total_chapters_in_volume:
-                    return "planning"
-                else:
-                    return "save_memory"
-            else:
-                return "writer"
-    
-        logger.warning(f"Validation failed without retry: {validation_result.get('feedback', '')}")
-        return "save_memory"
-
-    # 原有的代码验证逻辑（保持不变）
-    validation_result = state.validation_result or {}
-    passed = validation_result.get("passed", False)
-    retry_count = getattr(state, 'retry_count', 0)
-    max_retries = getattr(state, 'max_retries_per_subtask', 2)
-    remaining = getattr(state, 'remaining_subtasks', [])
-
-    if not passed and retry_count < max_retries:
-        return "code"
-    if passed:
-        return "advance_subtask" if remaining else "save_memory"
-    return "research" if retry_count < max_retries else "save_memory"
+    phase = WorkflowPhaseResolver.resolve(state)
+    logger.info(f"route_after_validate: phase={phase}, current_chapter={state.current_chapter}, "
+                f"current_scene_index={state.current_scene_index}, total_scenes={state.total_scenes_in_chapter}")
+    if phase == WorkflowPhase.WRITING:
+        return "writer"
+    if phase == WorkflowPhase.TRANSITIONING:
+        return "planning"
+    # 其他可能的路由（如 save_memory, 默认）
+    return "save_memory"
 
 def create_workflow() -> StateGraph:
     workflow = StateGraph(AgentState)

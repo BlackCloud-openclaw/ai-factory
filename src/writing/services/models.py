@@ -1,6 +1,6 @@
 # src/writing/services/models.py
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from src.orchestrator.state_patch import StatePatch
 
 
@@ -24,4 +24,53 @@ class SceneCompletionResult:
     chapter_finished: bool = False
     volume_finished: bool = False
     events_applied: int = 0
+    error: Optional[str] = None
+    
+
+@dataclass
+class ScenePlanningCommand:
+    """场景计划生成事务的输入"""
+    novel_id: str
+    volume: int
+    chapter: int
+    task_type: str
+    outline: Optional[Dict[str, Any]]
+    current_state: Optional[Dict[str, Any]]
+    user_input: str
+    resume: bool = False
+    # 可选：当前卷的总章节数，可从外部传入避免重复查询
+    total_chapters_in_volume: int = 0
+
+
+@dataclass
+class ScenePlanningResult:
+    """场景计划生成事务的输出"""
+    state_patch: StatePatch
+    total_scenes: int = 0
+    error: Optional[str] = None
+    
+
+@dataclass
+class WritingCommand:
+    """写作事务的输入"""
+    novel_id: str
+    volume: int
+    chapter: int
+    scene_idx: int
+    scene_plan: Dict[str, Any]
+    current_state: Dict[str, Any]
+    writing_feedback: str  # 来自上一次验证失败时的反馈
+    # 可选：声纹注册表路径等
+    voiceprint_config_path: Optional[str] = None
+
+
+@dataclass
+class WritingResult:
+    """写作事务的输出"""
+    state_patch: StatePatch
+    scene_text: str
+    events: List[Dict[str, Any]]
+    deviation_detected: bool = False
+    missing_goal_keywords: List[str] = None
+    missing_conflict_keywords: List[str] = None
     error: Optional[str] = None
