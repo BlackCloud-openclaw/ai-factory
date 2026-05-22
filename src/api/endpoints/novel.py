@@ -15,6 +15,8 @@ from src.writing.snapshot import SnapshotManager
 from src.writing.world_state import WorldState
 from src.writing.delta import StateDelta
 from src.db.pool import load_writing_progress, init_writing_progress  # 新增导入
+from src.writing.causality.initializer import ensure_core_predicates
+from src.orchestrator.nodes import _load_scene_plans_from_db
 
 logger = setup_logging("api.novel")
 router = APIRouter()
@@ -51,11 +53,15 @@ async def ensure_task_table():
             )
         """)
 
-
 async def run_resume_workflow(task_id: str, novel_id: str, initial_state: AgentState):
     """后台运行续写工作流，并更新任务状态"""
     pool = get_db_pool()
     try:
+        # 记录场景计划信息（用于调试）
+        logger.info(f"Resume workflow starting for {novel_id}, task {task_id}, "
+                    f"scene_plan_list length={len(initial_state.scene_plan_list)}, "
+                    f"current_scene_index={initial_state.current_scene_index}")
+        
         # 更新状态为 running
         async with pool.acquire() as conn:
             await conn.execute(
@@ -64,7 +70,7 @@ async def run_resume_workflow(task_id: str, novel_id: str, initial_state: AgentS
             )
         
         workflow = compile_workflow()
-        result = await workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100})
+        result = await workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 500})
         
         # 更新为成功
         async with pool.acquire() as conn:
@@ -81,7 +87,6 @@ async def run_resume_workflow(task_id: str, novel_id: str, initial_state: AgentS
                 str(e), task_id
             )
 
-
 # ========== 路由定义 ==========
 @router.post("/resume")
 async def resume_novel(request: ResumeRequest, background_tasks: BackgroundTasks):
@@ -91,6 +96,14 @@ async def resume_novel(request: ResumeRequest, background_tasks: BackgroundTasks
         raise HTTPException(status_code=500, detail="Database pool not initialized")
     
     await ensure_task_table()
+    
+    # ===== 初始化默认值 =====
+    current_volume = 1
+    current_chapter = 1
+    current_scene_index = 0
+    chapter_completed = False
+    outline = None
+    # ========================
     
     event_store = NarrativeEventStore(pool)
     snap_mgr = SnapshotManager(pool)
@@ -134,6 +147,10 @@ async def resume_novel(request: ResumeRequest, background_tasks: BackgroundTasks
         last_event_id = evt_id
     logger.info(f"Replayed {len(events_with_id)} events, final last_event_id={last_event_id}")
 
+    # ========== 新增：确保核心谓词已投影 ==========
+    await ensure_core_predicates(request.novel_id, world_state)
+    # ============================================
+
     # 5. 从 novels 表读取大纲
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
@@ -154,55 +171,50 @@ async def resume_novel(request: ResumeRequest, background_tasks: BackgroundTasks
         chapter_completed = progress.get("chapter_completed", False)
         logger.info(f"✅ Loaded progress from writing_progress: vol={current_volume}, ch={current_chapter}, scene={current_scene_index}, chapter_completed={chapter_completed}")
     else:
-        # 回退到 novels 表
+        # 回退到 novels 表, 计算已完成的章节（通过查询 narrative_events 中 chapter_num 的最大值）
         async with pool.acquire() as conn:
-            row2 = await conn.fetchrow(
-                "SELECT current_volume, current_chapter, current_scene_index FROM novels WHERE novel_id = $1",
-                request.novel_id
+            row = await conn.fetchrow(
+                "SELECT MAX(chapter_num) as last_chapter FROM narrative_events WHERE novel_id = $1 AND volume_num = $2",
+                request.novel_id, current_volume
             )
-        current_volume = row2["current_volume"] or 1 if row2 else 1
-        current_chapter = row2["current_chapter"] or 1 if row2 else 1
-        current_scene_index = row2["current_scene_index"] or 0 if row2 else 0
+            if row and row["last_chapter"]:
+                actual_chapter = row["last_chapter"]
+                # 如果实际章节大于 novels 表中的记录，则使用实际值
+                if actual_chapter > current_chapter:
+                    current_chapter = actual_chapter
+                    current_scene_index = 0  # 新章节从场景0开始        
+        
         logger.info(f"⚠️ No writing_progress record, falling back to novels table: vol={current_volume}, ch={current_chapter}, scene={current_scene_index}")
         # 初始化 writing_progress 记录（与 novels 表保持一致）
         await init_writing_progress(request.novel_id, current_volume, current_chapter, current_scene_index, False)
 
-    # 7. 从 scene_execution_units 加载当前章节的场景计划
-    scene_plan_list = []
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """SELECT plan_json, scene_index, status, planned_state_delta
-            FROM scene_execution_units
-            WHERE novel_id = $1 AND volume_num = $2 AND chapter_num = $3
-            ORDER BY scene_index ASC""",
-            request.novel_id, current_volume, current_chapter
-        )
-        if rows:
-            scene_plan_list = [json.loads(row["plan_json"]) for row in rows]
-            logger.info(f"Loaded {len(scene_plan_list)} scenes from scene_execution_units")
-        else:
-            logger.info("No scene plan found, will generate new plan in planning node")
+    # ========== 新增：校验 current_volume 是否超出大纲卷数 ==========
+    if outline:
+        total_volumes = len(outline.get("volumes", []))
+        if total_volumes > 0 and current_volume > total_volumes:
+            logger.warning(f"current_volume {current_volume} exceeds outline volume count {total_volumes}, resetting to {total_volumes}")
+            current_volume = total_volumes
+            current_chapter = 1          # 重置为第1章
+            current_scene_index = 0      # 重置场景索引
+            chapter_completed = False
+            # 同步更新 writing_progress 表
+            await init_writing_progress(request.novel_id, current_volume, current_chapter, current_scene_index, False)
+            # 同步更新 novels 表
+            async with pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE novels 
+                    SET current_volume = $1, current_chapter = $2, current_scene_index = $3
+                    WHERE novel_id = $4
+                """, current_volume, current_chapter, current_scene_index, request.novel_id)
+            logger.info(f"Reset progress to volume {current_volume}, chapter {current_chapter}")
 
-    # 8. 重建 metadata 中的场景计划
-    metadata = {"resumed": True, "from_event": request.from_event_id}
-    if scene_plan_list:
-        metadata["scene_plan_list"] = scene_plan_list
-        metadata["total_scenes_in_chapter"] = len(scene_plan_list)
-        metadata["current_scene_index"] = current_scene_index
-        if current_scene_index < len(scene_plan_list):
-            metadata["current_scene_plan"] = scene_plan_list[current_scene_index]
-            logger.info(f"Current scene plan found: {metadata['current_scene_plan'].get('goal', '')[:50]}...")
-        else:
-            logger.warning(f"current_scene_index={current_scene_index} exceeds scene_plan_list length={len(scene_plan_list)}")
-    else:
-        metadata["scene_plan_list"] = []
-        metadata["total_scenes_in_chapter"] = 0
-        metadata["current_scene_index"] = 0
-        metadata["current_scene_plan"] = None
-        logger.info("No scene_plan_list found, will generate new plan in planning node")
-    
-    logger.info(f"Resume metadata: scene_plan_list length={len(metadata.get('scene_plan_list', []))}, current_index={metadata.get('current_scene_index')}")
-    
+    # 7. 从 scene_execution_units 加载当前章节的场景计划
+    # 使用辅助函数（需要导入）
+    scene_plan_list, total_scenes = await _load_scene_plans_from_db(
+        pool, request.novel_id, current_volume, current_chapter
+    )
+    logger.info(f"Loaded {len(scene_plan_list)} scenes from scene_execution_units")
+
     # 9. 计算当前卷的总章节数
     total_chapters_in_volume = 0
     if outline and "volumes" in outline:
@@ -226,14 +238,14 @@ async def resume_novel(request: ResumeRequest, background_tasks: BackgroundTasks
         current_volume=current_volume,
         current_chapter=current_chapter,
         current_scene_index=current_scene_index,
-        total_scenes_in_chapter=len(scene_plan_list),
+        total_scenes_in_chapter=total_scenes,          # ✅ 直接设置 state 字段
         current_state=world_state.to_dict(),
         last_sequence_id=last_event_id,
         total_chapters_in_volume=total_chapters_in_volume,
-        metadata=metadata
+        scene_plan_list=scene_plan_list,               # ✅ 直接设置 state 字段
     )
-    logger.info(f"AgentState constructed: volume={current_volume}, chapter={current_chapter}, scene={current_scene_index}, total_scenes={len(scene_plan_list)}, total_chapters_in_volume={total_chapters_in_volume}")
-
+    logger.info(f"AgentState constructed: volume={current_volume}, chapter={current_chapter}, scene={current_scene_index}, total_scenes={total_scenes}, total_chapters_in_volume={total_chapters_in_volume}")
+    
     # 11. 创建任务记录
     task_id = uuid.uuid4().hex[:12]
     async with pool.acquire() as conn:

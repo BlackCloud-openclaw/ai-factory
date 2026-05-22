@@ -1,0 +1,42 @@
+rules:
+  - id: "use_item_requires_ownership"
+    precondition:
+      - subject: "?actor"
+        relation: "has_item"
+        object: "?item"
+        min_confidence: 0.8
+        allowed_source_types: ["item_acquire", "inherit"]
+    trigger_event_type: "use_item"
+    severity: "error"
+    suggestion: "{actor} 尚未拥有 {item}，请先安排获得途径。"
+
+  - id: "dialogue_requires_alive"
+    precondition:
+      - subject: "?actor"
+        relation: "is_alive"
+        object: true
+        min_confidence: 0.9
+    trigger_event_type: "dialogue"
+    severity: "warning"
+    suggestion: "{actor} 疑似已死亡，除非特殊剧情（梦境、回忆），否则可能矛盾。"
+
+  - id: "realm_upgrade_requires_previous_realm"
+    precondition:
+      - subject: "?actor"
+        relation: "realm"
+        object: "?prev_realm"
+        min_confidence: 0.9
+    trigger_event_type: "realm_upgrade"
+    severity: "error"
+    suggestion: "{actor} 必须拥有前置境界才能突破。"
+
+  - id: "fly_affordance_at_golden_core"
+    precondition:
+      - subject: "?actor"
+        relation: "realm"
+        object: "GoldenCore"
+    enables: ["fly"]
+    cooldown: 2
+    hint: "当前角色已达金丹期，可以短距离御剑飞行。"
+    severity: "info"
+    suggestion: ""

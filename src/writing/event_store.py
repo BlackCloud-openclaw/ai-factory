@@ -9,12 +9,16 @@
 """
 import asyncpg
 import json
-from typing import List, Optional, Tuple
 from datetime import datetime
+from typing import Dict, Optional, List, Tuple
 
 from .events import NarrativeEvent, event_to_dict, event_from_dict
 from .event_upcaster import EventUpcaster
+
 from src.common.logging import setup_logging
+from src.writing.causality.projector import DeltaEngine
+from src.writing.causality.scheduler import ProjectionScheduler
+from src.writing.causality.predicate import Predicate  # 可能需要
 
 logger = setup_logging("writing.event_store")
 
@@ -33,18 +37,19 @@ class NarrativeEventStore:
         chapter_num: int = None,
         scene_id: int = None,
     ) -> str:
-        """存储单个事件（幂等）"""
+        """存储单个事件（幂等），返回事件UUID"""
         event_data = event_to_dict(event)
         event_data = EventUpcaster.upcast(event_data)
 
         async with self.pool.acquire() as conn:
-            await conn.execute(
+            row = await conn.fetchrow(
                 """
                 INSERT INTO narrative_events 
                 (event_uuid, novel_id, volume_num, chapter_num, scene_id, 
-                 event_type, event_data, event_version, timestamp)
+                event_type, event_data, event_version, timestamp)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                ON CONFLICT (event_uuid) DO NOTHING
+                ON CONFLICT (event_uuid) DO UPDATE SET event_uuid = EXCLUDED.event_uuid
+                RETURNING id
                 """,
                 event.event_id,
                 novel_id,
@@ -56,8 +61,29 @@ class NarrativeEventStore:
                 event.event_version,
                 datetime.now(),
             )
-            return event.event_id
+            event_db_id = row["id"] if row else None
 
+        # 触发投影（同步，可后续改为异步队列）
+        try:
+            delta_engine = DeltaEngine()
+            scheduler = ProjectionScheduler()
+            current_active = await self._load_active_predicates(novel_id)
+
+            # 构建事件字典：复制 upcast 后的数据，补充必要字段
+            event_dict = event_data.copy()
+            event_dict["novel_id"] = novel_id
+            event_dict["id"] = event_db_id
+            event_dict["event_id"] = event_db_id
+            if "semantic" not in event_dict:
+                event_dict["semantic"] = "state_mutation"
+
+            delta = delta_engine.compute_delta(current_active, event_dict)
+            await scheduler.schedule(novel_id, delta)
+        except Exception as e:
+            logger.error(f"Projection failed for event {event.event_id}: {e}", exc_info=True)
+
+        return event.event_id
+        
     async def append_events(
         self,
         novel_id: str,
@@ -155,3 +181,38 @@ class NarrativeEventStore:
                 novel_id,
                 event_db_id,
             )
+            
+    async def _load_active_predicates(self, novel_id: str) -> Dict[str, Predicate]:
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT subject, relation, object, negated, confidence, priority, scope,
+                    event_id AS source_event_id, source_event_type, source_event_semantic
+                FROM predicates
+                WHERE novel_id = $1 AND is_active = true
+                """,
+                novel_id
+            )
+        predicates = {}
+        for row in rows:
+            obj = row["object"]
+            if isinstance(obj, str):
+                try:
+                    obj = json.loads(obj)
+                except:
+                    pass
+
+            pred = Predicate(
+                subject=row["subject"],
+                relation=row["relation"],
+                object=obj,
+                negated=row["negated"],
+                confidence=row["confidence"],
+                priority=row["priority"],
+                scope=row["scope"],
+                source_event_id=row["source_event_id"],
+                source_event_type=row["source_event_type"],
+                source_event_semantic=row["source_event_semantic"]
+            )
+            predicates[pred.identity_key()] = pred
+        return predicates

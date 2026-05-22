@@ -21,6 +21,11 @@ from src.prompts.validator_prompts import VALIDATOR_PROMPT_REGISTRY
 from src.writing.validators import validate_all
 from src.writing.prompt_firewall import PromptFirewall
 from src.writing.summarizer import generate_embedding, cosine_similarity
+from src.writing.causality.validator import CausalityValidator
+from src.db import get_db_pool
+from src.writing.event_store import NarrativeEventStore
+from src.writing.causality.budget import ConsistencyBudget
+from src.writing.causality.health import HealthChecker
 
 logger = setup_logging("agents.validator")
 
@@ -36,7 +41,6 @@ class ValidatorAgent(BaseAgent):
         self.llm_api_url = llm_api_url
         self.llm_model = llm_model
 
-
     async def run(self, state: AgentState) -> Dict[str, Any]:
         agent_name = "ValidatorAgent"
         state.step_count += 1
@@ -46,7 +50,7 @@ class ValidatorAgent(BaseAgent):
 
         mode = getattr(state, 'validation_mode', 'code')
 
-        # ========== 小说模式：调用真正的校验（不要强制通过） ==========
+        # ========== 小说模式：调用真正的校验 ==========
         if mode == "novel" and state.scene_text:
             raw = state.scene_text
             clean = self._extract_scene_text(raw)
@@ -62,19 +66,36 @@ class ValidatorAgent(BaseAgent):
                 "conflict": "",
             }
 
+            # 加载当前活跃谓词（用于因果关系校验）
+            if state.novel_id:
+                pool = get_db_pool()
+                if pool:
+                    try:
+                        event_store = NarrativeEventStore(pool)
+                        predicates = await event_store._load_active_predicates(state.novel_id)
+                        constraints["predicates"] = predicates
+                    except Exception as e:
+                        logger.warning(f"Failed to load predicates for causality validation: {e}")
+
+            # ========== 新增：创建一致性预算并加载 ==========
+            budget = ConsistencyBudget(state.novel_id, state.current_volume, state.current_chapter)
+            await budget.load()
+            constraints["budget"] = budget
+            # =============================================
+
+            # 健康检查与漂移降级
+            drift_level = await HealthChecker.check_drift(state.novel_id)
+            if drift_level in ("WARNING", "CRITICAL"):
+                constraints["degraded"] = True
+                logger.warning(f"Projection drift detected ({drift_level}), validator degraded")
+
             # 从 scene_plan 中提取必须事件、目标、冲突
             if state.scene_plan:
                 constraints["must_events"] = state.scene_plan.get("must_events", [])
                 constraints["goal"] = state.scene_plan.get("goal", "")
                 constraints["conflict"] = state.scene_plan.get("conflict", "")
 
-            # ========== 添加调试日志 ==========
-            logger.info(f"Validator received: deviation_detected={getattr(state, 'deviation_detected', False)}, "
-                        f"missing_goal={getattr(state, 'missing_goal_keywords', [])}, "
-                        f"missing_conflict={getattr(state, 'missing_conflict_keywords', [])}")
-
-
-            # 调用增强版校验（非强制通过）
+            # 调用增强版校验
             result = await self._validate_novel_enhanced(
                 raw,
                 constraints,
@@ -277,11 +298,10 @@ class ValidatorAgent(BaseAgent):
                 logger.error(f"Embedding failed for {desc}: {e}")
                 return None
 
-        # 获取场景正文 embedding（截取前 1000 字符，安全起见）
+        # 获取场景正文 embedding
         scene_sample = scene_text[:1000]
         scene_emb = await safe_embedding(scene_sample, "scene_text")
         if scene_emb is None:
-            # embedding 失败，降级为通过（避免阻塞，记录错误）
             logger.warning("Scene embedding failed, skipping semantic validation")
             return {
                 "passed": True,
@@ -292,12 +312,12 @@ class ValidatorAgent(BaseAgent):
                 "parsed_output": parsed_data,
             }
 
-        # 逐个检查 must_events
+        # 检查 must_events
         missing_events = []
         for evt in must_events:
             evt_emb = await safe_embedding(evt, f"must_event '{evt[:30]}'")
             if evt_emb is None:
-                continue  # 跳过该事件，不判定为缺失
+                continue
             sim = cosine_similarity(evt_emb, scene_emb)
             if sim < must_events_threshold:
                 missing_events.append(evt)
@@ -327,6 +347,58 @@ class ValidatorAgent(BaseAgent):
             errors.append(f"核心冲突语义不符: {conflict[:40]}...")
 
         should_retry = bool(missing_events or not goal_ok or not conflict_ok)
+        error_details = {
+            "missing_events": missing_events,
+            "goal_semantic_match": goal_ok,
+            "conflict_semantic_match": conflict_ok,
+        }
+
+        # ==================== 因果关系校验（集成预算 + 漂移降级） ====================
+        predicates = constraints.get("predicates", {})
+        budget = constraints.get("budget")
+        degraded = constraints.get("degraded", False)   # 漂移降级标志
+        causality_failed = False
+        causality_suggestions = []
+
+        if predicates:
+            from src.writing.causality.validator import CausalityValidator
+            causality_validator = CausalityValidator()
+            events_to_check = parsed_data.get("events", [])
+
+            for event_obj in events_to_check:
+                event_type = event_obj.get("type")
+                if not event_type:
+                    continue
+                temp_event = event_obj.copy()
+                temp_event["type"] = event_type
+                result = causality_validator.validate(temp_event, predicates)
+                if not result["passed"]:
+                    severity = result.get("severity", "error")
+                    # 漂移降级：若处于降级模式，将 error 转为 warning
+                    if degraded and severity == "error":
+                        severity = "warning"
+                        result["passed"] = True
+                        logger.warning(f"Drift degradation: rule {result.get('rule_id', 'unknown')} downgraded from error to warning")
+                    # 处理 warning 预算（仅当仍为 warning 时）
+                    if severity == "warning" and budget:
+                        if not await budget.consume("warning"):
+                            severity = "error"
+                            result["passed"] = False
+                    if severity == "error":
+                        causality_failed = True
+                        causality_suggestions.extend(result["suggestions"])
+                        should_retry = True
+                        errors.append(f"因果规则违反: {result['suggestions'][0] if result['suggestions'] else '未知'}")
+                    elif severity == "warning":
+                        logger.warning(f"Causality warning: {result['suggestions']}")
+                        causality_suggestions.extend(result["suggestions"])
+
+        if causality_failed:
+            error_details["causality"] = {
+                "passed": False,
+                "suggestions": causality_suggestions
+            }
+        # ================================================================
 
         if errors:
             feedback = "；".join(errors)
@@ -337,13 +409,9 @@ class ValidatorAgent(BaseAgent):
                 "suggestions": [
                     "请严格遵循场景计划中的 goal、conflict 和 must_events 的语义要求",
                     "确保生成的正文完整表达所有必须事件的核心含义",
-                ],
+                ] + (causality_suggestions if predicates else []),
                 "should_retry": should_retry,
-                "error_details": {
-                    "missing_events": missing_events,
-                    "goal_semantic_match": goal_ok,
-                    "conflict_semantic_match": conflict_ok,
-                },
+                "error_details": error_details,
                 "parsed_output": parsed_data,
             }
 
@@ -352,7 +420,7 @@ class ValidatorAgent(BaseAgent):
             "feedback": "校验通过",
             "suggestions": [],
             "should_retry": False,
-            "error_details": {},
+            "error_details": error_details,
             "parsed_output": parsed_data,
         }
 

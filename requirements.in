@@ -35,6 +35,7 @@ pyyaml
 numpy
 jieba
 requests
+json_repair
 
 # Testing
 pytest

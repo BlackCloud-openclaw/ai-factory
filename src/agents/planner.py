@@ -13,6 +13,7 @@ from src.orchestrator.state import AgentState
 from src.model_router import get_router
 from src.execution.llm_router_pool import get_llm_router_pool
 from src.prompts.planner_prompts import PROMPT_REGISTRY
+from src.writing.causality.rule_engine import RuleEngine
 
 logger = setup_logging("agents.planner")
 
@@ -62,7 +63,13 @@ User request: {user_request}
 
 class PlannerAgent(BaseAgent):
     def __init__(self):
-        pass
+        self.rule_engine = None
+
+    def _get_rule_engine(self):
+        if self.rule_engine is None:
+            from src.writing.causality.rule_engine import RuleEngine
+            self.rule_engine = RuleEngine()
+        return self.rule_engine
 
     async def run(self, state: AgentState) -> Dict[str, Any]:
         agent_name = "PlannerAgent"
@@ -89,12 +96,36 @@ class PlannerAgent(BaseAgent):
                 logger.error(f"{agent_name} failed (stepwise outline), step={step}, error={e}, duration={duration:.2f}")
                 return {"plan_result": {}, "error": str(e)}
 
+        # ---------- 对于 scene_plan 任务，计算可供性提示（冷却） ----------
+        if task_type == "scene_plan":
+            # 获取所有有 enables 的规则（即可供性规则）
+            affordance_rules = [r for r in self._get_rule_engine().rules if r.enables]
+            if affordance_rules and state.novel_id:
+                from src.writing.causality.affordance import get_affordance_cooldown_penalty
+                scored = []
+                for rule in affordance_rules:
+                    # 使用第一个能力作为标识（可根据规则定义调整）
+                    aff_id = rule.enables[0] if rule.enables else rule.id
+                    penalty = await get_affordance_cooldown_penalty(
+                        state.novel_id, aff_id, state.current_chapter, rule.cooldown
+                    )
+                    # 基础分数（此处简单使用 1，未来可结合谓词满足程度）
+                    score = 1.0 * penalty
+                    hint_text = rule.hint if rule.hint else rule.suggestion   # 关键修改
+                    scored.append((score, rule.hint))
+                # 按分数降序排序，取前 5
+                scored.sort(reverse=True, key=lambda x: x[0])
+                top_hints = [hint for _, hint in scored[:5]]
+                state.metadata["affordance_hints"] = top_hints
+            else:
+                state.metadata["affordance_hints"] = []
+
         # ---------- 其他任务类型（code, scene_plan 等）使用原有逻辑 ----------
         builder = PROMPT_REGISTRY.get(task_type)
         if not builder:
             builder = PROMPT_REGISTRY["code"]
 
-        prompt = builder.build(state)
+        prompt = builder.build(state)   # builder.build 内部会读取 state.metadata 中的 affordance_hints
 
         try:
             response = await self._plan_request_with_prompt(prompt, task_type)

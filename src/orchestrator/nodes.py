@@ -4,7 +4,7 @@ import time
 import json
 import re
 import asyncio
-from typing import Any
+from typing import Any, Tuple, List, Dict
 from pathlib import Path
 
 from src.orchestrator.state import AgentState
@@ -27,11 +27,52 @@ from src.writing.prompt_firewall import PromptFirewall
 from src.writing.context_compiler import ContextCompiler
 from src.writing.voiceprint import VoiceprintRegistry
 from src.db.pool import update_progress_scene, update_progress_chapter, update_progress_volume
+from src.writing.causality.initializer import ensure_core_predicates
+
 
 logger = setup_logging("orchestrator.nodes")
 
 _memory_agent = MemoryAgent()
 
+async def _load_scene_plans_from_db(
+    pool, novel_id: str, volume_num: int, chapter_num: int
+) -> Tuple[List[Dict[str, Any]], int]:
+    """
+    从 scene_execution_units 表加载指定章节的场景计划列表。
+    返回 (scene_plan_list, total_scenes)
+    """
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT plan_json, scene_index, status
+            FROM scene_execution_units
+            WHERE novel_id = $1 AND volume_num = $2 AND chapter_num = $3
+            ORDER BY scene_index ASC
+            """,
+            novel_id, volume_num, chapter_num
+        )
+        scene_plans = []
+        for row in rows:
+            plan = json.loads(row["plan_json"])
+            # 可选：添加状态字段用于调试，但不影响计划内容
+            # plan["_status"] = row["status"]
+            scene_plans.append(plan)
+        return scene_plans, len(scene_plans)
+
+async def _get_succeeded_scenes_count(
+    pool, novel_id: str, volume_num: int, chapter_num: int
+) -> int:
+    """返回指定章节中状态为 'succeeded' 的场景数量"""
+    async with pool.acquire() as conn:
+        count = await conn.fetchval(
+            """
+            SELECT COUNT(*) FROM scene_execution_units
+            WHERE novel_id = $1 AND volume_num = $2 AND chapter_num = $3
+            AND status = 'succeeded'
+            """,
+            novel_id, volume_num, chapter_num
+        )
+        return count or 0
 
 def get_memory_agent() -> MemoryAgent:
     return _memory_agent
@@ -274,7 +315,34 @@ async def plan_node(state: AgentState) -> dict[str, Any]:
     # 上下文注入
     if state.task_type == "scene_plan" and state.novel_id:
         try:
-            world = WorldState.from_dict(state.current_state) if state.current_state else WorldState()
+            # ----- 1. 获取或初始化世界状态 -----
+            if state.current_state:
+                world = WorldState.from_dict(state.current_state)
+            else:
+                # 新建小说：从 outline 构建初始世界状态
+                world = WorldState()
+                if state.outline and "characters" in state.outline:
+                    for char_info in state.outline["characters"]:
+                        name = char_info.get("name")
+                        initial_realm = char_info.get("initial_state", {}).get("realm", "炼气")
+                        from src.writing.world_state import Realm, CharacterState
+                        import re
+                        realm_str = initial_realm
+                        level = 1
+                        match = re.search(r'(\d+)', realm_str)
+                        if match:
+                            level = int(match.group(1))
+                            realm_str = realm_str.replace(str(level), "").strip()
+                        realm_map = {"炼气": Realm.REFINING_QI, "筑基": Realm.FOUNDATION, "金丹": Realm.GOLDEN_CORE}
+                        realm_enum = realm_map.get(realm_str, Realm.REFINING_QI)
+                        char_state = CharacterState(name=name, realm=realm_enum, realm_level=level)
+                        world.characters[name] = char_state
+                state.current_state = world.to_dict()
+
+            # ----- 2. 确保核心谓词已投影 -----
+            await ensure_core_predicates(state.novel_id, world)
+
+            # ----- 3. 编译上下文 -----
             compiler = ContextCompiler()
             current_volume_outline = None
             if state.outline and "volumes" in state.outline:
@@ -289,7 +357,7 @@ async def plan_node(state: AgentState) -> dict[str, Any]:
             state.metadata["compiled_context"] = compiled
         except Exception as e:
             logger.warning(f"Context compile failed: {e}")
-    
+        
     # 调用 PlannerAgent
     planner = PlannerAgent()
     planner_updates = await planner.run(state)
@@ -319,19 +387,15 @@ async def plan_node(state: AgentState) -> dict[str, Any]:
                 if "scene_id" not in scene:
                     scene["scene_id"] = i + 1
             
-            updates["scene_plan_list"] = scenes
-            updates["total_scenes_in_chapter"] = len(scenes)
-            updates["scene_plan"] = scenes[0] if scenes else {}
+            # 更新 state 字段（主要存储位置）
             state.scene_plan_list = scenes
             state.total_scenes_in_chapter = len(scenes)
             state.scene_plan = scenes[0] if scenes else {}
-            logger.info(f"plan_node: set state.scene_plan (exists={state.scene_plan is not None}, scenes={len(scenes)})")
             
-            state.metadata["scene_plan_list"] = scenes
-            state.metadata["total_scenes_in_chapter"] = len(scenes)
-            state.metadata["current_scene_index"] = 0
-            state.metadata["current_scene_plan"] = scenes[0] if scenes else None
-            logger.info(f"plan_node: stored scene plans in metadata, count={len(scenes)}")
+            # 同步到 updates 返回字段
+            updates["scene_plan_list"] = scenes
+            updates["total_scenes_in_chapter"] = len(scenes)
+            updates["scene_plan"] = scenes[0] if scenes else {}
             
             # 持久化到 scene_execution_units
             await _persist_scene_plans(state, scenes)
@@ -359,43 +423,35 @@ async def plan_node(state: AgentState) -> dict[str, Any]:
 
 
 async def writer_node(state: AgentState) -> dict[str, Any]:
-    if state.total_scenes_in_chapter == 0 and state.metadata.get("total_scenes_in_chapter"):
-        state.total_scenes_in_chapter = state.metadata["total_scenes_in_chapter"]
-    if state.current_scene_index is None and state.metadata.get("current_scene_index") is not None:
-        state.current_scene_index = state.metadata["current_scene_index"]
-    
-    scene_plan_list = state.metadata.get("scene_plan_list", [])
-    current_idx = state.metadata.get("current_scene_index", 0)
+    # 直接使用 state 字段（不再从 metadata 读取）
+    scene_plan_list = state.scene_plan_list
+    current_idx = state.current_scene_index if state.current_scene_index is not None else 0
+
     if current_idx < len(scene_plan_list):
         current_scene_plan = scene_plan_list[current_idx]
     else:
         current_scene_plan = None
-    
+
     if current_scene_plan is None:
         logger.error(f"writer_node: no scene plan for index {current_idx}, list length {len(scene_plan_list)}")
         return {"scene_text": "", "final_answer": "", "current_node": "writer"}
-    
-    state.metadata["current_scene_plan"] = current_scene_plan
+
     state.scene_plan = current_scene_plan
-    
-    if state.scene_plan is None:
-        logger.error("writer_node: state.scene_plan is None, cannot write")
-        return {"scene_text": "", "final_answer": "", "current_node": "writer"}
-    
-    # 注入验证反馈
+
+    # 注入验证反馈（保留，feedback 是瞬态）
     if hasattr(state, 'writing_feedback') and state.writing_feedback:
         state.metadata["writing_feedback"] = state.writing_feedback
     else:
         state.metadata.pop("writing_feedback", None)
-    
+
     # 更新场景执行单元状态为 running
     if state.novel_id and state.task_type == "scene_plan" and current_scene_plan:
         await _update_scene_unit_status(state.novel_id, state.current_volume, state.current_chapter, current_idx, "running")
-    
+
     writer = WritingAgent()
     result = await writer.run(state)
     raw_json = result.get("scene_text", "")
-    
+
     # 提取 scene_text
     clean_text = ""
     json_match = re.search(r'\{.*\}', raw_json, re.DOTALL)
@@ -407,7 +463,7 @@ async def writer_node(state: AgentState) -> dict[str, Any]:
             clean_text = raw_json
     else:
         clean_text = raw_json
-    
+
     return {
         "scene_text": raw_json,
         "final_answer": clean_text,
@@ -421,30 +477,31 @@ async def writer_node(state: AgentState) -> dict[str, Any]:
 
 
 async def validate_node(state: AgentState) -> dict[str, Any]:
-    if state.total_scenes_in_chapter == 0 and state.metadata.get("total_scenes_in_chapter"):
-        state.total_scenes_in_chapter = state.metadata["total_scenes_in_chapter"]
-    
-    scene_plan_list = state.metadata.get("scene_plan_list", [])
-    current_scene_index = state.metadata.get("current_scene_index", 0)
-    total_scenes = state.metadata.get("total_scenes_in_chapter", 0)
-    
+    chapter_finished = False
+    succeeded = 0
+
+    # 直接从 state 读取（不再 fallback 到 metadata）
+    total_scenes = state.total_scenes_in_chapter
+    scene_plan_list = state.scene_plan_list
+    current_scene_index = state.current_scene_index if state.current_scene_index is not None else 0
+
     if current_scene_index < len(scene_plan_list):
         current_scene_plan = scene_plan_list[current_scene_index]
     else:
         current_scene_plan = None
         logger.warning(f"validate_node: invalid scene index {current_scene_index} for list length {len(scene_plan_list)}")
-    
+
     state.scene_plan = current_scene_plan if current_scene_plan else {}
     mode = "novel" if state.scene_text else "code"
     state.validation_mode = mode
     validator = ValidatorAgent()
     updates = await validator.run(state)
-    
+
     validation_result = updates.get("validation_result", {})
     passed = validation_result.get("passed", False)
     should_retry = validation_result.get("should_retry", False)
     need_semantic = validation_result.get("need_semantic", False)
-    
+
     # 异步语义验证
     if need_semantic and state.scene_text and state.scene_plan:
         from src.writing.validators import validate_semantic
@@ -459,13 +516,13 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
             validation_result["feedback"] = semantic_error
             validation_result["should_retry"] = True
             logger.warning(f"Semantic validation failed: {semantic_error}")
-    
+
     # 处理重试逻辑
     if not passed and should_retry:
         retry_count = getattr(state, 'retry_count', 0) + 1
         max_retries = getattr(state, 'max_retries_per_subtask', 2)
         logger.warning(f"Validation failed: {validation_result.get('feedback', '')}")
-        
+
         if retry_count < max_retries:
             logger.info(f"Retrying scene {current_scene_index + 1} (retry {retry_count}/{max_retries})")
             if state.novel_id and state.task_type == "scene_plan":
@@ -484,14 +541,15 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
             if state.novel_id and state.task_type == "scene_plan":
                 await _update_scene_unit_status(state.novel_id, state.current_volume, state.current_chapter, current_scene_index,
                                                 "skipped", validation_result.get("feedback", "Validation failed after retries"))
-            
+
+            original_idx = current_scene_index
             new_idx = current_scene_index + 1
             if state.novel_id and state.task_type == "scene_plan":
                 try:
                     await update_progress_scene(state.novel_id, new_idx, chapter_completed=False)
                 except Exception as e:
                     logger.error(f"Failed to update writing_progress for skipped scene: {e}", exc_info=True)
-            
+
             base_updates = {
                 "validation_result": validation_result,
                 "error": validation_result.get("feedback"),
@@ -500,26 +558,44 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
                 "needs_retry": False,
                 "novel_id": state.novel_id,
             }
-            state.metadata["current_scene_index"] = new_idx
-            if new_idx < len(scene_plan_list):
-                next_scene_plan = scene_plan_list[new_idx]
-                state.metadata["current_scene_plan"] = next_scene_plan
-                base_updates["scene_plan"] = next_scene_plan
-                logger.info(f"Skipped scene, updated scene_plan for next scene (index {new_idx})")
-            
-            if total_scenes > 0 and new_idx >= total_scenes:
-                logger.info(f"Chapter {state.current_chapter} completed (with skipped scenes), advancing to next chapter")
+
+            # 获取当前章节实际已成功的场景数
+            pool = get_db_pool()
+            succeeded_actual = new_idx
+            if pool and state.novel_id:
+                succeeded_actual = await _get_succeeded_scenes_count(
+                    pool, state.novel_id, state.current_volume, state.current_chapter
+                )
+
+            if total_scenes > 0 and succeeded_actual >= total_scenes:
+                # 章节已完成，安全递增
+                state.current_scene_index = new_idx
+                if new_idx < len(scene_plan_list):
+                    next_scene_plan = scene_plan_list[new_idx]
+                    base_updates["scene_plan"] = next_scene_plan
+                else:
+                    state.scene_plan_list = []
+                    state.total_scenes_in_chapter = 0
+                    state.current_scene_index = 0
+                    base_updates["scene_plan_list"] = []
+                    base_updates["total_scenes_in_chapter"] = 0
+
                 new_chapter = state.current_chapter + 1
+                logger.info(f"✅ Chapter {state.current_chapter} completed (succeeded scenes: {succeeded_actual}/{total_scenes})! Advancing to chapter {new_chapter}")
                 base_updates["current_chapter"] = new_chapter
                 base_updates["current_scene_index"] = 0
                 base_updates["scene_plan_list"] = []
                 base_updates["total_scenes_in_chapter"] = 0
                 base_updates["_chapter_finished"] = True
                 base_updates["scene_plan"] = None
-                state.metadata["scene_plan_list"] = []
-                state.metadata["total_scenes_in_chapter"] = 0
-                state.metadata["current_scene_index"] = 0
-                state.metadata["current_scene_plan"] = None
+
+                # 同步 state
+                state.current_chapter = new_chapter
+                state.current_scene_index = 0
+                state.scene_plan_list = []
+                state.total_scenes_in_chapter = 0
+                state.scene_plan = None
+
                 if state.novel_id:
                     try:
                         await update_progress_chapter(state.novel_id, new_chapter)
@@ -530,15 +606,25 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
                     new_vol = state.current_volume + 1
                     base_updates["current_volume"] = new_vol
                     base_updates["current_chapter"] = 1
-                    logger.info(f"Volume {state.current_volume} completed! Moving to volume {new_vol}")
+                    state.current_volume = new_vol
+                    state.current_chapter = 1
+                    logger.info(f"📚 Volume {state.current_volume} completed! Moving to volume {new_vol}")
                     if state.novel_id:
                         try:
                             await update_progress_volume(state.novel_id, new_vol)
                         except Exception as e:
                             logger.error(f"Failed to update writing_progress for volume: {e}", exc_info=True)
+            else:
+                # 章节未完成，但当前场景被跳过 → 保持索引，强制重新规划
+                logger.warning(f"Scene {current_scene_index} skipped but chapter not completed (succeeded={succeeded_actual}/{total_scenes}). Keeping index at {original_idx} to avoid out-of-range.")
+                base_updates["current_scene_index"] = original_idx
+                state.current_scene_index = original_idx
+                base_updates["scene_plan"] = None
+                base_updates["needs_replan"] = True
+
             base_updates["metadata"] = state.metadata
             return base_updates
-    
+
     # 致命错误
     if not passed:
         logger.error(f"Validation failed (fatal): {validation_result.get('feedback', '')}")
@@ -552,10 +638,10 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
             "metadata": state.metadata,
             "novel_id": state.novel_id,
         }
-    
-    # 验证通过，应用状态变更和存储事件
+
+    # ========== 验证通过，应用状态变更和存储事件 ==========
     parsed_output = validation_result.get("parsed_output") if validation_result else None
-    
+
     if state.task_type == "scene_plan" and state.scene_text:
         pool = get_db_pool()
         if pool:
@@ -564,7 +650,7 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
                 new_world = current_world
                 events_applied = False
                 events = []
-                
+
                 if parsed_output:
                     events_data = parsed_output.get("events", [])
                     if events_data:
@@ -580,7 +666,7 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
                             new_world = delta.apply_to(current_world)
                             events_applied = True
                             logger.info(f"Applied {len(events)} events from Writer output")
-                
+
                 if not events_applied:
                     planned_delta_dict = state.scene_plan.get("state_delta", {}) if state.scene_plan else {}
                     if planned_delta_dict:
@@ -588,7 +674,7 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
                         new_world = delta.apply_to(current_world)
                         events_applied = True
                         logger.info("Applied state_delta from Planner (fallback)")
-                
+
                 if events_applied and pool:
                     if parsed_output and parsed_output.get("events"):
                         event_store = NarrativeEventStore(pool)
@@ -599,16 +685,14 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
                                 current_scene_index
                             )
                         last_id = await event_store.get_last_event_id(state.novel_id)
-                        chapter_finished = total_scenes > 0 and (current_scene_index + 1 >= total_scenes)
-                        if chapter_finished:
+                        if total_scenes > 0 and (current_scene_index + 1 >= total_scenes):
                             snap_mgr = SnapshotManager(pool)
                             await snap_mgr.save_snapshot(
                                 state.novel_id, new_world, last_id,
                                 state.current_volume, state.current_chapter
                             )
                     updates["current_state"] = new_world.to_dict()
-                    
-                    # 更新场景执行单元状态为 succeeded，并保存实际状态增量
+
                     if state.novel_id and state.task_type == "scene_plan" and current_scene_plan:
                         actual_events = parsed_output.get("events", []) if parsed_output else []
                         actual_state_delta = {"events": actual_events} if actual_events else None
@@ -617,48 +701,54 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
                     logger.info("World state updated and events stored")
             except Exception as e:
                 logger.error(f"State delta application error: {e}", exc_info=True)
-        
+
         # 更新场景索引
         new_idx = current_scene_index + 1
-        state.metadata["current_scene_index"] = new_idx
+        state.current_scene_index = new_idx
         updates["current_scene_index"] = new_idx
         updates["retry_count"] = 0
         updates["total_scenes_in_chapter"] = total_scenes
-        
+
         if state.novel_id:
             try:
                 await update_progress_scene(
                     state.novel_id,
                     scene_index=new_idx,
-                    chapter_completed=(total_scenes > 0 and new_idx >= total_scenes)
+                    chapter_completed=False
                 )
             except Exception as e:
                 logger.error(f"Failed to update writing_progress for scene: {e}", exc_info=True)
-        
+
         if new_idx < len(scene_plan_list):
             next_scene_plan = scene_plan_list[new_idx]
-            state.metadata["current_scene_plan"] = next_scene_plan
             updates["scene_plan"] = next_scene_plan
             logger.info(f"Updated scene_plan for next scene (index {new_idx}): goal={next_scene_plan.get('goal', '')[:60]}")
-        
+
         if state.novel_id and state.final_answer:
             await _save_scene_to_file(state, state.final_answer)
-        
+
         logger.info(f"validate_node: total_scenes={total_scenes}, current_idx={current_scene_index}, new_idx={new_idx}, current_chapter={state.current_chapter}")
-        
-        if total_scenes > 0 and new_idx >= total_scenes:
+
+        succeeded = new_idx
+        chapter_finished = (total_scenes > 0 and succeeded >= total_scenes)
+
+        if chapter_finished:
             new_chapter = state.current_chapter + 1
-            logger.info(f"✅ Chapter {state.current_chapter} completed! Advancing to chapter {new_chapter}")
+            logger.info(f"✅ Chapter {state.current_chapter} completed (succeeded scenes: {succeeded}/{total_scenes})! Advancing to chapter {new_chapter}")
             updates["current_chapter"] = new_chapter
             updates["current_scene_index"] = 0
             updates["scene_plan_list"] = []
             updates["total_scenes_in_chapter"] = 0
             updates["_chapter_finished"] = True
             updates["scene_plan"] = None
-            state.metadata["scene_plan_list"] = []
-            state.metadata["total_scenes_in_chapter"] = 0
-            state.metadata["current_scene_index"] = 0
-            state.metadata["current_scene_plan"] = None
+
+            # 同步 state
+            state.current_chapter = new_chapter
+            state.current_scene_index = 0
+            state.scene_plan_list = []
+            state.total_scenes_in_chapter = 0
+            state.scene_plan = None
+
             if state.novel_id:
                 try:
                     await update_progress_chapter(state.novel_id, new_chapter)
@@ -669,6 +759,8 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
                 new_vol = state.current_volume + 1
                 updates["current_volume"] = new_vol
                 updates["current_chapter"] = 1
+                state.current_volume = new_vol
+                state.current_chapter = 1
                 logger.info(f"📚 Volume {state.current_volume} completed! Moving to volume {new_vol}")
                 if state.novel_id:
                     try:
@@ -676,8 +768,9 @@ async def validate_node(state: AgentState) -> dict[str, Any]:
                     except Exception as e:
                         logger.error(f"Failed to update writing_progress for volume: {e}", exc_info=True)
         else:
-            logger.info(f"Continuing with next scene of chapter {state.current_chapter}")
-    
+            updates["_chapter_finished"] = False
+            logger.info(f"Continuing with next scene of chapter {state.current_chapter} (succeeded: {succeeded}/{total_scenes})")
+
     updates["metadata"] = state.metadata
     updates["novel_id"] = state.novel_id
     return updates

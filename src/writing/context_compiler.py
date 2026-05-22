@@ -226,7 +226,7 @@ class ContextCompiler:
         # 添加事件类型说明（仅作参考，不强制）
         lines.append("【events 字段填写指南】")
         lines.append("根据场景中实际发生的状态变化，从以下类型中选择，可以写多个事件：")
-        lines.append("- realm_upgrade: 境界突破（actor, to_realm）")
+        lines.append('- realm_upgrade: 境界突破（actor, to_major_realm: "金丹", to_minor_stage: 1）')
         lines.append("- item_acquire: 获得物品（actor, item, quantity, source可选）")
         lines.append("- item_lose: 失去物品（actor, item, quantity, reason）")
         lines.append("- relationship_change: 关系变化（from_char, to_char, delta）")

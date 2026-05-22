@@ -144,21 +144,21 @@ CREATE TABLE IF NOT EXISTS writing_progress (
 );
 
 -- ============================================================
--- 新增：场景执行单元表（执行计划持久化）
+-- 场景执行单元表（执行计划持久化）
 -- ============================================================
 CREATE TABLE IF NOT EXISTS scene_execution_units (
     id BIGSERIAL PRIMARY KEY,
     novel_id VARCHAR(32) NOT NULL,
     volume_num INT NOT NULL,
     chapter_num INT NOT NULL,
-    scene_index INT NOT NULL,          -- 0-based 场景索引
+    scene_index INT NOT NULL,
 
-    status VARCHAR(32) NOT NULL DEFAULT 'pending',  -- pending, running, succeeded, failed, skipped
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
 
-    plan_json JSONB NOT NULL,          -- 完整的场景计划（goal, conflict, must_events, characters, state_delta 等）
-    planned_state_delta JSONB,         -- Planner 期望的状态变更（来自 plan_json.state_delta）
-    actual_state_delta JSONB,          -- Writer 实际生成的状态变更（聚合自 events）
-    applied_event_ids JSONB,           -- 最终应用到事件存储的事件 ID 列表（数组）
+    plan_json JSONB NOT NULL,
+    planned_state_delta JSONB,
+    actual_state_delta JSONB,
+    applied_event_ids JSONB,
 
     retry_count INT DEFAULT 0,
     max_retries INT DEFAULT 2,
@@ -198,3 +198,98 @@ CREATE TABLE IF NOT EXISTS task_jobs (
 );
 
 CREATE INDEX IF NOT EXISTS chunks_embedding_idx ON chunks USING hnsw (embedding vector_cosine_ops);
+
+-- ============================================================
+-- 因果引擎新增表与字段 (v3.0)
+-- ============================================================
+
+-- 为 narrative_events 增加语义字段和 schema 版本
+ALTER TABLE narrative_events ADD COLUMN IF NOT EXISTS semantic VARCHAR(32);
+ALTER TABLE narrative_events ADD COLUMN IF NOT EXISTS event_schema_version INT DEFAULT 1;
+
+-- 为 world_snapshots 增加快照 schema 版本
+ALTER TABLE world_snapshots ADD COLUMN IF NOT EXISTS snapshot_schema_version INT DEFAULT 1;
+
+-- 谓词投影缓存表
+CREATE TABLE IF NOT EXISTS predicates (
+    id BIGSERIAL PRIMARY KEY,
+    novel_id VARCHAR(32) NOT NULL,
+    event_id BIGINT NOT NULL,
+    source_event_type VARCHAR(64),
+    source_event_semantic VARCHAR(32),
+    projection_version INT DEFAULT 1,
+    subject VARCHAR(128),
+    relation VARCHAR(64),
+    object JSONB,
+    negated BOOLEAN DEFAULT false,
+    confidence FLOAT DEFAULT 1.0,
+    priority VARCHAR(16) DEFAULT 'narrative',
+    scope VARCHAR(32) DEFAULT 'scene',
+    is_active BOOLEAN DEFAULT true,
+    valid_from_event_id BIGINT,
+    valid_to_event_id BIGINT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    identity_key VARCHAR(512),   -- 新增列：谓词唯一标识
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+-- 为 identity_key 创建索引（加速查询和失效操作）
+CREATE INDEX IF NOT EXISTS idx_predicates_identity_key ON predicates(identity_key);
+-- （可选）部分唯一索引：确保同一 identity_key 最多只有一条活跃记录
+CREATE UNIQUE INDEX IF NOT EXISTS idx_predicates_active_identity 
+ON predicates (novel_id, identity_key) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_predicates_novel_version ON predicates(novel_id, projection_version);
+CREATE INDEX IF NOT EXISTS idx_predicates_novel_subject_relation ON predicates(novel_id, subject, relation);
+CREATE INDEX IF NOT EXISTS idx_predicates_active_priority ON predicates(novel_id, is_active, priority);
+CREATE INDEX IF NOT EXISTS idx_predicates_identity ON predicates(novel_id, subject, relation, (object->>0)) WHERE is_active = true;
+
+-- 投影幂等记录表
+CREATE TABLE IF NOT EXISTS projection_applied (
+    delta_id VARCHAR(64) PRIMARY KEY,
+    novel_id VARCHAR(32) NOT NULL,
+    event_id BIGINT NOT NULL,
+    applied_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 投影健康检查表
+CREATE TABLE IF NOT EXISTS projection_health (
+    novel_id VARCHAR(32) PRIMARY KEY,
+    last_projected_event_id BIGINT,
+    projection_lag_events INT,
+    last_full_rebuild_at TIMESTAMPTZ,
+    core_predicates_hash TEXT,
+    drift_level VARCHAR(16),
+    validator_mode VARCHAR(16),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 投影死信队列
+CREATE TABLE IF NOT EXISTS projection_dead_letters (
+    id BIGSERIAL PRIMARY KEY,
+    novel_id VARCHAR(32) NOT NULL,
+    event_id BIGINT NOT NULL,
+    error TEXT,
+    traceback TEXT,
+    retry_count INT DEFAULT 0,
+    status VARCHAR(16) DEFAULT 'pending',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+-- 添加唯一约束（确保幂等性）
+ALTER TABLE projection_dead_letters ADD CONSTRAINT IF NOT EXISTS projection_dead_letters_novel_event_unique UNIQUE (novel_id, event_id);
+
+-- 章节一致性预算表
+CREATE TABLE IF NOT EXISTS chapter_budget (
+    novel_id VARCHAR(32) NOT NULL,
+    volume_num INT NOT NULL,
+    chapter_num INT NOT NULL,
+    remaining_warnings INT DEFAULT 3,
+    remaining_soft INT DEFAULT 1,
+    PRIMARY KEY (novel_id, volume_num, chapter_num)
+);
+
+-- 可供性使用记录表（冷却）
+CREATE TABLE IF NOT EXISTS affordance_usage (
+    novel_id VARCHAR(32) NOT NULL,
+    affordance_id VARCHAR(64) NOT NULL,
+    last_used_chapter INT NOT NULL,
+    PRIMARY KEY (novel_id, affordance_id)
+);

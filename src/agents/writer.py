@@ -18,6 +18,8 @@ from src.writing.voiceprint import VoiceprintRegistry
 from src.writing.context_compiler import ContextCompiler
 from src.writing.prompt_firewall import PromptFirewall
 from src.writing.validators import validate_all
+from src.writing.world_state import WorldState
+
 
 logger = setup_logging("agents.writer")
 
@@ -49,7 +51,6 @@ class WritingAgent(BaseAgent):
         voiceprint_registry = get_voiceprint_registry()
         
         # 获取当前世界状态（如果存在）
-        from src.writing.world_state import WorldState
         world_state = WorldState.from_dict(state.current_state) if state.current_state else WorldState()
         
         # 编译上下文
@@ -132,15 +133,64 @@ class WritingAgent(BaseAgent):
             parsed = validation["parsed_output"] or {}
             scene_text = parsed.get("scene_text", "")
             
-            # ========== 3. 后验证：强制检查 events 是否与 state_delta 一致 ==========
+            # ========== 增强事件格式修复 ==========
+            events = parsed.get("events", [])
+            if events:
+                for evt in events:
+                    # 1. 修复 discovery.importance: 确保为字符串
+                    if evt.get("type") == "discovery" and "importance" in evt:
+                        imp = evt["importance"]
+                        if isinstance(imp, int):
+                            if imp >= 5:
+                                evt["importance"] = "critical"
+                            elif imp >= 3:
+                                evt["importance"] = "high"
+                            elif imp >= 1:
+                                evt["importance"] = "normal"
+                            else:
+                                evt["importance"] = "low"
+                        elif isinstance(imp, float):
+                            evt["importance"] = "critical" if imp >= 5 else "high" if imp >= 3 else "normal" if imp >= 1 else "low"
+                        elif isinstance(imp, bool):
+                            evt["importance"] = "critical" if imp else "low"                    
+                    # 2. 修复 relationship_change: 确保 new_value 存在
+                    if evt.get("type") == "relationship_change":
+                        if "new_value" not in evt and "delta" in evt:
+                            from_char = evt.get("from_char")
+                            to_char = evt.get("to_char")
+                            if from_char and to_char:
+                                key = f"{from_char}|{to_char}"
+                                old_value = world_state.relationships.get(key, 0) if world_state else 0
+                                delta = evt["delta"]
+                                new_value = old_value + delta
+                                new_value = max(-100, min(100, new_value))
+                                evt["new_value"] = new_value
+                            else:
+                                # 无法确定关系，设置默认值 0 并记录警告
+                                evt["new_value"] = 0
+                                logger.warning(f"Missing from_char/to_char in relationship_change event: {evt}")
+                    # 3. 新增：修复 hp_changed / mp_changed 负数
+                    if evt.get("type") == "hp_changed":
+                        new_hp = evt.get("new_hp")
+                        if isinstance(new_hp, (int, float)) and new_hp < 0:
+                            evt["new_hp"] = 0
+                            logger.warning(f"Corrected negative hp to 0: {new_hp}")
+                    if evt.get("type") == "mp_changed":
+                        new_mp = evt.get("new_mp")
+                        if isinstance(new_mp, (int, float)) and new_mp < 0:
+                            evt["new_mp"] = 0
+                            logger.warning(f"Corrected negative mp to 0: {new_mp}")
+
+                # 将修复后的事件写回 parsed
+                parsed["events"] = events
+            
+            # ========== 后验证：强制检查 events 是否与 state_delta 一致 ==========
             if expected_events:
                 actual_events = parsed.get("events", [])
-                # 简单对比：序列化后比较（更严格的可以递归比较）
                 if json.dumps(actual_events, sort_keys=True) != json.dumps(expected_events, sort_keys=True):
                     deviation_detected = True
                     error_msg = f"state_delta mismatch: expected {len(expected_events)} events, got {len(actual_events)}"
                     logger.error(error_msg)
-                    # 可以选择重试，这里标记偏差，让上层 validate_node 处理重试
         else:
             logger.warning(f"Validation failed: {validation['error']}")
             # 尝试从原始输出中提取 JSON 中的 scene_text
@@ -166,7 +216,7 @@ class WritingAgent(BaseAgent):
             "deviation_detected": deviation_detected,
             "missing_goal_keywords": missing_goal,
             "missing_conflict_keywords": missing_conflict,
-            "error": error_msg,  # 可选，供上层使用
+            "error": error_msg,
         }
     
     @retry_with_backoff(max_retries=2, base_delay=1.0)

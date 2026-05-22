@@ -1,18 +1,31 @@
 #!/usr/bin/env python
-"""清理测试数据 - 安全版本，检查表结构和列是否存在"""
+"""清理测试数据 - 安全版本，检查表结构和列是否存在
+
+支持因果引擎新增的表：
+- predicates
+- projection_applied
+- projection_health
+- chapter_budget
+- affordance_usage
+- projection_dead_letters
+- event_embeddings
+- narrative_causality
+"""
 
 import asyncio
 import asyncpg
 import sys
 import os
 import shutil
+import argparse
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.config import config
 
-NOVEL_ID = "simple_long_novel_001"
+DEFAULT_NOVEL_ID = "simple_long_novel_001"
+
 
 async def get_table_columns(conn, table_name):
     """获取表的列名列表"""
@@ -28,7 +41,22 @@ async def get_table_columns(conn, table_name):
         print(f"  Warning: Could not get columns for {table_name}: {e}")
         return []
 
-async def clean_database():
+
+async def table_exists(conn, table_name: str) -> bool:
+    """检查表是否存在"""
+    try:
+        row = await conn.fetchval("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables 
+                WHERE table_name = $1
+            )
+        """, table_name)
+        return row
+    except Exception:
+        return False
+
+
+async def clean_database(novel_id: str):
     """清理数据库中的相关记录（安全版本）"""
     print("Connecting to database...")
     conn = await asyncpg.connect(config.postgres_dsn)
@@ -40,18 +68,9 @@ async def clean_database():
             if 'novel_id' in columns:
                 result = await conn.execute(
                     "DELETE FROM narrative_events WHERE novel_id = $1",
-                    NOVEL_ID
+                    novel_id
                 )
                 print(f"✅ Cleaned narrative_events: {result}")
-            elif 'novel_id' in [c for c in columns if 'novel' in c.lower()]:
-                # 尝试找到包含 novel 的列名
-                novel_col = next((c for c in columns if 'novel' in c.lower()), None)
-                if novel_col:
-                    result = await conn.execute(
-                        f"DELETE FROM narrative_events WHERE {novel_col} = $1",
-                        NOVEL_ID
-                    )
-                    print(f"✅ Cleaned narrative_events (using {novel_col}): {result}")
             else:
                 print(f"⚠️ narrative_events has no novel_id column, columns: {columns}")
         except Exception as e:
@@ -63,7 +82,7 @@ async def clean_database():
             if 'novel_id' in columns:
                 result = await conn.execute(
                     "DELETE FROM world_snapshots WHERE novel_id = $1",
-                    NOVEL_ID
+                    novel_id
                 )
                 print(f"✅ Cleaned world_snapshots: {result}")
             else:
@@ -77,7 +96,7 @@ async def clean_database():
             if 'novel_id' in columns:
                 result = await conn.execute(
                     "DELETE FROM compressed_states WHERE novel_id = $1",
-                    NOVEL_ID
+                    novel_id
                 )
                 print(f"✅ Cleaned compressed_states: {result}")
             else:
@@ -91,7 +110,7 @@ async def clean_database():
             if 'novel_id' in columns:
                 result = await conn.execute(
                     "DELETE FROM chapter_summaries WHERE novel_id = $1",
-                    NOVEL_ID
+                    novel_id
                 )
                 print(f"✅ Cleaned chapter_summaries: {result}")
             else:
@@ -105,7 +124,7 @@ async def clean_database():
             if 'novel_id' in columns:
                 result = await conn.execute(
                     "DELETE FROM chapters WHERE novel_id = $1",
-                    NOVEL_ID
+                    novel_id
                 )
                 print(f"✅ Cleaned chapters: {result}")
             else:
@@ -113,17 +132,136 @@ async def clean_database():
         except Exception as e:
             print(f"⚠️ Could not clean chapters: {e}")
         
-        # 6. 清理或重置 novels 表
+        # 6. 清理 writing_progress（使用 project_id 字段）
+        try:
+            result = await conn.execute(
+                "DELETE FROM writing_progress WHERE project_id = $1",
+                novel_id
+            )
+            print(f"✅ Cleaned writing_progress: {result}")
+        except Exception as e:
+            print(f"⚠️ Could not clean writing_progress: {e}")
+        
+        # 7. 清理 scene_execution_units
+        try:
+            result = await conn.execute(
+                "DELETE FROM scene_execution_units WHERE novel_id = $1",
+                novel_id
+            )
+            print(f"✅ Cleaned scene_execution_units: {result}")
+        except Exception as e:
+            print(f"⚠️ Could not clean scene_execution_units: {e}")
+        
+        # 8. 清理 resume_tasks
+        try:
+            result = await conn.execute(
+                "DELETE FROM resume_tasks WHERE novel_id = $1",
+                novel_id
+            )
+            print(f"✅ Cleaned resume_tasks: {result}")
+        except Exception as e:
+            print(f"⚠️ Could not clean resume_tasks: {e}")
+        
+        # ========== 新增：因果引擎相关表 ==========
+        
+        # 9. 清理 predicates
+        try:
+            result = await conn.execute(
+                "DELETE FROM predicates WHERE novel_id = $1",
+                novel_id
+            )
+            print(f"✅ Cleaned predicates: {result}")
+        except Exception as e:
+            print(f"⚠️ Could not clean predicates: {e}")
+        
+        # 10. 清理 projection_applied
+        try:
+            result = await conn.execute(
+                "DELETE FROM projection_applied WHERE novel_id = $1",
+                novel_id
+            )
+            print(f"✅ Cleaned projection_applied: {result}")
+        except Exception as e:
+            print(f"⚠️ Could not clean projection_applied: {e}")
+        
+        # 11. 清理 projection_health
+        try:
+            result = await conn.execute(
+                "DELETE FROM projection_health WHERE novel_id = $1",
+                novel_id
+            )
+            print(f"✅ Cleaned projection_health: {result}")
+        except Exception as e:
+            print(f"⚠️ Could not clean projection_health: {e}")
+        
+        # 12. 清理 chapter_budget
+        try:
+            result = await conn.execute(
+                "DELETE FROM chapter_budget WHERE novel_id = $1",
+                novel_id
+            )
+            print(f"✅ Cleaned chapter_budget: {result}")
+        except Exception as e:
+            print(f"⚠️ Could not clean chapter_budget: {e}")
+        
+        # 13. 清理 affordance_usage
+        try:
+            result = await conn.execute(
+                "DELETE FROM affordance_usage WHERE novel_id = $1",
+                novel_id
+            )
+            print(f"✅ Cleaned affordance_usage: {result}")
+        except Exception as e:
+            print(f"⚠️ Could not clean affordance_usage: {e}")
+        
+        # 14. 清理 projection_dead_letters
+        try:
+            result = await conn.execute(
+                "DELETE FROM projection_dead_letters WHERE novel_id = $1",
+                novel_id
+            )
+            print(f"✅ Cleaned projection_dead_letters: {result}")
+        except Exception as e:
+            print(f"⚠️ Could not clean projection_dead_letters: {e}")
+        
+        # 15. 清理 event_embeddings（检查表是否存在）
+        if await table_exists(conn, 'event_embeddings'):
+            try:
+                await conn.execute("""
+                    DELETE FROM event_embeddings 
+                    WHERE event_id IN (SELECT id FROM narrative_events WHERE novel_id = $1)
+                """, novel_id)
+                print(f"✅ Cleaned event_embeddings")
+            except Exception as e:
+                print(f"⚠️ Could not clean event_embeddings: {e}")
+        else:
+            print(f"ℹ️ event_embeddings table does not exist, skipping")
+        
+        # 16. 清理 narrative_causality（检查表是否存在）
+        if await table_exists(conn, 'narrative_causality'):
+            try:
+                await conn.execute("""
+                    DELETE FROM narrative_causality 
+                    WHERE cause_event_id IN (SELECT id FROM narrative_events WHERE novel_id = $1)
+                       OR effect_event_id IN (SELECT id FROM narrative_events WHERE novel_id = $1)
+                """, novel_id)
+                print(f"✅ Cleaned narrative_causality")
+            except Exception as e:
+                print(f"⚠️ Could not clean narrative_causality: {e}")
+        else:
+            print(f"ℹ️ narrative_causality table does not exist, skipping")
+        
+        # ============================================
+        
+        # 17. 重置 novels 表记录
         try:
             columns = await get_table_columns(conn, 'novels')
             if 'novel_id' in columns:
-                # 检查记录是否存在
                 exists = await conn.fetchval(
                     "SELECT EXISTS (SELECT 1 FROM novels WHERE novel_id = $1)",
-                    NOVEL_ID
+                    novel_id
                 )
                 if exists:
-                    # 重置记录而不是删除（保留 ID 但清空数据）
                     result = await conn.execute("""
                         UPDATE novels 
                         SET outline = NULL,
@@ -135,16 +273,16 @@ async def clean_database():
                             revision = revision + 1,
                             updated_at = NOW()
                         WHERE novel_id = $1
-                    """, NOVEL_ID)
+                    """, novel_id)
                     print(f"✅ Reset novels record: {result}")
                 else:
-                    print(f"ℹ️ No novels record found for {NOVEL_ID}")
+                    print(f"ℹ️ No novels record found for {novel_id}")
             else:
                 print(f"⚠️ novels table columns: {columns}")
         except Exception as e:
             print(f"⚠️ Could not clean novels: {e}")
         
-        # 7. 可选：列出当前 novels 表中的所有记录
+        # 18. 可选：列出当前 novels 表中的所有记录（调试）
         try:
             rows = await conn.fetch("SELECT novel_id, current_chapter, current_scene_index FROM novels LIMIT 5")
             if rows:
@@ -159,25 +297,35 @@ async def clean_database():
     finally:
         await conn.close()
 
-def clean_files():
+
+def clean_files(novel_id: str):
     """删除生成的小说文件"""
-    novel_dir = Path(f"data/novels/{NOVEL_ID}")
+    novel_dir = Path(f"data/novels/{novel_id}")
     if novel_dir.exists():
         shutil.rmtree(novel_dir)
         print(f"✅ Deleted {novel_dir}")
     else:
         print(f"ℹ️ {novel_dir} does not exist")
 
+
 async def main():
-    print(f"Cleaning test data for novel: {NOVEL_ID}")
+    parser = argparse.ArgumentParser(description="Clean test data for a specific novel")
+    parser.add_argument("novel_id", nargs="?", default=DEFAULT_NOVEL_ID, 
+                        help=f"Novel ID to clean (default: {DEFAULT_NOVEL_ID})")
+    args = parser.parse_args()
+    
+    novel_id = args.novel_id
+    
+    print(f"Cleaning test data for novel: {novel_id}")
     print("Database DSN:", config.postgres_dsn.replace(config.postgres_password, "***"))
     print("-" * 50)
     
-    await clean_database()
-    clean_files()
+    await clean_database(novel_id)
+    clean_files(novel_id)
     
     print("-" * 50)
     print("✅ Clean completed! Test environment is ready.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

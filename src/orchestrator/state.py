@@ -1,7 +1,7 @@
 from typing import Annotated, Any, List, Dict, Optional
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
-
+from src.orchestrator.state_patch import WorkflowPhase
 
 class AgentState(BaseModel):
     """State definition for the AI Factory LangGraph workflow."""
@@ -94,5 +94,9 @@ class AgentState(BaseModel):
     skip_remaining: bool = False
     plan: List[Dict[str, Any]] = []
 
+    # 在现有字段后添加
+    phase: Optional[WorkflowPhase] = None
+    writing_feedback: str = ""   # 注意：如果已有该字段，只添加 phase 即可
+    
     def should_retry(self) -> bool:
         return self.retry_count < self.max_retries and self.error is not None

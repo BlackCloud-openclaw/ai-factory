@@ -110,8 +110,18 @@ class WorldState(BaseModel):
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'WorldState':
-        return cls.model_validate(data)
-    
+        """从字典创建 WorldState，并对 hp/mp 进行钳位防止负数"""
+        # 复制数据避免修改原字典
+        cleaned = data.copy()
+        characters = cleaned.get("characters", {})
+        for char_data in characters.values():
+            if isinstance(char_data, dict):
+                if "hp" in char_data and char_data["hp"] < 0:
+                    char_data["hp"] = 0
+                if "mp" in char_data and char_data["mp"] < 0:
+                    char_data["mp"] = 0
+        return cls.model_validate(cleaned)    
+
     def model_dump(self, **kwargs) -> Dict[str, Any]:
         """序列化，处理 Enum 等"""
         return super().model_dump(**kwargs)

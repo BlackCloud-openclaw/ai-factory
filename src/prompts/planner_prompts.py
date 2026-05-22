@@ -4,42 +4,55 @@ import re
 import logging
 import ast
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Union, List
 from src.orchestrator.state import AgentState
 
+# 尝试导入 json_repair，如果不存在则降级
+try:
+    from json_repair import repair_json
+    HAS_JSON_REPAIR = True
+except ImportError:
+    HAS_JSON_REPAIR = False
+    repair_json = None
 
-def extract_json_from_response(text: str) -> Dict[str, Any]:
+logger = logging.getLogger("agents.planner")
+
+def extract_json_from_response(text: str) -> Union[Dict[str, Any], List[Any]]:
     """
     从 LLM 响应中提取 JSON 对象或数组，具有极强的容错性。
-    支持修复缺失逗号、未转义引号、控制字符等问题，并支持按对象分割解析。
+    优先使用 json_repair 库，然后回退到手动修复。
     """
-    import re
-    import json
-    import logging
-    import ast
-
-    logger = logging.getLogger("agents.planner")
     text = text.strip()
+    logger.debug(f"Extracting JSON from response (length={len(text)})")
 
-    # 1. 提取 markdown 代码块
+    # ========== 1. 提取 markdown 代码块 ==========
     match = re.search(r'```(?:json)?\s*\n([\s\S]*?)\n\s*```', text, re.DOTALL)
     if match:
         text = match.group(1).strip()
+        logger.debug("Extracted content from markdown code block")
 
-    # 2. 尝试直接解析整个文本（最理想情况）
-    try:
-        return json.loads(text)
-    except Exception as e:
-        logger.debug(f"Direct parse failed: {e}")
+    # ========== 2. 尝试使用 json_repair 库 ==========
+    if HAS_JSON_REPAIR:
+        try:
+            # json_repair 会尝试修复常见错误（缺失引号、尾随逗号、注释等）
+            repaired = repair_json(text)
+            parsed = json.loads(repaired)
+            logger.info("Successfully parsed JSON using json_repair")
+            return parsed
+        except Exception as e:
+            logger.warning(f"json_repair failed: {e}, falling back to manual repair")
+    else:
+        logger.debug("json_repair not installed, using manual repair")
 
-    # 3. 查找第一个数组 '[' 或对象 '{'
+    # ========== 3. 手动修复（原有逻辑） ==========
+    # 查找第一个数组 '[' 或对象 '{'
     start_idx = text.find('[')
     if start_idx == -1:
         start_idx = text.find('{')
         if start_idx == -1:
             raise ValueError("No JSON array or object found")
 
-    # 4. 匹配完整的 JSON 结构（使用栈，处理嵌套）
+    # 匹配完整的 JSON 结构
     stack = []
     end = start_idx
     for i, ch in enumerate(text[start_idx:], start_idx):
@@ -49,7 +62,6 @@ def extract_json_from_response(text: str) -> Dict[str, Any]:
             if stack and stack[-1] == '{':
                 stack.pop()
             else:
-                # 可能的格式错误，尝试继续
                 if len(stack) == 0:
                     end = i
                     break
@@ -66,50 +78,45 @@ def extract_json_from_response(text: str) -> Dict[str, Any]:
             end = i
             break
     else:
-        # 未找到闭合，取整个剩余部分
         end = len(text) - 1
 
     json_str = text[start_idx:end+1]
 
-    # 5. 预处理：去除尾随逗号
+    # 去除尾随逗号
     json_str = re.sub(r',\s*}', '}', json_str)
     json_str = re.sub(r',\s*]', ']', json_str)
 
-    # 6. 修复字符串值内部未转义的双引号
-    # 匹配 "key": "任意内容（可能包含未转义双引号）"，并转义内容中的双引号
+    # 修复字符串值内部未转义的双引号
     def fix_quotes(m):
         key = m.group(1)
         value = m.group(2)
-        # 将 value 中的双引号转义（但保留已经转义的 \\"）
         value_fixed = re.sub(r'(?<!\\)"', r'\\"', value)
         return f'"{key}": "{value_fixed}"'
 
-    # 多次执行直到稳定
     for _ in range(3):
         new_json = re.sub(r'"([^"\\]+)"\s*:\s*"([^"]*)"', fix_quotes, json_str)
         if new_json == json_str:
             break
         json_str = new_json
 
-    # 7. 转义控制字符（ASCII 0-31，除了 \t \n \r）
+    # 转义控制字符
     def escape_control(m):
         ch = m.group(0)
         if ch in '\t\n\r':
             return ch
         return f'\\u{ord(ch):04x}'
 
-    # 保护已有转义反斜杠
     json_str = json_str.replace('\\\\', '<<DBACK>>')
     json_str = re.sub(r'[\x00-\x1F]', escape_control, json_str)
     json_str = json_str.replace('<<DBACK>>', '\\\\')
 
-    # 8. 尝试解析整个 JSON
+    # 尝试解析整个 JSON
     try:
         return json.loads(json_str)
     except Exception as e:
         logger.warning(f"Whole JSON parse failed after fixes: {e}")
 
-    # 9. 最后手段：按对象分割解析（适用于数组）
+    # 最后手段：按对象分割解析（适用于数组）
     if json_str.startswith('[') and json_str.endswith(']'):
         content = json_str[1:-1].strip()
         objects = []
@@ -129,19 +136,17 @@ def extract_json_from_response(text: str) -> Dict[str, Any]:
                     if brace_count == 0:
                         obj_str = content[start_obj:i+1]
                         try:
-                            # 尝试修复该对象
                             obj_str = re.sub(r',\s*}', '}', obj_str)
                             obj = json.loads(obj_str)
                             objects.append(obj)
                         except:
-                            # 尝试用 ast 解析
                             try:
                                 obj = ast.literal_eval(obj_str)
                                 objects.append(obj)
                             except:
                                 logger.warning(f"Skipping invalid object: {obj_str[:100]}")
         if objects:
-            return objects  # 返回列表，调用者需处理
+            return objects
         else:
             raise ValueError("No valid objects found after split parsing")
     else:
@@ -363,6 +368,13 @@ class ScenePlanPromptBuilder(PromptBuilder):
         if history_summaries:
             summary_text = "\n\n【参考历史章节摘要】\n" + "\n---\n".join(history_summaries)
             base_prompt += summary_text
+
+        affordance_hints = state.metadata.get("affordance_hints", [])
+        if affordance_hints:
+            base_prompt += "\n\n【当前世界允许的能力】\n"
+            for hint in affordance_hints:
+                base_prompt += f"- {hint}\n"
+            base_prompt += "建议：生成的事件最好不超出上述能力范围，但允许特殊情况。\n"
 
         return base_prompt
 

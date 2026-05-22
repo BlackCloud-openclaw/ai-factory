@@ -34,6 +34,17 @@ class EventType(str, Enum):
     DISCOVERY = "discovery"
     NPC_INTRODUCE = "npc_introduce"
 
+class MajorRealm(str, Enum):
+    """大境界枚举（不含层级）"""
+    QI_REFINING = "炼气"
+    FOUNDATION = "筑基"
+    GOLDEN_CORE = "金丹"
+    NASCENT_SOUL = "元婴"
+    DEITY_TRANSFORMATION = "化神"
+    VOID_REFINEMENT = "炼虚"
+    INTEGRATION = "合体"
+    MAHAYANA = "大乘"
+    TRIBULATION = "渡劫"
 
 class BaseNarrativeEvent(BaseModel):
     """事件基类"""
@@ -48,14 +59,13 @@ class BaseNarrativeEvent(BaseModel):
 # ========== 状态变更事件 ==========
 
 class RealmUpgradeEvent(BaseNarrativeEvent):
-    """境界突破事件"""
     type: EventType = EventType.REALM_UPGRADE
     actor: str
-    from_realm: str
-    from_level: int
-    to_realm: str
-    to_level: int
-    breakthrough_method: str = "normal"  # 突破方式：normal, tribulation, medicine
+    from_realm: Optional[MajorRealm] = None   # 可选，因为可能是首次出现
+    from_level: Optional[int] = None
+    to_major_realm: MajorRealm                # 目标大境界
+    to_minor_stage: int                       # 1-9 小层级
+    breakthrough_method: str = "normal"
 
 
 class ItemAcquireEvent(BaseNarrativeEvent):

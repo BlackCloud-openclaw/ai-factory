@@ -97,35 +97,28 @@ async def update_progress_scene(
 
 
 async def update_progress_chapter(
-    novel_id: str,
-    new_chapter: int,
-    reset_scene: bool = True
+    novel_id: str, 
+    new_chapter: int, 
+    reset_scene: bool = True,
+    require_sync: bool = True
 ) -> None:
-    """
-    更新当前章节号，并重置场景索引为0，清除章节完成标志。
-    
-    Args:
-        novel_id: 小说ID
-        new_chapter: 新的章节号
-        reset_scene: 是否重置场景索引（默认 True）
-    """
     pool = get_db_pool()
     async with pool.acquire() as conn:
-        if reset_scene:
-            await conn.execute("""
-                UPDATE writing_progress
-                SET current_chapter = $2, current_scene = 0, chapter_completed = FALSE, last_updated = NOW()
-                WHERE project_id = $1
-            """, novel_id, new_chapter)
-            logger.info(f"update_progress_chapter: novel={novel_id}, chapter={new_chapter}, scene reset to 0")
-        else:
-            await conn.execute("""
-                UPDATE writing_progress
-                SET current_chapter = $2, chapter_completed = FALSE, last_updated = NOW()
-                WHERE project_id = $1
-            """, novel_id, new_chapter)
-            logger.info(f"update_progress_chapter: novel={novel_id}, chapter={new_chapter} (scene unchanged)")
-
+        async with conn.transaction(isolation='serializable'):  # 显式事务
+            if reset_scene:
+                await conn.execute("""
+                    UPDATE writing_progress
+                    SET current_chapter = $2, current_scene = 0, chapter_completed = FALSE, last_updated = NOW()
+                    WHERE project_id = $1
+                """, novel_id, new_chapter)
+            else:
+                await conn.execute("""
+                    UPDATE writing_progress
+                    SET current_chapter = $2, chapter_completed = FALSE, last_updated = NOW()
+                    WHERE project_id = $1
+                """, novel_id, new_chapter)
+            if require_sync:
+                await conn.execute("COMMIT")  # 确保提交
 
 async def update_progress_volume(
     novel_id: str,

@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # LLM Pool
     llm_max_concurrent: int = 4
     llm_timeout: int = 600
-    llm_timeout_planning: int = 900
+    llm_timeout_planning: int = 1800
     llm_timeout_coding: int = 900
     llm_timeout_validation: int = 600
     llm_timeout_research: int = 600

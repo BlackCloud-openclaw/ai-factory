@@ -7,8 +7,8 @@ import json
 import logging
 import psutil
 from typing import Optional
-from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Request
 
 from src.orchestrator.state import AgentState
 from src.db import get_db_pool
@@ -24,8 +24,8 @@ from src.writing.snapshot import SnapshotManager
 from src.writing.world_state import WorldState
 from src.writing.delta import StateDelta
 
-# 全局并发控制（最多同时运行 2 个工作流）
-_global_workflow_semaphore = asyncio.Semaphore(2)
+# 全局并发控制（最多同时运行 1 个工作流，防止资源竞争和文件覆盖）
+_global_workflow_semaphore = asyncio.Semaphore(1)
 
 logger = setup_logging("api.execute")
 
@@ -55,39 +55,39 @@ class ExecuteRequest(BaseModel):
     resume: bool = False              # 是否从上次中断处继续
 
 
-async def _run_workflow(request: ExecuteRequest) -> dict:
+async def _run_workflow(req: ExecuteRequest) -> dict:
     logger = logging.getLogger("api.execute")
 
-    session_id = request.session_id or uuid.uuid4().hex[:8]
-    project_id = request.project_id or session_id
-    max_retries = request.max_retries or 3
+    session_id = req.session_id or uuid.uuid4().hex[:8]
+    project_id = req.project_id or session_id
+    max_retries = req.max_retries or 3
 
     initial_state = AgentState(
-        user_input=request.user_input,
+        user_input=req.user_input,
         project_id=project_id,
         max_retries=max_retries,
         metadata={"session_id": session_id, "project_id": project_id},
-        task_type=request.task_type,
-        novel_id=request.novel_id,
-        resume=request.resume,
+        task_type=req.task_type,
+        novel_id=req.novel_id,
+        resume=req.resume,
     )
 
     pool = get_db_pool()
 
     # ========== 断点续写模式（基于新架构） ==========
-    if request.resume and request.novel_id and pool:
+    if req.resume and req.novel_id and pool:
         try:
             event_store = NarrativeEventStore(pool)
             snap_mgr = SnapshotManager(pool)
 
             # 1. 加载最新快照
-            world_state, _, last_event_id = await snap_mgr.load_latest_snapshot(request.novel_id)
+            world_state, _, last_event_id = await snap_mgr.load_latest_snapshot(req.novel_id)
             if world_state is None:
                 world_state = WorldState()
                 last_event_id = 0
 
             # 2. 加载快照之后的事件
-            events_with_id = await event_store.get_events_since(request.novel_id, since_event_id=last_event_id)
+            events_with_id = await event_store.get_events_since(req.novel_id, since_event_id=last_event_id)
 
             # 3. 重放事件，更新世界状态
             for evt_id, evt in events_with_id:
@@ -99,12 +99,12 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
             initial_state.current_state = world_state.to_dict()
             initial_state.last_sequence_id = last_event_id
 
-            # 5. 从 novels 表读取元数据（大纲、进度等），不再读取 scene_plan_list
+            # 5. 从 novels 表读取元数据（大纲、进度等）
             async with pool.acquire() as conn:
                 row = await conn.fetchrow(
                     """SELECT outline, current_volume, current_chapter, current_scene_index
                     FROM novels WHERE novel_id = $1""",
-                    request.novel_id
+                    req.novel_id
                 )
                 
                 if row:
@@ -114,8 +114,6 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
                     initial_state.current_chapter = row["current_chapter"] or 1
                     initial_state.current_scene_index = row["current_scene_index"] or 0
                     
-                    # 续写模式下，场景计划应该从 scene_execution_units 加载，
-                    # 此处不设置，留空以便后续 plan_node 生成或续写时通过 /resume 接口处理。
                     initial_state.metadata["scene_plan_list"] = []
                     initial_state.metadata["total_scenes_in_chapter"] = 0
                     initial_state.metadata["current_scene_index"] = initial_state.current_scene_index
@@ -123,7 +121,6 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
                     initial_state.scene_plan_list = []
                     initial_state.total_scenes_in_chapter = 0
 
-                    # 从大纲中获取当前卷的总章节数（用于卷切换）
                     if initial_state.outline and "volumes" in initial_state.outline:
                         volumes = initial_state.outline["volumes"]
                         vol_idx = initial_state.current_volume - 1
@@ -131,24 +128,24 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
                             total_chapters = len(volumes[vol_idx].get("chapters", []))
                             initial_state.total_chapters_in_volume = total_chapters
 
-            logger.info(f"Resume: restored state for {request.novel_id}, "
+            logger.info(f"Resume: restored state for {req.novel_id}, "
                         f"volume={initial_state.current_volume}, "
                         f"chapter={initial_state.current_chapter}, "
                         f"scene={initial_state.current_scene_index}, "
                         f"last_event_id={last_event_id}")
 
         except Exception as e:
-            logger.error(f"Failed to resume state for novel {request.novel_id}: {e}", exc_info=True)
+            logger.error(f"Failed to resume state for novel {req.novel_id}: {e}", exc_info=True)
             initial_state.resume = False
 
-    # ========== 非续写模式：加载大纲和已有进度（仅初版，不依赖事件） ==========
-    elif not request.resume and request.task_type in ("scene_plan", "novel_outline") and request.novel_id and pool:
+    # ========== 非续写模式：加载大纲和已有进度 ==========
+    elif not req.resume and req.task_type in ("scene_plan", "novel_outline") and req.novel_id and pool:
         try:
             async with pool.acquire() as conn:
                 row = await conn.fetchrow(
                     """SELECT outline, current_volume, current_chapter, current_scene_index
                        FROM novels WHERE novel_id = $1""",
-                    request.novel_id
+                    req.novel_id
                 )
                 if row:
                     if row["outline"]:
@@ -157,7 +154,6 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
                     initial_state.current_chapter = row["current_chapter"] or 1
                     initial_state.current_scene_index = row["current_scene_index"] or 0
                     
-                    # 非续写模式下，场景计划尚未生成，初始化为空
                     initial_state.metadata["scene_plan_list"] = []
                     initial_state.metadata["total_scenes_in_chapter"] = 0
                     initial_state.metadata["current_scene_index"] = initial_state.current_scene_index
@@ -172,23 +168,26 @@ async def _run_workflow(request: ExecuteRequest) -> dict:
                             total_chapters = len(volumes[vol_idx].get("chapters", []))
                             initial_state.total_chapters_in_volume = total_chapters
 
-                    logger.info(f"Loaded outline for novel {request.novel_id} (non-resume mode)")
+                    logger.info(f"Loaded outline for novel {req.novel_id} (non-resume mode)")
         except Exception as e:
-            logger.error(f"Failed to load outline for novel {request.novel_id}: {e}", exc_info=True)
+            logger.error(f"Failed to load outline for novel {req.novel_id}: {e}", exc_info=True)
 
     workflow = get_workflow()
     result = await asyncio.wait_for(
-        workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 100}),
+        workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 500}),
         timeout=3600,
     )
     return result
 
 
 @execute_router.post("")
-async def execute(request: ExecuteRequest) -> AgentResponse:
+async def execute(req: ExecuteRequest, request: Request) -> AgentResponse:
+    # 记录客户端 IP 和请求内容（用于排查重复请求）
+    logger.info(f"Request from {request.client.host}: {req.user_input[:100]}")
+    
     global _last_memory_cleanup
 
-    if not request.user_input.strip():
+    if not req.user_input.strip():
         raise HTTPException(status_code=400, detail="user_input cannot be empty")
 
     mem = psutil.virtual_memory()
@@ -200,9 +199,9 @@ async def execute(request: ExecuteRequest) -> AgentResponse:
             raise HTTPException(status_code=503, detail="System memory overloaded, please retry later")
 
     async with _global_workflow_semaphore:
-        session_id = request.session_id or uuid.uuid4().hex[:8]
-        project_id = request.project_id or session_id
-        logger.info(f"Executing request for session={session_id}, project={project_id}: {request.user_input[:150]}")
+        session_id = req.session_id or uuid.uuid4().hex[:8]
+        project_id = req.project_id or session_id
+        logger.info(f"Executing request for session={session_id}, project={project_id}: {req.user_input[:150]}")
 
         mem = psutil.virtual_memory()
         pool = get_llm_router_pool()
@@ -218,7 +217,7 @@ async def execute(request: ExecuteRequest) -> AgentResponse:
             logger.warning(f"Memory overloaded: {mem.percent}%, rejecting request")
             raise HTTPException(status_code=503, detail="System memory overloaded, please retry later")
 
-        lower_input = request.user_input.lower()
+        lower_input = req.user_input.lower()
         if any(kw in lower_input for kw in ["写代码", "函数", "斐波那契", "计算"]):
             priority = 1
         elif any(kw in lower_input for kw in ["写小说", "故事", "雨夜"]):
@@ -228,7 +227,7 @@ async def execute(request: ExecuteRequest) -> AgentResponse:
 
         scheduler = get_scheduler()
         try:
-            result = await scheduler.submit(priority, _run_workflow, request)
+            result = await scheduler.submit(priority, _run_workflow, req)
         except Exception as e:
             logger.error(f"Scheduler submission failed: {e}")
             raise HTTPException(status_code=500, detail=str(e))
