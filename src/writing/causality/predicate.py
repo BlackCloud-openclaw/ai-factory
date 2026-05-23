@@ -7,10 +7,10 @@ from src.common.canonical import canonical_dumps
 
 def normalize_object(obj: Any) -> str:
     if isinstance(obj, dict):
-        return canonical_dumps(obj, sort_keys=True, separators=(',', ':'))    
+        return canonical_dumps(obj)    
     elif isinstance(obj, list):
         # 递归处理列表
-        return json.dumps([normalize_object(x) for x in obj], sort_keys=True, separators=(',', ':'))
+        return canonical_dumps(obj)
     elif isinstance(obj, str):
         return obj.lower().strip()
     elif hasattr(obj, 'value'):  # Enum 或类似

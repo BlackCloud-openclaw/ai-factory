@@ -39,7 +39,8 @@ json_repair
 
 # Testing
 pytest
-pytest-asyncio
+-pytest-asyncio
++pytest-asyncio==0.23.0
 pytest-cov
 
 # Code quality
