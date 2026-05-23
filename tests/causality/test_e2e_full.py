@@ -3,22 +3,6 @@ import uuid
 from src.writing.event_store import NarrativeEventStore
 from src.writing.events import ItemAcquireEvent
 
-@pytest.mark.skip(reason="E2E requires full LLM and workflow, skip for CI")
-@pytest.mark.asyncio
-async def test_outline_generation(db_pool, novel_id):
-    pass
-
-@pytest.mark.skip(reason="E2E requires full LLM and workflow, skip for CI")
-@pytest.mark.asyncio
-async def test_scene_plan_and_writing(db_pool, novel_id):
-    pass
-
-@pytest.mark.skip(reason="E2E requires full LLM and workflow, skip for CI")
-@pytest.mark.asyncio
-async def test_consistency_budget(db_pool, novel_id):
-    pass
-
-@pytest.mark.skip(reason="Database init issue with test database, skip for now")
 @pytest.mark.asyncio
 async def test_event_store_basic(db_pool, novel_id):
     store = NarrativeEventStore(db_pool)

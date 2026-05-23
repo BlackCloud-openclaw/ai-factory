@@ -127,17 +127,24 @@ class ProjectionStore:
 
     async def _record_dead_letter(self, novel_id: str, event_id: int, error: str):
         async with self.pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO projection_dead_letters (novel_id, event_id, error, retry_count)
-                VALUES ($1, $2, $3, 1)
-                ON CONFLICT (novel_id, event_id) DO UPDATE
-                SET retry_count = projection_dead_letters.retry_count + 1,
-                    error = EXCLUDED.error,
-                    status = 'pending'
-                """,
-                novel_id, event_id, error
+            # 检查该事件是否已存在死信记录
+            existing = await conn.fetchval(
+                "SELECT retry_count FROM projection_dead_letters WHERE novel_id=$1 AND event_id=$2",
+                novel_id, event_id
             )
+            retry = (existing or 0) + 1
+            await conn.execute("""
+                INSERT INTO projection_dead_letters (novel_id, event_id, error, retry_count, status)
+                VALUES ($1, $2, $3, $4, 'pending')
+                ON CONFLICT (novel_id, event_id) DO UPDATE
+                SET retry_count = EXCLUDED.retry_count, error = EXCLUDED.error, status = 'pending', created_at = NOW()
+            """, novel_id, event_id, error, retry)
+            
+            # 告警：首次发生或重试超过阈值
+            if retry == 1:
+                logger.error(f"[DEAD_LETTER] New dead letter for novel {novel_id}, event {event_id}: {error[:200]}")
+            elif retry >= 3:
+                logger.critical(f"[DEAD_LETTER] Persistent dead letter (retry {retry}) for novel {novel_id}, event {event_id}: {error[:200]}")
 
     @staticmethod
     def _make_delta_id(novel_id: str, event_id: int, version: int) -> str:

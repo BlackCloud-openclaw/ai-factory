@@ -7,6 +7,7 @@ from src.writing.delta import StateDelta
 from src.writing.world_state import WorldState
 from src.writing.events import event_from_dict
 from src.orchestrator.state_patch import StatePatch, WorkflowPhase
+from src.common.timing import timed
 from .models import SceneCompletionCommand, SceneCompletionResult
 import logging
 
@@ -19,6 +20,7 @@ class SceneCompletionService:
     未来拆分候选：SnapshotPersistence, ProgressUpdater, EventApplication
     """
     @staticmethod
+    @timed("SceneCompletionService.execute")
     async def execute(cmd: SceneCompletionCommand) -> SceneCompletionResult:
         pool = get_db_pool()
         if not pool:

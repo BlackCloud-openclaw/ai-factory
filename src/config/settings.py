@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     # PostgreSQL
     postgres_host: str = "localhost"
     postgres_port: int = 5432
-    postgres_db: str = "ai_factory"
-    postgres_user: str = "woami"
-    postgres_password: str = "kali"
+    postgres_db: str          # 无默认值，必须从环境变量读取
+    postgres_user: str        # 无默认值
+    postgres_password: str    # 无默认值
     postgres_pool_size: int = 10
     postgres_max_overflow: int = 20
     postgres_max_queries: int = 50000
@@ -86,6 +86,10 @@ class Settings(BaseSettings):
     snapshot_interval_events: int = 1000
     auto_snapshot_on_chapter: bool = True
     must_events_similarity_threshold: float = 0.3
+    
+    # 可观测性
+    enable_projection_metrics: bool = True
+    dead_letter_alert_threshold: int = 3
 
     # 任务模型映射（可被环境变量覆盖为 JSON 字符串，未实现动态加载）
     task_model_map: Dict[str, List[str]] = {
@@ -99,8 +103,10 @@ class Settings(BaseSettings):
 
     @property
     def postgres_dsn(self) -> str:
+        if not all([self.postgres_user, self.postgres_password, self.postgres_db]):
+            raise ValueError("Database credentials missing. Set POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB in .env")
         return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-
+    
     @property
     def embedding_endpoint(self) -> str:
         return f"{self.embedding_api_url}/v1/embeddings"

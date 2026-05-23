@@ -293,3 +293,11 @@ CREATE TABLE IF NOT EXISTS affordance_usage (
     last_used_chapter INT NOT NULL,
     PRIMARY KEY (novel_id, affordance_id)
 );
+
+CREATE TABLE IF NOT EXISTS projection_metrics (
+    id BIGSERIAL PRIMARY KEY,
+    novel_id VARCHAR(32) NOT NULL,
+    event_id BIGINT NOT NULL,
+    latency_seconds FLOAT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);

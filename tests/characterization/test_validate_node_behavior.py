@@ -1,15 +1,21 @@
+"""
+Characterization Tests for validate_node
+
+这些测试捕获 validate_node 的核心行为，防止重构时引入语义变化。
+"""
+
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 from src.orchestrator.nodes import validate_node
 from src.orchestrator.state import AgentState
-from src.orchestrator.state_patch import WorkflowPhase
+from src.orchestrator.state_patch import StatePatch, WorkflowPhase
 from src.writing.services.scene_completion import SceneCompletionResult
 from src.writing.services.chapter_transition import ChapterTransitionResult
 
 
-@pytest.mark.skip(reason="AsyncMock issue with pytest-asyncio 1.3.0; to be fixed")
 @pytest.mark.asyncio
 async def test_validate_node_passes_and_advances_scene():
+    """验证通过时，场景索引增加，阶段为 WRITING"""
     state = AgentState(
         novel_id="test",
         current_volume=1,
@@ -24,19 +30,30 @@ async def test_validate_node_passes_and_advances_scene():
         max_retries_per_subtask=3,
     )
 
-    with patch("src.orchestrator.nodes.ValidatorAgent.run", new_callable=AsyncMock) as mock_validator:
-        mock_validator.return_value = {
+    async def fake_validator_run(_):
+        return {
             "validation_result": {
                 "passed": True,
                 "parsed_output": {"events": [], "scene_text": "ok"}
             }
         }
-        with patch("src.orchestrator.nodes.SceneCompletionService.execute", new_callable=AsyncMock) as mock_scene:
-            mock_scene.return_value = SceneCompletionResult(
-                state_patch=type('Patch', (), {'current_scene_index': 3, 'phase': WorkflowPhase.WRITING})(),
-                chapter_finished=False,
-                events_applied=0
-            )
+
+    # 创建真正的 StatePatch 对象
+    patch_obj = StatePatch(
+        current_scene_index=3,
+        phase=WorkflowPhase.WRITING,
+        current_state={}
+    )
+
+    async def fake_scene_completion_execute(_):
+        return SceneCompletionResult(
+            state_patch=patch_obj,
+            chapter_finished=False,
+            events_applied=0
+        )
+
+    with patch("src.orchestrator.nodes.ValidatorAgent.run", side_effect=fake_validator_run):
+        with patch("src.orchestrator.nodes.SceneCompletionService.execute", side_effect=fake_scene_completion_execute):
             updates = await validate_node(state)
 
     assert updates.get("current_scene_index") == 3
@@ -45,6 +62,7 @@ async def test_validate_node_passes_and_advances_scene():
 
 @pytest.mark.asyncio
 async def test_validate_node_triggers_chapter_transition_when_finished():
+    """章节完成时，触发切换，阶段变为 PLANNING"""
     state = AgentState(
         novel_id="test",
         current_volume=1,
@@ -59,24 +77,42 @@ async def test_validate_node_triggers_chapter_transition_when_finished():
         outline={"volumes": [{"chapters": [{}]*10}]},
     )
 
-    with patch("src.orchestrator.nodes.ValidatorAgent.run", new_callable=AsyncMock) as mock_validator:
-        mock_validator.return_value = {
+    async def fake_validator_run(_):
+        return {
             "validation_result": {
                 "passed": True,
                 "parsed_output": {"events": [], "scene_text": "ok"}
             }
         }
-        with patch("src.orchestrator.nodes.SceneCompletionService.execute", new_callable=AsyncMock) as mock_scene:
-            mock_scene.return_value = SceneCompletionResult(
-                state_patch=type('Patch', (), {'current_scene_index': 5, 'phase': WorkflowPhase.TRANSITIONING})(),
-                chapter_finished=True
-            )
-        with patch("src.orchestrator.nodes.ChapterTransitionService.execute", new_callable=AsyncMock) as mock_transition:
-            mock_transition.return_value = ChapterTransitionResult(
-                state_patch=type('Patch', (), {'current_chapter': 2, 'current_scene_index': 0, 'phase': WorkflowPhase.PLANNING})(),
-                volume_finished=False
-            )
-            updates = await validate_node(state)
+
+    scene_patch = StatePatch(
+        current_scene_index=5,
+        phase=WorkflowPhase.TRANSITIONING,
+        current_state={}
+    )
+    transition_patch = StatePatch(
+        current_chapter=2,
+        current_scene_index=0,
+        phase=WorkflowPhase.PLANNING,
+        current_state={}
+    )
+
+    async def fake_scene_completion_execute(_):
+        return SceneCompletionResult(
+            state_patch=scene_patch,
+            chapter_finished=True
+        )
+
+    async def fake_chapter_transition_execute(_):
+        return ChapterTransitionResult(
+            state_patch=transition_patch,
+            volume_finished=False
+        )
+
+    with patch("src.orchestrator.nodes.ValidatorAgent.run", side_effect=fake_validator_run):
+        with patch("src.orchestrator.nodes.SceneCompletionService.execute", side_effect=fake_scene_completion_execute):
+            with patch("src.orchestrator.nodes.ChapterTransitionService.execute", side_effect=fake_chapter_transition_execute):
+                updates = await validate_node(state)
 
     assert updates.get("current_chapter") == 2
     assert updates.get("phase") == WorkflowPhase.PLANNING
@@ -84,6 +120,7 @@ async def test_validate_node_triggers_chapter_transition_when_finished():
 
 @pytest.mark.asyncio
 async def test_validate_node_retries_on_failure():
+    """验证失败且可重试时，重试计数增加，阶段保持 WRITING"""
     state = AgentState(
         novel_id="test",
         current_scene_index=2,
@@ -95,14 +132,16 @@ async def test_validate_node_retries_on_failure():
         current_state={}
     )
 
-    with patch("src.orchestrator.nodes.ValidatorAgent.run", new_callable=AsyncMock) as mock_validator:
-        mock_validator.return_value = {
+    async def fake_validator_run(_):
+        return {
             "validation_result": {
                 "passed": False,
                 "should_retry": True,
                 "feedback": "Missing must_events"
             }
         }
+
+    with patch("src.orchestrator.nodes.ValidatorAgent.run", side_effect=fake_validator_run):
         updates = await validate_node(state)
 
     assert updates.get("retry_count") == 1
@@ -112,6 +151,7 @@ async def test_validate_node_retries_on_failure():
 
 @pytest.mark.asyncio
 async def test_validate_node_skips_scene_after_max_retries():
+    """超过最大重试次数时，跳过当前场景，索引+1"""
     state = AgentState(
         novel_id="test",
         current_scene_index=2,
@@ -123,15 +163,20 @@ async def test_validate_node_skips_scene_after_max_retries():
         current_state={}
     )
 
-    with patch("src.orchestrator.nodes.ValidatorAgent.run", new_callable=AsyncMock) as mock_validator:
-        mock_validator.return_value = {
+    async def fake_validator_run(_):
+        return {
             "validation_result": {
                 "passed": False,
                 "should_retry": True,
                 "feedback": "Still missing"
             }
         }
-        with patch("src.orchestrator.nodes._skip_scene", new_callable=AsyncMock):
+
+    async def fake_skip_scene(_):
+        pass
+
+    with patch("src.orchestrator.nodes.ValidatorAgent.run", side_effect=fake_validator_run):
+        with patch("src.orchestrator.nodes._skip_scene", side_effect=fake_skip_scene):
             updates = await validate_node(state)
 
     assert updates.get("current_scene_index") == 3
