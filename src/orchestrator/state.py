@@ -97,7 +97,6 @@ class AgentState(BaseModel):
     missing_conflict_keywords: List[str] = Field(default_factory=list)
 
     # ===== 已废弃字段（保留以免反序列化失败，但不再使用）=====
-    _chapter_finished: bool = False      # 已由 phase 替代，保留仅用于兼容旧 checkpoint
     skip_remaining: bool = False         # 不再使用
     plan: List[Dict[str, Any]] = []      # 不再使用
 

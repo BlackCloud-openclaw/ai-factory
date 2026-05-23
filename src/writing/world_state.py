@@ -4,9 +4,9 @@
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
 from .delta import StateDelta
 from src.common.canonical import canonical_hash
+from pydantic import BaseModel, Field, field_validator, ValidationInfo
 
 class Realm(str, Enum):
     """境界枚举"""
@@ -35,12 +35,13 @@ class CharacterState(BaseModel):
     flags: Dict[str, Any] = Field(default_factory=dict)
     last_active: datetime = Field(default_factory=datetime.now)
     
-    @validator('realm_level')
-    def level_within_bounds(cls, v, values):
+    @field_validator('realm_level')
+    def level_within_bounds(cls, v, info: ValidationInfo):
+        values = info.data
         if 'realm' in values and values['realm'] != Realm.MORTAL:
             if not (1 <= v <= 9):
                 raise ValueError(f'境界层级必须在1-9之间，当前: {v}')
-        return v
+        return v    
     
     def full_realm(self) -> str:
         """完整境界描述，如'炼气三层'"""
