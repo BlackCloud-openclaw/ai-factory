@@ -1,4 +1,13 @@
 # src/orchestrator/nodes.py
+"""
+LangGraph 节点实现 - 薄编排层
+
+职责：
+- 调用 Service 执行业务事务
+- 返回 StatePatch 更新状态
+- 不包含业务逻辑、数据库操作、复杂条件判断
+"""
+
 import uuid
 import time
 import json
@@ -16,19 +25,12 @@ from src.agents.validator import ValidatorAgent
 from src.agents.writer import WritingAgent
 from src.common.logging import setup_logging
 from src.db import get_db_pool
-from src.writing.summarizer import generate_chapter_summary
-from src.writing.state_compressor import compress_current_state
 from src.writing.world_state import WorldState
 from src.writing.delta import StateDelta
 from src.writing.event_store import NarrativeEventStore
 from src.writing.snapshot import SnapshotManager
-from src.writing.validators import validate_all
-from src.writing.prompt_firewall import PromptFirewall
 from src.writing.context_compiler import ContextCompiler
-from src.writing.voiceprint import VoiceprintRegistry
-from src.db.pool import update_progress_scene, update_progress_chapter, update_progress_volume
 from src.writing.causality.initializer import ensure_core_predicates
-import logging
 from src.writing.services import SceneCompletionService, SceneCompletionCommand
 from src.orchestrator.state_patch import StatePatch, WorkflowPhase
 from src.orchestrator.phase_resolver import WorkflowPhaseResolver
@@ -38,17 +40,20 @@ from src.writing.services.writing import WritingService
 from src.writing.services.models import WritingCommand
 from src.writing.services.chapter_transition import ChapterTransitionService, ChapterTransitionCommand
 
+# 全局 logger
 logger = setup_logging("orchestrator.nodes")
 
 _memory_agent = MemoryAgent()
 
+
+# ============================================================================
+# 辅助函数（保留必要的）
+# ============================================================================
+
 async def _load_scene_plans_from_db(
     pool, novel_id: str, volume_num: int, chapter_num: int
 ) -> Tuple[List[Dict[str, Any]], int]:
-    """
-    从 scene_execution_units 表加载指定章节的场景计划列表。
-    返回 (scene_plan_list, total_scenes)
-    """
+    """从 scene_execution_units 表加载指定章节的场景计划列表"""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
@@ -62,32 +67,17 @@ async def _load_scene_plans_from_db(
         scene_plans = []
         for row in rows:
             plan = json.loads(row["plan_json"])
-            # 可选：添加状态字段用于调试，但不影响计划内容
-            # plan["_status"] = row["status"]
             scene_plans.append(plan)
         return scene_plans, len(scene_plans)
 
-async def _get_succeeded_scenes_count(
-    pool, novel_id: str, volume_num: int, chapter_num: int
-) -> int:
-    """返回指定章节中状态为 'succeeded' 的场景数量"""
-    async with pool.acquire() as conn:
-        count = await conn.fetchval(
-            """
-            SELECT COUNT(*) FROM scene_execution_units
-            WHERE novel_id = $1 AND volume_num = $2 AND chapter_num = $3
-            AND status = 'succeeded'
-            """,
-            novel_id, volume_num, chapter_num
-        )
-        return count or 0
 
 def get_memory_agent() -> MemoryAgent:
+    """获取全局 MemoryAgent 实例"""
     return _memory_agent
 
 
-# ====== Helper functions ======
 def _keyword_analyze(user_input: str) -> tuple[str, list[str]]:
+    """简单的意图识别（用于 analyze_node）"""
     lower = user_input.lower()
     if any(kw in lower for kw in ["write", "code", "implement", "function", "class", "create"]):
         intent = "code_generation"
@@ -99,16 +89,12 @@ def _keyword_analyze(user_input: str) -> tuple[str, list[str]]:
 
 
 def _is_complex_task(user_input: str) -> bool:
+    """判断任务是否复杂（长度 > 200 字符）"""
     return len(user_input) > 200
 
 
-def _build_research_summary(results: list[dict[str, Any]]) -> str:
-    if not results:
-        return "No research results available."
-    return "\n\n".join(f"[{r.get('source','unknown')}]: {r.get('summary', r.get('content','No content'))}" for r in results)
-
-
 async def _save_scene_to_file(state: AgentState, raw_text: str) -> None:
+    """将场景正文追加到章节文件"""
     if not state.novel_id or not raw_text:
         return
     try:
@@ -126,7 +112,6 @@ async def _save_scene_to_file(state: AgentState, raw_text: str) -> None:
         logger.error(f"Failed to save scene: {e}")
 
 
-# ====== 场景执行单元辅助函数 ======
 async def _update_scene_unit_status(
     novel_id: str,
     volume: int,
@@ -183,47 +168,51 @@ async def _update_scene_unit_status(
         logger.error(f"Failed to update scene unit status {status}: {e}", exc_info=True)
 
 
-async def _persist_scene_plans(state: AgentState, scenes: list) -> None:
-    """将场景计划持久化到 scene_execution_units"""
-    if not state.novel_id:
-        return
+async def _skip_scene(state: AgentState):
+    """跳过当前场景：更新 writing_progress 和 scene_execution_units 状态"""
     pool = get_db_pool()
     if not pool:
         return
-    try:
-        async with pool.acquire() as conn:
-            for idx, scene in enumerate(scenes):
-                scene_index = idx
-                plan_json = json.dumps(scene, ensure_ascii=False)
-                planned_state_delta = json.dumps(scene.get("state_delta", {}), ensure_ascii=False) if scene.get("state_delta") else None
-                await conn.execute("""
-                    INSERT INTO scene_execution_units 
-                    (novel_id, volume_num, chapter_num, scene_index, status, plan_json, planned_state_delta, retry_count, max_retries, created_at, updated_at)
-                    VALUES ($1, $2, $3, $4, 'pending', $5, $6, 0, 2, NOW(), NOW())
-                    ON CONFLICT (novel_id, volume_num, chapter_num, scene_index)
-                    DO UPDATE SET
-                        plan_json = EXCLUDED.plan_json,
-                        planned_state_delta = EXCLUDED.planned_state_delta,
-                        status = 'pending',
-                        retry_count = 0,
-                        updated_at = NOW()
-                """, state.novel_id, state.current_volume, state.current_chapter, scene_index, plan_json, planned_state_delta)
-        logger.info(f"Persisted {len(scenes)} scenes to scene_execution_units for chapter {state.current_chapter}")
-    except Exception as e:
-        logger.error(f"Failed to persist scene_execution_units: {e}", exc_info=True)
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            new_scene_idx = state.current_scene_index + 1
+            await conn.execute(
+                """
+                INSERT INTO writing_progress (project_id, current_volume, current_chapter, current_scene, chapter_completed, last_updated)
+                VALUES ($1, $2, $3, $4, false, NOW())
+                ON CONFLICT (project_id) DO UPDATE SET
+                    current_scene = EXCLUDED.current_scene,
+                    last_updated = NOW()
+                """,
+                state.novel_id, state.current_volume, state.current_chapter, new_scene_idx
+            )
+            await conn.execute(
+                """
+                UPDATE scene_execution_units
+                SET status = 'skipped', completed_at = NOW(), updated_at = NOW()
+                WHERE novel_id = $1 AND volume_num = $2 AND chapter_num = $3 AND scene_index = $4
+                """,
+                state.novel_id, state.current_volume, state.current_chapter, state.current_scene_index
+            )
 
 
-# ====== Node functions ======
+# ============================================================================
+# LangGraph 节点函数
+# ============================================================================
+
 async def load_memory_node(state: AgentState) -> dict[str, Any]:
+    """加载记忆上下文"""
     return await _memory_agent.run(state)
 
 
 async def save_memory_node(state: AgentState) -> dict[str, Any]:
+    """保存小说大纲到数据库，并同步 writing_progress"""
     logger.info(f"Save memory for {state.novel_id}, outline exists: {state.outline is not None}")
+    logger.info(f"outline value: {state.outline}")  # 新增调试
     
     if state.outline and state.novel_id:
         pool = get_db_pool()
-        if pool:           
+        if pool:
             max_retries = 3
             for attempt in range(max_retries):
                 try:
@@ -252,7 +241,7 @@ async def save_memory_node(state: AgentState) -> dict[str, Any]:
                                     revision = revision + 1,
                                     updated_at = NOW()
                                 WHERE novel_id = $1 AND revision = $6
-                            """, state.novel_id, 
+                            """, state.novel_id,
                                 json.dumps(state.outline),
                                 state.current_volume,
                                 state.current_chapter,
@@ -270,7 +259,7 @@ async def save_memory_node(state: AgentState) -> dict[str, Any]:
                     break
             else:
                 logger.error(f"Failed to save outline after {max_retries} retries")
-            
+
             # 强制同步 writing_progress
             if state.novel_id and state.task_type == "scene_plan":
                 from src.db.pool import init_writing_progress
@@ -284,33 +273,57 @@ async def save_memory_node(state: AgentState) -> dict[str, Any]:
                 logger.info(f"Synced writing_progress for {state.novel_id} (volume={state.current_volume}, chapter={state.current_chapter}, scene={state.current_scene_index})")
     else:
         logger.warning(f"state.outline is empty for {state.novel_id}, cannot save")
-    
+
     return {"metadata": state.metadata, "novel_id": state.novel_id}
 
 
 async def analyze_node(state: AgentState) -> dict[str, Any]:
+    """分析用户意图（仅用于非小说任务）"""
     intent, subtasks = _keyword_analyze(state.user_input)
-    return {"intent": intent, "subtasks": subtasks, "is_complex": _is_complex_task(state.user_input), "current_node": "analyze"}
+    return {
+        "intent": intent,
+        "subtasks": subtasks,
+        "is_complex": _is_complex_task(state.user_input),
+        "current_node": "analyze"
+    }
 
 async def plan_node(state: AgentState) -> dict:
     logger.info(f"plan_node called with chapter={state.current_chapter}, task_type={state.task_type}")
 
-    cmd = ScenePlanningCommand(
-        novel_id=state.novel_id,
-        volume=state.current_volume,
-        chapter=state.current_chapter,
-        task_type=state.task_type,
-        outline=state.outline,
-        current_state=state.current_state,
-        user_input=state.user_input,
-        resume=state.resume,
-        total_chapters_in_volume=getattr(state, 'total_chapters_in_volume', 0),
-    )
-    result = await ScenePlanningService.execute(cmd)
-    if result.error:
-        logger.error(f"ScenePlanningService failed: {result.error}")
-        return StatePatch(error=result.error).to_dict()
-    return result.state_patch.to_dict()
+    # 1) 小说大纲生成
+    if state.task_type == "novel_outline":
+        planner = PlannerAgent()
+        result = await planner.run(state)
+        outline = result.get("outline")
+        if not outline:
+            logger.error("Failed to generate outline")
+            return {"error": "Outline generation failed"}
+        # 直接返回字典，LangGraph 会合并到 state
+        return {"outline": outline, "phase": WorkflowPhase.PLANNING}
+
+    # 2) 场景计划生成
+    if state.task_type == "scene_plan":
+        cmd = ScenePlanningCommand(
+            novel_id=state.novel_id,
+            volume=state.current_volume,
+            chapter=state.current_chapter,
+            task_type=state.task_type,
+            outline=state.outline,
+            current_state=state.current_state,
+            user_input=state.user_input,
+            resume=state.resume,
+            total_chapters_in_volume=getattr(state, 'total_chapters_in_volume', 0),
+        )
+        result = await ScenePlanningService.execute(cmd)
+        if result.error:
+            logger.error(f"ScenePlanningService failed: {result.error}")
+            return StatePatch(error=result.error).to_dict()
+        return result.state_patch.to_dict()
+
+    # 3) 其他任务
+    planner = PlannerAgent()
+    result = await planner.run(state)
+    return result
 
 async def writer_node(state: AgentState) -> dict:
     """写作节点：调用 WritingService 生成场景"""
@@ -324,13 +337,12 @@ async def writer_node(state: AgentState) -> dict:
     current_scene_plan = scene_plan_list[current_idx]
     state.scene_plan = current_scene_plan
 
-    # 更新场景执行单元状态为 running（可以在 service 外做，因为不是事务核心）
+    # 更新场景状态为 running
     if state.novel_id and state.task_type == "scene_plan":
         await _update_scene_unit_status(
             state.novel_id, state.current_volume, state.current_chapter, current_idx, "running"
         )
 
-    # 调用写作服务
     cmd = WritingCommand(
         novel_id=state.novel_id,
         volume=state.current_volume,
@@ -346,20 +358,14 @@ async def writer_node(state: AgentState) -> dict:
         logger.error(f"WritingService failed: {result.error}")
         return StatePatch(error=result.error).to_dict()
 
-    # 返回 patch（LangGraph 会自动合并）
     return result.state_patch.to_dict()
 
-logger = logging.getLogger(__name__)
 
 async def validate_node(state: AgentState) -> dict:
-    """
-    验证场景并推进工作流。
-    重构后：验证 -> 处理重试 -> 调用 SceneCompletionService -> 返回 patch
-    """
-    # 确保验证模式为小说模式
+    """验证场景并推进工作流"""
     state.validation_mode = "novel"
-    
-    # 1. 验证（使用现有 ValidatorAgent）
+
+    # 1. 验证
     validator = ValidatorAgent()
     updates = await validator.run(state)
     validation_result = updates.get("validation_result", {})
@@ -379,7 +385,6 @@ async def validate_node(state: AgentState) -> dict:
                 phase=WorkflowPhase.WRITING,
             ).to_dict()
         else:
-            # 超过重试次数，跳过该场景
             logger.warning(f"Scene {state.current_scene_index} validation failed after {retry_count} retries, skipping")
             await _skip_scene(state)
             return StatePatch(
@@ -390,26 +395,6 @@ async def validate_node(state: AgentState) -> dict:
 
     # 3. 验证通过，调用服务
     parsed_output = validation_result.get("parsed_output", {})
-    if parsed_output:
-        events = parsed_output.get("events", [])
-        for evt in events:
-            if evt.get("type") == "discovery" and "importance" in evt:
-                imp = evt["importance"]
-                if isinstance(imp, int):
-                    if imp >= 5:
-                        evt["importance"] = "critical"
-                    elif imp >= 3:
-                        evt["importance"] = "high"
-                    elif imp >= 1:
-                        evt["importance"] = "normal"
-                    else:
-                        evt["importance"] = "low"
-                elif isinstance(imp, float):
-                    evt["importance"] = "critical" if imp >= 5 else "high" if imp >= 3 else "normal" if imp >= 1 else "low"
-                elif isinstance(imp, bool):
-                    evt["importance"] = "critical" if imp else "low"
-        parsed_output["events"] = events
-        validation_result["parsed_output"] = parsed_output
     
     cmd = SceneCompletionCommand(
         novel_id=state.novel_id,
@@ -424,61 +409,50 @@ async def validate_node(state: AgentState) -> dict:
     result = await SceneCompletionService.execute(cmd)
     logger.info(f"validate_node: service returned chapter_finished={result.chapter_finished}")
 
-    # 4. 保存场景到文件（如果存在正文）
+    # 4. 保存场景正文
     if parsed_output.get("scene_text"):
         await _save_scene_to_file(state, parsed_output["scene_text"])
 
-    # 如果章节完成，执行切换
+    # 5. 章节切换
     if result.chapter_finished:
-        # 忽略场景完成返回的 patch（除了可能需要保留的 state 等，但切换会清空场景计划，所以直接返回切换 patch）
-        transition_cmd = ChapterTransitionCommand(...)
+        transition_cmd = ChapterTransitionCommand(
+            novel_id=state.novel_id,
+            current_volume=state.current_volume,
+            current_chapter=state.current_chapter,
+            total_chapters_in_volume=getattr(state, 'total_chapters_in_volume', 0),
+            outline=state.outline,
+        )
         transition_result = await ChapterTransitionService.execute(transition_cmd)
-        # 仍需保留世界状态和验证结果（可选）
         transition_result.state_patch.current_state = result.state_patch.current_state
         transition_result.state_patch.validation_result = result.state_patch.validation_result
         return transition_result.state_patch.to_dict()
     else:
         return result.state_patch.to_dict()
 
-async def _skip_scene(state: AgentState):
-    """跳过当前场景：更新 writing_progress 和 scene_execution_units 状态"""
-    pool = get_db_pool()
-    if not pool:
-        return
-    async with pool.acquire() as conn:
-        async with conn.transaction():
-            # 更新 writing_progress
-            new_scene_idx = state.current_scene_index + 1
-            await conn.execute(
-                """
-                INSERT INTO writing_progress (project_id, current_volume, current_chapter, current_scene, chapter_completed, last_updated)
-                VALUES ($1, $2, $3, $4, false, NOW())
-                ON CONFLICT (project_id) DO UPDATE SET
-                    current_scene = EXCLUDED.current_scene,
-                    last_updated = NOW()
-                """,
-                state.novel_id, state.current_volume, state.current_chapter, new_scene_idx
-            )
-            # 标记 scene_execution_units 为 skipped
-            await conn.execute(
-                """
-                UPDATE scene_execution_units
-                SET status = 'skipped', completed_at = NOW(), updated_at = NOW()
-                WHERE novel_id = $1 AND volume_num = $2 AND chapter_num = $3 AND scene_index = $4
-                """,
-                state.novel_id, state.current_volume, state.current_chapter, state.current_scene_index
-            )
+
+# ============================================================================
+# 其他节点（保留原有实现）
+# ============================================================================
 
 async def research_node(state: AgentState) -> dict[str, Any]:
     ra = ResearchAgent()
     result = await ra.run(state)
-    return {"research_results": result.get("research_results", []), "sources": result.get("sources", []), "current_node": "research"}
+    return {
+        "research_results": result.get("research_results", []),
+        "sources": result.get("sources", []),
+        "current_node": "research"
+    }
 
 
 async def code_node(state: AgentState) -> dict[str, Any]:
     ea = ExecutorAgent()
     updates = await ea.run(state)
-    return {"code_generated": updates.get("code_generated", ""), "code_file_path": updates.get("code_file_path", ""), "execution_result": updates.get("execution_result"), "current_node": "code"}
+    return {
+        "code_generated": updates.get("code_generated", ""),
+        "code_file_path": updates.get("code_file_path", ""),
+        "execution_result": updates.get("execution_result"),
+        "current_node": "code"
+    }
 
 
 async def scheduler_node(state: AgentState) -> dict[str, Any]:

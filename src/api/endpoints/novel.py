@@ -357,3 +357,36 @@ async def edit_event(event_uuid: str, edit: EditEventRequest):
             )
 
     return {"status": "event_updated", "novel_id": novel_id}
+
+@router.get("/novel_id/{novel_id}/progress")
+async def get_novel_progress(novel_id: str):
+    """获取小说当前写作进度（卷、章、场景）"""
+    pool = get_db_pool()
+    if not pool:
+        raise HTTPException(status_code=500, detail="Database pool not initialized")
+    async with pool.acquire() as conn:
+        # 优先从 writing_progress 表读取
+        row = await conn.fetchrow(
+            "SELECT current_volume, current_chapter, current_scene, chapter_completed FROM writing_progress WHERE project_id = $1",
+            novel_id
+        )
+        if row:
+            return {
+                "current_volume": row["current_volume"],
+                "current_chapter": row["current_chapter"],
+                "current_scene": row["current_scene"],
+                "chapter_completed": row["chapter_completed"]
+            }
+        # 降级：从 novels 表获取
+        row = await conn.fetchrow(
+            "SELECT current_volume, current_chapter, current_scene_index FROM novels WHERE novel_id = $1",
+            novel_id
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Novel not found")
+        return {
+            "current_volume": row["current_volume"],
+            "current_chapter": row["current_chapter"],
+            "current_scene": row["current_scene_index"],
+            "chapter_completed": False
+        }

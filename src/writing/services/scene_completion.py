@@ -36,11 +36,29 @@ class SceneCompletionService:
                 events_data = cmd.parsed_output.get("events", [])
                 events = []
                 for evt_dict in events_data:
+                    # ----- 修复 discovery.importance 类型 -----
+                    if evt_dict.get("type") == "discovery" and "importance" in evt_dict:
+                        imp = evt_dict["importance"]
+                        if isinstance(imp, int):
+                            if imp >= 5:
+                                evt_dict["importance"] = "critical"
+                            elif imp >= 3:
+                                evt_dict["importance"] = "high"
+                            elif imp >= 1:
+                                evt_dict["importance"] = "normal"
+                            else:
+                                evt_dict["importance"] = "low"
+                        elif isinstance(imp, float):
+                            evt_dict["importance"] = "critical" if imp >= 5 else "high" if imp >= 3 else "normal" if imp >= 1 else "low"
+                        elif isinstance(imp, bool):
+                            evt_dict["importance"] = "critical" if imp else "low"
+                    # ---------------------------------------
                     evt_type = evt_dict.get("type")
                     if evt_type:
                         evt = event_from_dict(evt_type, evt_dict)
                         if evt:
                             events.append(evt)
+
                 if events:
                     delta = StateDelta(events=events)
                     new_world = delta.apply_to(new_world)

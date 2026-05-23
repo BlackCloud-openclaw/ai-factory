@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """
-AI Factory 长篇小说生成脚本
-支持断点续写，防止重复执行
+AI Factory 长篇小说生成脚本（完整版）
+支持自动续写全部5卷50章，每章3个场景。
+需要 API 提供 /novel_id/{novel_id}/progress 端点。
 """
 
 import requests
@@ -17,15 +18,17 @@ API_BASE = "http://localhost:8000/api/v1"
 NOVEL_ID = "simple_long_novel_001"
 LOCK_FILE = "/tmp/ai_factory_simple_long_novel.lock"
 
+TOTAL_VOLUMES = 5
+CHAPTERS_PER_VOLUME = 10
+
 # ========== 日志函数 ==========
 def log(msg, level="INFO"):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] [{level}] {msg}")
     sys.stdout.flush()
 
-# ========== 锁机制：防止重复执行 ==========
+# ========== 锁机制 ==========
 def acquire_lock():
-    """获取文件锁，防止脚本重复运行"""
     global lock_fd
     lock_fd = open(LOCK_FILE, "w")
     try:
@@ -37,7 +40,6 @@ def acquire_lock():
         return False
 
 def release_lock():
-    """释放文件锁"""
     global lock_fd
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)
@@ -46,9 +48,8 @@ def release_lock():
     except:
         pass
 
-# ========== API 调用封装 ==========
+# ========== API 调用 ==========
 def wait_for_task(task_id, timeout=3600, poll_interval=60):
-    """等待异步任务完成"""
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
@@ -68,27 +69,11 @@ def wait_for_task(task_id, timeout=3600, poll_interval=60):
                 log(f"查询任务状态失败: {resp.status_code}", "WARNING")
         except Exception as e:
             log(f"查询任务状态异常: {e}", "WARNING")
-        
         time.sleep(poll_interval)
-    
     log(f"任务 {task_id} 超时", "ERROR")
     return False, None
 
-def sync_request(endpoint, payload, timeout=1800):
-    """同步请求（阻塞等待）"""
-    try:
-        resp = requests.post(f"{API_BASE}/{endpoint}", json=payload, timeout=timeout)
-        if resp.status_code == 200:
-            return True, resp.json()
-        else:
-            log(f"请求失败: {resp.status_code} - {resp.text}", "ERROR")
-            return False, None
-    except Exception as e:
-        log(f"请求异常: {e}", "ERROR")
-        return False, None
-
 def async_request(endpoint, payload):
-    """异步请求（返回 task_id）"""
     try:
         resp = requests.post(f"{API_BASE}/{endpoint}", json=payload, timeout=30)
         if resp.status_code == 200:
@@ -107,117 +92,116 @@ def async_request(endpoint, payload):
         log(f"请求异常: {e}", "ERROR")
         return False, None
 
-# ========== 检查小说状态 ==========
-def check_novel_status():
-    """检查小说是否有已有进度"""
+def get_progress():
+    """获取当前写作进度（卷、章）"""
     try:
         resp = requests.get(f"{API_BASE}/novel_id/{NOVEL_ID}/progress", timeout=10)
         if resp.status_code == 200:
             data = resp.json()
-            current_chapter = data.get("current_chapter", 1)
-            current_volume = data.get("current_volume", 1)
-            log(f"小说当前进度: 第{current_volume}卷第{current_chapter}章")
-            return current_chapter > 1 or current_volume > 1
+            return data.get("current_volume", 1), data.get("current_chapter", 1)
         elif resp.status_code == 404:
-            log("小说不存在，将从头开始")
-            return False
+            return None, None
         else:
             log(f"查询进度失败: {resp.status_code}", "WARNING")
-            return False
+            return None, None
     except Exception as e:
         log(f"查询进度异常: {e}", "WARNING")
+        return None, None
+
+def is_novel_completed(volume, chapter):
+    if volume is None or chapter is None:
+        return False
+    if volume > TOTAL_VOLUMES:
+        return True
+    if volume == TOTAL_VOLUMES and chapter > CHAPTERS_PER_VOLUME:
+        return True
+    return False
+
+def generate_outline():
+    """生成小说大纲（同步）"""
+    log("生成小说大纲...")
+    payload = {
+        "user_input": "写一部修仙小说，共5卷，每卷10章，每章3个场景。主角林逸，从炼气期飞升。",
+        "task_type": "novel_outline",
+        "novel_id": NOVEL_ID,
+        "resume": False
+    }
+    try:
+        resp = requests.post(f"{API_BASE}/execute", json=payload, timeout=7200)
+        if resp.status_code == 200:
+            log("大纲生成成功")
+            return True
+        else:
+            log(f"大纲生成失败: {resp.status_code}", "ERROR")
+            return False
+    except Exception as e:
+        log(f"大纲生成异常: {e}", "ERROR")
         return False
 
 # ========== 主流程 ==========
 def main():
     log("=" * 50)
-    log("AI Factory 长篇小说生成脚本启动")
+    log("AI Factory 长篇小说生成脚本启动（完整版）")
     log(f"Novel ID: {NOVEL_ID}")
+    log(f"目标: {TOTAL_VOLUMES}卷 × {CHAPTERS_PER_VOLUME}章 = {TOTAL_VOLUMES * CHAPTERS_PER_VOLUME}章")
     log("=" * 50)
-    
-    # 1. 获取执行锁
+
     if not acquire_lock():
         sys.exit(1)
-    
+
     try:
-        # 2. 检查小说状态
-        has_progress = check_novel_status()
-        
-        # 3. 生成大纲（如果没有）
-        if not has_progress:
-            log("步骤1: 生成小说大纲...")
-            outline_payload = {
-                "user_input": "写一部修仙小说，共5卷，每卷10章，每章3个场景。主角林逸，从炼气期飞升。",
-                "task_type": "novel_outline",
-                "novel_id": NOVEL_ID,
-                "resume": False
-            }
-            success, result = sync_request("execute", outline_payload, timeout=1800)
-            if not success:
-                log("大纲生成失败，退出", "ERROR")
+        # 检查是否有大纲（通过进度是否存在判断）
+        vol, ch = get_progress()
+        if vol is None:
+            log("小说尚未初始化，开始生成大纲...")
+            if not generate_outline():
                 sys.exit(1)
-            log("大纲生成成功")
-            time.sleep(2)  # 等待数据库写入完成
-        else:
-            log("跳过大纲生成（小说已有进度）")
-        
-        # 4. 开始/继续写作
-        log("步骤2: 开始/继续写作...")
-        writing_payload = {
-            "user_input": "开始写作，自动完成所有5卷10章，每章3个场景。",
-            "task_type": "scene_plan",
-            "novel_id": NOVEL_ID,
-            "resume": has_progress  # 如果有进度，使用续写模式
-        }
-        
-        if has_progress:
-            log("使用断点续写模式 (resume=true)")
-        else:
-            log("使用全新写作模式")
-        
-        # 使用异步接口，支持长时间运行
-        success, task_id = async_request("resume", writing_payload)
-        if not success or not task_id:
-            log("启动写作任务失败", "ERROR")
-            sys.exit(1)
-        
-        # 5. 等待任务完成
-        log("等待写作任务完成（可能需要数小时）...")
-        success, result = wait_for_task(task_id, timeout=86400)  # 24小时超时
-        
-        if success:
-            log("=" * 50)
-            log("✅ 小说生成完成！")
-            log(f"小说 ID: {NOVEL_ID}")
-            log(f"查看文件: data/novels/{NOVEL_ID}/")
-            log("=" * 50)
-        else:
-            log("❌ 小说生成失败", "ERROR")
-            sys.exit(1)
-            
+            time.sleep(2)  # 等待数据库写入
+            vol, ch = get_progress()
+            if vol is None:
+                log("大纲生成后仍无法获取进度，请检查 API 端点 /progress", "ERROR")
+                sys.exit(1)
+
+        # 循环写作直到完成
+        while True:
+            vol, ch = get_progress()
+            if is_novel_completed(vol, ch):
+                log("🎉 所有章节已生成完毕！🎉")
+                break
+
+            log(f"开始生成第{vol}卷第{ch}章...")
+            payload = {
+                "user_input": "继续写作",
+                "task_type": "scene_plan",
+                "novel_id": NOVEL_ID,
+                "resume": True
+            }
+            success, task_id = async_request("resume", payload)
+            if not success or not task_id:
+                log("启动写作任务失败", "ERROR")
+                break
+
+            success, _ = wait_for_task(task_id, timeout=3600)
+            if not success:
+                log(f"第{vol}卷第{ch}章生成失败，终止", "ERROR")
+                break
+
+            log(f"✅ 第{vol}卷第{ch}章完成")
+            time.sleep(2)
+
+        log("=" * 50)
+        log("✅ 小说生成完成！")
+        log(f"小说 ID: {NOVEL_ID}")
+        log(f"查看文件: data/novels/{NOVEL_ID}/")
+        log("=" * 50)
+
     except KeyboardInterrupt:
         log("用户中断", "WARNING")
-        sys.exit(1)
     except Exception as e:
         log(f"脚本异常: {e}", "ERROR")
         sys.exit(1)
     finally:
         release_lock()
-
-# ========== 添加 /novel_id/{novel_id}/progress 端点（如果没有的话）==========
-# 注意：这个端点可能需要你在 API 中添加
-# 临时方案：使用 writing_progress 表查询
-def add_progress_endpoint_if_needed():
-    """检查并提示添加进度查询端点"""
-    try:
-        resp = requests.get(f"{API_BASE}/novel_id/{NOVEL_ID}/progress", timeout=5)
-        if resp.status_code == 404:
-            log("提示: API 缺少 /novel_id/{novel_id}/progress 端点", "WARNING")
-            log("将使用备用方案（直接尝试写作）")
-            return False
-    except:
-        pass
-    return True
 
 if __name__ == "__main__":
     main()

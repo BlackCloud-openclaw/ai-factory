@@ -3,6 +3,7 @@ from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 from src.orchestrator.state_patch import WorkflowPhase
 
+
 class AgentState(BaseModel):
     """State definition for the AI Factory LangGraph workflow."""
 
@@ -10,8 +11,8 @@ class AgentState(BaseModel):
     user_input: str = ""
     original_request: str = ""          # 与 user_input 等效，便于 planner 使用
     project_id: str = ""                # 记忆隔离
-    novel_id: Optional[str] = None      # 新增：当前小说ID（用于写作场景）
-    metadata: Dict[str, Any] = {}
+    novel_id: Optional[str] = None      # 当前小说ID（用于写作场景）
+    metadata: Dict[str, Any] = {}       # 仅用于临时、非结构化数据
 
     # ===== 消息历史 =====
     messages: Annotated[list, add_messages] = []
@@ -56,47 +57,49 @@ class AgentState(BaseModel):
     # ===== 节点跟踪与错误 =====
     current_node: str = ""
     error: Optional[str] = None
-    
+
     # ===== 验证模式 =====
-    validation_mode: str = "code"   # 新增，默认代码验证模式
+    validation_mode: str = "code"   # 代码验证模式（默认）或 novel
 
     # ===== 记忆上下文 =====
     memory_context: Dict[str, Any] = {}
-    
+
     # ===== 事件溯源与状态缓存（用于小说写作）=====
     pending_tool_calls: List[Dict[str, Any]] = []   # 待处理的工具调用
     applied_events: List[Any] = []                  # 已应用的事件（可选）
-    current_state: Dict[str, Any] = {}              # 当前状态缓存
+    current_state: Dict[str, Any] = {}              # 当前世界状态缓存
     last_sequence_id: int = 0                       # 最新事件 sequence_id
-    
-    # ===== 小说写作专用字段 =====
+
+    # ===== 小说写作专用字段（结构化）=====
     chapter_id: Optional[str] = None
-    resume: bool = False                 # 新增：是否从上次中断处继续
-    task_type: str = "code"                     # code, novel_outline, scene_plan
-    outline: Optional[Dict[str, Any]] = None    # 小说大纲
+    resume: bool = False                     # 是否为断点续写
+    task_type: str = "code"                  # code, novel_outline, scene_plan
+    outline: Optional[Dict[str, Any]] = None # 小说大纲
     current_volume: int = 1
     current_chapter: int = 1
-    scene_plan: Optional[Dict[str, Any]] = None # 当前场景计划
+    scene_plan: Optional[Dict[str, Any]] = None   # 当前场景计划
     scene_plan_list: List[Dict[str, Any]] = Field(default_factory=list)
     total_chapters_in_volume: int = 0
     total_scenes_in_chapter: int = 0
-    current_scene_index: Optional[int] = 0   # 0-based 已完成场景数（下一个要生成的场景索引）
-    _chapter_finished: bool = False
+    current_scene_index: Optional[int] = 0   # 0‑based 已完成场景数（下一个要生成的场景索引）
     writing_constraints: Optional[Dict[str, Any]] = None
     scene_text: str = ""
 
-    # 在 AgentState 类的末尾（其他字段附近）添加
+    # ===== 工作流阶段（显式状态机）=====
+    phase: Optional[WorkflowPhase] = None
+
+    # ===== 写作反馈（用于重试）=====
+    writing_feedback: str = ""
+
+    # ===== 临时诊断字段（逐步废弃，保留兼容）=====
     deviation_detected: bool = False
     missing_goal_keywords: List[str] = Field(default_factory=list)
     missing_conflict_keywords: List[str] = Field(default_factory=list)
 
-    # ===== 兼容旧字段（保留，逐步废弃） =====
-    skip_remaining: bool = False
-    plan: List[Dict[str, Any]] = []
+    # ===== 已废弃字段（保留以免反序列化失败，但不再使用）=====
+    _chapter_finished: bool = False      # 已由 phase 替代，保留仅用于兼容旧 checkpoint
+    skip_remaining: bool = False         # 不再使用
+    plan: List[Dict[str, Any]] = []      # 不再使用
 
-    # 在现有字段后添加
-    phase: Optional[WorkflowPhase] = None
-    writing_feedback: str = ""   # 注意：如果已有该字段，只添加 phase 即可
-    
     def should_retry(self) -> bool:
         return self.retry_count < self.max_retries and self.error is not None

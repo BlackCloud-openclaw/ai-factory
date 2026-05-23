@@ -82,25 +82,6 @@ class WritingService:
         else:
             clean_text = raw_json
             
-        # ===== 添加重要性修复 =====
-        if events:
-            for evt in events:
-                if evt.get("type") == "discovery" and "importance" in evt:
-                    imp = evt["importance"]
-                    if isinstance(imp, int):
-                        if imp >= 5:
-                            evt["importance"] = "critical"
-                        elif imp >= 3:
-                            evt["importance"] = "high"
-                        elif imp >= 1:
-                            evt["importance"] = "normal"
-                        else:
-                            evt["importance"] = "low"
-                    elif isinstance(imp, float):
-                        evt["importance"] = "critical" if imp >= 5 else "high" if imp >= 3 else "normal" if imp >= 1 else "low"
-                    elif isinstance(imp, bool):
-                        evt["importance"] = "critical" if imp else "low"            
-
         # 6. 更新 scene_execution_units 状态为 running（可选，但可以在节点中做，也可以在这里做）
         # 为了保持服务原子性，这里只返回 patch，不在 service 中直接修改数据库。
         # 节点中会单独调用 _update_scene_unit_status，但我们可以将状态更新也纳入服务吗？

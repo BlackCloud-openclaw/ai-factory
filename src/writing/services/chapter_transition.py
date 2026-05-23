@@ -15,7 +15,7 @@ class ChapterTransitionCommand:
     current_volume: int
     current_chapter: int
     total_chapters_in_volume: int
-    # 可选：下一章的 outline 信息等
+    outline: Optional[Dict[str, Any]] = None   # 新增：用于获取新卷的总章节数
 
 
 @dataclass
@@ -47,13 +47,27 @@ class ChapterTransitionService:
         new_chapter = cmd.current_chapter + 1
         new_volume = cmd.current_volume
         volume_finished = False
+        new_total_chapters = cmd.total_chapters_in_volume   # 默认透传
 
         # 检查是否完成当前卷
-        if cmd.total_chapters_in_volume > 0chapter_transition.py and new_chapter > cmd.total_chapters_in_volume:
+        if cmd.total_chapters_in_volume > 0 and new_chapter > cmd.total_chapters_in_volume:
             new_volume = cmd.current_volume + 1
             new_chapter = 1
             volume_finished = True
             logger.info(f"📚 Volume {cmd.current_volume} completed! Moving to volume {new_volume}")
+            
+            # 尝试从 outline 获取新卷的总章节数
+            new_total_chapters = 0  # 默认值
+            if cmd.outline and "volumes" in cmd.outline:
+                volumes = cmd.outline.get("volumes", [])
+                if new_volume - 1 < len(volumes):
+                    next_volume_info = volumes[new_volume - 1]
+                    new_total_chapters = len(next_volume_info.get("chapters", []))
+                    logger.info(f"New volume {new_volume} has {new_total_chapters} chapters")
+                else:
+                    logger.warning(f"Cannot find outline for volume {new_volume}, set total_chapters_in_volume=0")
+            else:
+                logger.warning("No outline provided, total_chapters_in_volume set to 0")
 
         # 更新 writing_progress
         async with pool.acquire() as conn:
@@ -85,6 +99,7 @@ class ChapterTransitionService:
             scene_plan_list=[],
             total_scenes_in_chapter=0,
             phase=WorkflowPhase.PLANNING,  # 切换后进入规划阶段
+            total_chapters_in_volume=new_total_chapters,   # 透传或更新后的值
         )
 
         logger.info(f"Chapter transition: {cmd.current_chapter} -> {new_chapter} (volume {cmd.current_volume} -> {new_volume})")
