@@ -4,7 +4,6 @@ import re
 from typing import Dict, List, Optional, Any
 from .predicate import Predicate
 from .delta import PredicateDelta, PredicateRef
-from .upcaster import EventUpcaster
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +102,6 @@ class DeltaEngine:
                         identity_key=target_identity,
                         event_id=event_id
                     ))
-
 
         elif event_type == 'realm_upgrade':
             actor = event.get('actor')

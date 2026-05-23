@@ -6,7 +6,7 @@ from enum import Enum
 from datetime import datetime
 from pydantic import BaseModel, Field, validator
 from .delta import StateDelta
-
+from src.common.canonical import canonical_hash
 
 class Realm(str, Enum):
     """境界枚举"""
@@ -129,3 +129,6 @@ class WorldState(BaseModel):
     def apply_delta(self, delta: StateDelta) -> 'WorldState':
         """应用状态增量（委托给 delta 的方法）"""
         return delta.apply_to(self)
+    
+    def get_state_hash(self) -> str:
+        return canonical_hash(self.model_dump())

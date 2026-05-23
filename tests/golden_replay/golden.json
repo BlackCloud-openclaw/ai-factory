@@ -1,0 +1,132 @@
+{
+  "novel_id": "simple_long_novel_001",
+  "generated_at": 98791.388288678,
+  "checkpoints": [
+    {
+      "volume": 1,
+      "chapter": 1,
+      "event_id": 3273,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 1,
+      "chapter": 2,
+      "event_id": 3281,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 1,
+      "chapter": 3,
+      "event_id": 3291,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 1,
+      "chapter": 4,
+      "event_id": 3301,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 1,
+      "chapter": 5,
+      "event_id": 3310,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 1,
+      "chapter": 6,
+      "event_id": 3319,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 1,
+      "chapter": 7,
+      "event_id": 3328,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 1,
+      "chapter": 8,
+      "event_id": 3338,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 1,
+      "chapter": 9,
+      "event_id": 3347,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 1,
+      "chapter": 10,
+      "event_id": 3358,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 2,
+      "chapter": 1,
+      "event_id": 3367,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 2,
+      "chapter": 2,
+      "event_id": 3375,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 2,
+      "chapter": 3,
+      "event_id": 3384,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 2,
+      "chapter": 4,
+      "event_id": 3393,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 2,
+      "chapter": 5,
+      "event_id": 3403,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 2,
+      "chapter": 6,
+      "event_id": 3412,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 2,
+      "chapter": 7,
+      "event_id": 3421,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    },
+    {
+      "volume": 2,
+      "chapter": 8,
+      "event_id": 3429,
+      "world_hash": "dadc5fe1571135322d146fd94e606a2539273d0b9f7c97c213e006abc2f6bc1d",
+      "predicate_hash": "f911663f259eba39f908bbd97906570e85a8900754b245830bdc6d4cb8d030fb"
+    }
+  ]
+}

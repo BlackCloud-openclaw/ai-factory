@@ -13,12 +13,11 @@ from datetime import datetime
 from typing import Dict, Optional, List, Tuple
 
 from .events import NarrativeEvent, event_to_dict, event_from_dict
-from .event_upcaster import EventUpcaster
-
 from src.common.logging import setup_logging
 from src.writing.causality.projector import DeltaEngine
 from src.writing.causality.scheduler import ProjectionScheduler
-from src.writing.causality.predicate import Predicate  # 可能需要
+from src.writing.causality.predicate import Predicate
+from src.writing.causality.upcaster import LATEST_EVENT_SCHEMA_VERSION, upcast_event_envelope
 
 logger = setup_logging("writing.event_store")
 
@@ -39,7 +38,9 @@ class NarrativeEventStore:
     ) -> str:
         """存储单个事件（幂等），返回事件UUID"""
         event_data = event_to_dict(event)
-        event_data = EventUpcaster.upcast(event_data)
+        event_data["event_schema_version"] = LATEST_EVENT_SCHEMA_VERSION
+        # 确保事件信封已升级到最新 schema（幂等）
+        event_data = upcast_event_envelope(event_data)
 
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -83,7 +84,7 @@ class NarrativeEventStore:
             logger.error(f"Projection failed for event {event.event_id}: {e}", exc_info=True)
 
         return event.event_id
-        
+
     async def append_events(
         self,
         novel_id: str,
@@ -109,7 +110,7 @@ class NarrativeEventStore:
         since_event_id: int = 0,
         limit: int = 1000,
     ) -> List[Tuple[int, NarrativeEvent]]:
-        """返回 (event_db_id, event) 列表"""
+        """返回 (event_db_id, event) 列表，事件已升级到最新 schema"""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
@@ -128,7 +129,8 @@ class NarrativeEventStore:
                 event_data = row["event_data"]
                 if isinstance(event_data, str):
                     event_data = json.loads(event_data)
-                event_data = EventUpcaster.upcast(event_data)
+                # 升级事件信封到最新 schema
+                event_data = upcast_event_envelope(event_data)
                 event = event_from_dict(row["event_type"], event_data)
                 if event:
                     result.append((row["id"], event))
@@ -158,7 +160,7 @@ class NarrativeEventStore:
                 event_data = row["event_data"]
                 if isinstance(event_data, str):
                     event_data = json.loads(event_data)
-                event_data = EventUpcaster.upcast(event_data)
+                event_data = upcast_event_envelope(event_data)
                 event = event_from_dict(row["event_type"], event_data)
                 if event:
                     events.append(event)
@@ -181,8 +183,9 @@ class NarrativeEventStore:
                 novel_id,
                 event_db_id,
             )
-            
+
     async def _load_active_predicates(self, novel_id: str) -> Dict[str, Predicate]:
+        """加载当前小说的所有活跃谓词（用于 delta 计算）"""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
