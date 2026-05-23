@@ -2,13 +2,12 @@
 import json
 from dataclasses import dataclass
 from typing import Any, Optional
+from src.common.canonical import canonical_dumps
 
 
 def normalize_object(obj: Any) -> str:
-    """将对象规范化为字符串，用于 identity key"""
     if isinstance(obj, dict):
-        # 排序后 JSON，无空格，确保确定性
-        return json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
+        return canonical_dumps(obj, sort_keys=True, separators=(',', ':'))    
     elif isinstance(obj, list):
         # 递归处理列表
         return json.dumps([normalize_object(x) for x in obj], sort_keys=True, separators=(',', ':'))
