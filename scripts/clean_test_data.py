@@ -262,18 +262,7 @@ async def clean_database(novel_id: str):
                     novel_id
                 )
                 if exists:
-                    result = await conn.execute("""
-                        UPDATE novels 
-                        SET outline = NULL,
-                            current_volume = 1,
-                            current_chapter = 1,
-                            current_scene_index = 0,
-                            current_state = NULL,
-                            last_sequence_id = 0,
-                            revision = revision + 1,
-                            updated_at = NOW()
-                        WHERE novel_id = $1
-                    """, novel_id)
+                    result = await conn.execute("DELETE FROM novels WHERE novel_id = $1", novel_id)
                     print(f"✅ Reset novels record: {result}")
                 else:
                     print(f"ℹ️ No novels record found for {novel_id}")

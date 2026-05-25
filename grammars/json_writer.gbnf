@@ -1,0 +1,20 @@
+# grammars/json_writer.gbnf
+# 强制 Writer 输出严格 JSON，包含 scene_text, events, foreshadowing
+
+root ::= "{" ws "\"scene_text\"" ws ":" ws string ws "," ws "\"events\"" ws ":" ws "[" ws (event ("," ws event)*)? ws "]" ws "," ws "\"foreshadowing\"" ws ":" ws "[" ws (string ("," ws string)*)? ws "]" ws "}"
+
+# 空白字符
+ws ::= [ \t\n]*
+
+# 字符串（自动处理转义）
+string ::= "\"" ([^"\\] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\""
+
+# 事件对象（宽松：任何键值对，但必须是 object）
+event ::= "{" ws (event_field ("," ws event_field)*)? ws "}"
+event_field ::= string ws ":" ws value
+
+# 值可以是字符串、数字、布尔、null、对象或数组
+value ::= string | number | "true" | "false" | "null" | "{" ws (event_field ("," ws event_field)*)? ws "}" | "[" ws (value ("," ws value)*)? ws "]"
+
+# 数字（简化）
+number ::= "-"? ([0-9] | [1-9] [0-9]*) ("." [0-9]+)? ([eE] [-+]? [0-9]+)?

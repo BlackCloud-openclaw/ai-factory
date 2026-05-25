@@ -9,6 +9,8 @@ import tempfile
 import os
 import asyncio
 from typing import Any, Optional, Dict, List, Tuple
+from openai import AsyncOpenAI
+from src.model_router import get_router
 
 from src.config import config
 from src.common.logging import setup_logging
@@ -26,6 +28,8 @@ from src.db import get_db_pool
 from src.writing.event_store import NarrativeEventStore
 from src.writing.causality.budget import ConsistencyBudget
 from src.writing.causality.health import HealthChecker
+from src.common.prompt_logger import log_prompt
+
 
 logger = setup_logging("agents.validator")
 
@@ -312,6 +316,8 @@ class ValidatorAgent(BaseAgent):
                 "parsed_output": parsed_data,
             }
 
+        errors = []
+        error_details = {}   # 新增初始化
         # 检查 must_events
         missing_events = []
         for evt in must_events:
@@ -338,9 +344,11 @@ class ValidatorAgent(BaseAgent):
                 sim = cosine_similarity(conflict_emb, scene_emb)
                 conflict_ok = sim >= goal_conflict_threshold
 
-        errors = []
         if missing_events:
-            errors.append(f"缺失必须事件: {', '.join(missing_events)}")
+            # 精确列出缺失的事件
+            missing_list = "、".join(missing_events)
+            feedback = f"❌ 缺失必须事件：{missing_list}\n请确保在下一次生成的 scene_text 中**原样包含**以上短语，不可改写或省略。"
+            errors.append(feedback)
         if not goal_ok:
             errors.append(f"场景目标语义不符: {goal[:40]}...")
         if not conflict_ok:
@@ -516,9 +524,9 @@ class ValidatorAgent(BaseAgent):
 
     @retry_with_backoff(max_retries=2, base_delay=1.0)
     async def _validate_with_llm(self, prompt: str, execution_result: Optional[dict] = None) -> dict:
-        # 保留原代码验证逻辑
-        from openai import AsyncOpenAI
-        from src.model_router import get_router
+        # 记录 prompt（在调用之前）
+        log_prompt("validator", prompt, metadata={"validation_type": "code"})
+
         model = get_router().get_model_for_task("validate")
         client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
         try:
@@ -533,7 +541,7 @@ class ValidatorAgent(BaseAgent):
                 timeout=config.llm_timeout_validation,
             )
             raw_output = response.choices[0].message.content or ""
-            parsed_result = self._parse_validation_result_enhanced(raw_output)
+            parsed_result = self._parse_validation_result_enhanced(raw_output)        
             return self._normalize_validation_result(parsed_result, raw_output)
         except Exception as e:
             logger.warning(f"LLM validation call failed: {e}")

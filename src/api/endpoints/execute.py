@@ -17,6 +17,7 @@ from src.common.models import AgentResponse
 from src.common.logging import setup_logging
 from src.execution.llm_router_pool import get_llm_router_pool
 from src.api.scheduler import get_scheduler
+from src.config import config
 
 # 新架构事件存储和快照
 from src.writing.event_store import NarrativeEventStore
@@ -174,7 +175,7 @@ async def _run_workflow(req: ExecuteRequest) -> dict:
 
     workflow = get_workflow()
     result = await asyncio.wait_for(
-        workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 500}),
+        workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": config.langgraph_recursion_limit}),
         timeout=3600,
     )
     return result

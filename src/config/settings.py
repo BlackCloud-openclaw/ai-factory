@@ -86,6 +86,7 @@ class Settings(BaseSettings):
     snapshot_interval_events: int = 1000
     auto_snapshot_on_chapter: bool = True
     must_events_similarity_threshold: float = 0.3
+    langgraph_recursion_limit: int = 5000   #LangGraph递归限制
     
     # 可观测性
     enable_projection_metrics: bool = True

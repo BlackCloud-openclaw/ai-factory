@@ -7,6 +7,7 @@ import json
 from .world_state import WorldState
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from .voiceprint import VoiceprintRegistry
+from .state_projection import extract_hard_constraints, format_constraints_as_xml
 
 
 class ContextCompiler:
@@ -152,9 +153,45 @@ class ContextCompiler:
             result = result[:max_tokens] + "\n... (truncated)"
         return result
 
-    def build_writer_prompt(self, scene_plan, world_state, voiceprint_registry, compiled_context):
+    def build_writer_prompt(self, scene_plan, world_state, voiceprint_registry, compiled_context, history_summaries: List[str] = None, key_events_summary: str = None):
         lines = []
         
+        # ========== 硬状态注入（最高优先级）==========
+        constraints = extract_hard_constraints(world_state)
+        
+        # 添加历史摘要（如果提供）
+        if history_summaries:
+            lines.append("【历史章节摘要】")
+            for s in history_summaries:
+                lines.append(s)
+            lines.append("")
+        
+        if key_events_summary:
+            lines.append(key_events_summary)
+            lines.append("")        
+            
+        # 添加醒目的境界约束 banner
+        lines.append("=" * 60)
+        lines.append("⚠️ 当前境界约束 - 必须严格遵守 ⚠️")
+        lines.append("=" * 60)
+        current_realm = constraints.get("current_realm", {})
+        lines.append(f"当前境界：{current_realm.get('full', '未知')}")
+        allowed = constraints.get("allowed_next_realms", [])
+        if allowed:
+            lines.append(f"允许突破：{', '.join(allowed)}")
+        else:
+            lines.append("允许突破：当前无法突破")
+        forbidden = constraints.get("forbidden_realms", [])
+        if forbidden:
+            lines.append(f"禁止突破：{', '.join(forbidden[:5])}{'...' if len(forbidden) > 5 else ''}")
+        lines.append("")
+        lines.append("【重要】每次突破只能提升一个小境界，禁止跨越大境界！")
+        lines.append("")
+        
+        # 原有的 XML 格式约束
+        lines.append(format_constraints_as_xml(constraints))
+        lines.append("")
+
         # 1. 注入编译后的世界状态
         lines.append("【当前世界状态摘要】")
         lines.append(compiled_context)
@@ -198,7 +235,7 @@ class ContextCompiler:
                 constraint = voiceprint_registry.build_prompt_constraint(char)
                 if constraint:
                     lines.append(constraint)
-            lines.append("")
+            lines.append("")        
         
         # 5. 结构化输出要求（增强 events 字段指导）
         lines.append("【输出格式要求】")

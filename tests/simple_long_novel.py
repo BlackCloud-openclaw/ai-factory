@@ -92,6 +92,25 @@ def async_request(endpoint, payload):
         log(f"请求异常: {e}", "ERROR")
         return False, None
 
+def sync_request(endpoint, payload, timeout=1800):
+    """同步请求（用于大纲生成）"""
+    try:
+        resp = requests.post(f"{API_BASE}/{endpoint}", json=payload, timeout=timeout)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("success"):
+                log("同步请求成功")
+                return True, data
+            else:
+                log(f"同步请求失败: {data.get('error', 'Unknown error')}", "ERROR")
+                return False, data
+        else:
+            log(f"请求失败: {resp.status_code} - {resp.text}", "ERROR")
+            return False, None
+    except Exception as e:
+        log(f"请求异常: {e}", "ERROR")
+        return False, None
+
 def get_progress():
     """获取当前写作进度（卷、章）"""
     try:
@@ -108,6 +127,22 @@ def get_progress():
         log(f"查询进度异常: {e}", "WARNING")
         return None, None
 
+def get_outline():
+    """检查大纲是否存在（通过查询 progress 端点）"""
+    try:
+        resp = requests.get(f"{API_BASE}/novel_id/{NOVEL_ID}/progress", timeout=10)
+        if resp.status_code == 200:
+            # 有进度记录，说明已有大纲（因为大纲生成后会创建进度记录）
+            return True
+        elif resp.status_code == 404:
+            return False
+        else:
+            log(f"查询进度失败: {resp.status_code}", "WARNING")
+            return False
+    except Exception as e:
+        log(f"查询进度异常: {e}", "WARNING")
+        return False
+
 def is_novel_completed(volume, chapter):
     if volume is None or chapter is None:
         return False
@@ -118,7 +153,7 @@ def is_novel_completed(volume, chapter):
     return False
 
 def generate_outline():
-    """生成小说大纲（同步）"""
+    """生成小说大纲（同步），并验证写入数据库"""
     log("生成小说大纲...")
     payload = {
         "user_input": "写一部修仙小说，共5卷，每卷10章，每章3个场景。主角林逸，从炼气期飞升。",
@@ -126,17 +161,26 @@ def generate_outline():
         "novel_id": NOVEL_ID,
         "resume": False
     }
-    try:
-        resp = requests.post(f"{API_BASE}/execute", json=payload, timeout=7200)
-        if resp.status_code == 200:
-            log("大纲生成成功")
-            return True
-        else:
-            log(f"大纲生成失败: {resp.status_code}", "ERROR")
-            return False
-    except Exception as e:
-        log(f"大纲生成异常: {e}", "ERROR")
+    
+    success, result = sync_request("execute", payload, timeout=7200)
+    if not success:
+        log("大纲生成请求失败", "ERROR")
         return False
+    
+    log("大纲生成请求成功，等待数据库写入...")
+    time.sleep(3)  # 等待数据库写入
+    
+    # 验证大纲是否真的被写入
+    max_retries = 5
+    for attempt in range(max_retries):
+        if get_outline():
+            log(f"✅ 大纲已成功写入数据库（尝试 {attempt + 1}/{max_retries}）")
+            return True
+        log(f"等待大纲写入数据库...（尝试 {attempt + 1}/{max_retries}）")
+        time.sleep(2)
+    
+    log("❌ 大纲未写入数据库，请检查 API 和数据库状态", "ERROR")
+    return False
 
 # ========== 主流程 ==========
 def main():
@@ -150,17 +194,19 @@ def main():
         sys.exit(1)
 
     try:
-        # 检查是否有大纲（通过进度是否存在判断）
-        vol, ch = get_progress()
-        if vol is None:
+        # 检查是否有大纲
+        has_outline = get_outline()
+        if not has_outline:
             log("小说尚未初始化，开始生成大纲...")
             if not generate_outline():
                 sys.exit(1)
-            time.sleep(2)  # 等待数据库写入
+            # 验证进度记录
             vol, ch = get_progress()
             if vol is None:
                 log("大纲生成后仍无法获取进度，请检查 API 端点 /progress", "ERROR")
                 sys.exit(1)
+        else:
+            log("小说已有大纲，直接开始写作...")
 
         # 循环写作直到完成
         while True:

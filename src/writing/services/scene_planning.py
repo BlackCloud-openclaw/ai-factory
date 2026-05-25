@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 class ScenePlanningService:
     @staticmethod
     async def execute(cmd: ScenePlanningCommand) -> ScenePlanningResult:
+        logger.info(f"ScenePlanningService: cmd.outline={cmd.outline is not None}, novel_id={cmd.novel_id}")
+        
         pool = get_db_pool()
         updates = {}
 
@@ -57,6 +59,28 @@ class ScenePlanningService:
                     realm_enum = realm_map.get(realm_str, Realm.REFINING_QI)
                     char_state = CharacterState(name=name, realm=realm_enum, realm_level=level)
                     world.characters[name] = char_state
+
+        # 确保主角境界已初始化（兜底）
+        protagonist = "林逸"
+        if protagonist not in world.characters:
+            # 从 outline 中提取初始境界（如果有）
+            initial_realm = Realm.REFINING_QI
+            initial_level = 1
+            if outline and "characters" in outline:
+                for char_info in outline["characters"]:
+                    if char_info.get("name") == protagonist:
+                        realm_str = char_info.get("initial_state", {}).get("realm", "炼气")
+                        match = re.search(r'(\d+)', realm_str)
+                        if match:
+                            initial_level = int(match.group(1))
+                        break
+            
+            world.characters[protagonist] = CharacterState(
+                name=protagonist,
+                realm=initial_realm,
+                realm_level=initial_level
+            )
+            logger.info(f"Initialized protagonist {protagonist} at {initial_realm.value}{initial_level}层")
 
         # 3. 确保核心谓词已投影
         if cmd.novel_id:
@@ -143,6 +167,7 @@ class ScenePlanningService:
             scene_plan=first_scene,
             phase=WorkflowPhase.WRITING,  # 计划生成后进入写作阶段
             current_scene_index=0,        # 重置场景索引
+            current_state=world.to_dict(),  # 新增：确保世界状态被传递
         )
 
         # 9. 确保 total_chapters_in_volume

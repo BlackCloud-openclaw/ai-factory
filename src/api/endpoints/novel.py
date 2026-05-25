@@ -17,6 +17,7 @@ from src.writing.delta import StateDelta
 from src.db.pool import load_writing_progress, init_writing_progress  # 新增导入
 from src.writing.causality.initializer import ensure_core_predicates
 from src.orchestrator.nodes import _load_scene_plans_from_db
+from src.config import config
 
 logger = setup_logging("api.novel")
 router = APIRouter()
@@ -70,7 +71,7 @@ async def run_resume_workflow(task_id: str, novel_id: str, initial_state: AgentS
             )
         
         workflow = compile_workflow()
-        result = await workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": 500})
+        result = await workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": config.langgraph_recursion_limit})
         
         # 更新为成功
         async with pool.acquire() as conn:
@@ -390,3 +391,18 @@ async def get_novel_progress(novel_id: str):
             "current_scene": row["current_scene_index"],
             "chapter_completed": False
         }
+        
+@router.get("/novel_id/{novel_id}/outline")
+async def get_novel_outline(novel_id: str):
+    """获取小说大纲（检查是否存在）"""
+    pool = get_db_pool()
+    if not pool:
+        raise HTTPException(status_code=500, detail="Database pool not initialized")
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT outline FROM novels WHERE novel_id = $1",
+            novel_id
+        )
+    if not row:
+        raise HTTPException(status_code=404, detail="Novel not found")
+    return {"outline": row["outline"] is not None, "has_outline": row["outline"] is not None}

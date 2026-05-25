@@ -207,6 +207,8 @@ async def load_memory_node(state: AgentState) -> dict[str, Any]:
 
 async def save_memory_node(state: AgentState) -> dict[str, Any]:
     """保存小说大纲到数据库，并同步 writing_progress"""
+    logger.info(f"save_memory_node: state.outline={state.outline}, state.task_type={state.task_type}")
+    logger.info(f"save_memory_node: outline type={type(state.outline)}, value={state.outline}")
     logger.info(f"Save memory for {state.novel_id}, outline exists: {state.outline is not None}")
     logger.info(f"outline value: {state.outline}")  # 新增调试
     
@@ -376,20 +378,20 @@ async def validate_node(state: AgentState) -> dict:
     if not passed and should_retry:
         retry_count = state.retry_count + 1
         if retry_count < state.max_retries_per_subtask:
+            # 构建精确反馈
+            validation_result = updates.get("validation_result", {})
+            feedback = validation_result.get("feedback", "")
+            # 如果 feedback 为空但 error_details 中有缺失事件，构造默认反馈
+            if not feedback and "missing_events" in validation_result.get("error_details", {}):
+                missing = validation_result["error_details"]["missing_events"]
+                feedback = f"缺失必须事件：{', '.join(missing)}，请在下一次输出中完整包含。"
+            
             logger.info(f"Scene {state.current_scene_index} validation failed, retrying ({retry_count}/{state.max_retries_per_subtask})")
             return StatePatch(
                 validation_result=validation_result,
                 retry_count=retry_count,
                 needs_retry=True,
-                writing_feedback=validation_result.get("feedback", ""),
-                phase=WorkflowPhase.WRITING,
-            ).to_dict()
-        else:
-            logger.warning(f"Scene {state.current_scene_index} validation failed after {retry_count} retries, skipping")
-            await _skip_scene(state)
-            return StatePatch(
-                current_scene_index=state.current_scene_index + 1,
-                retry_count=0,
+                writing_feedback=feedback,      # 确保传递到 writer
                 phase=WorkflowPhase.WRITING,
             ).to_dict()
 

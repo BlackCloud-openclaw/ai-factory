@@ -4,7 +4,9 @@ Writer Agent - 基于状态驱动的章节生成（强制服从 state_delta）
 import json
 import time
 import re
+import pathlib
 from typing import Dict, Any, Optional
+from openai import AsyncOpenAI
 
 from src.agents.base import BaseAgent
 from src.orchestrator.state import AgentState
@@ -19,7 +21,8 @@ from src.writing.context_compiler import ContextCompiler
 from src.writing.prompt_firewall import PromptFirewall
 from src.writing.validators import validate_all
 from src.writing.world_state import WorldState
-
+from src.common.prompt_logger import log_prompt
+from src.writing.history_summarizer import get_chapter_summaries, get_key_events_summary
 
 logger = setup_logging("agents.writer")
 
@@ -36,7 +39,31 @@ def get_voiceprint_registry():
 class WritingAgent(BaseAgent):
     task_type = "writing"
 
+    # Grammar 缓存
+    _grammar: Optional[str] = None
+
+    @classmethod
+    def _get_grammar(cls) -> Optional[str]:
+        """加载 GBNF grammar 文件，用于强制 JSON 输出"""
+        if cls._grammar is not None:
+            return cls._grammar if cls._grammar else None
+
+        grammar_path = pathlib.Path(__file__).parent.parent.parent / "grammars" / "json_writer.gbnf"
+        if grammar_path.exists():
+            try:
+                cls._grammar = grammar_path.read_text(encoding="utf-8")
+                logger.info(f"Loaded grammar from {grammar_path}")
+                return cls._grammar
+            except Exception as e:
+                logger.error(f"Failed to load grammar: {e}")
+                cls._grammar = ""  # 标记为已尝试但失败
+        else:
+            logger.warning(f"Grammar file not found at {grammar_path}, JSON validation will rely on model only.")
+            cls._grammar = ""
+        return None
+
     async def run(self, state: AgentState) -> Dict[str, Any]:
+        self._state = state  # 保存供日志使用
         logger.info("WritingAgent starting")
         start_time = time.time()
 
@@ -61,13 +88,26 @@ class WritingAgent(BaseAgent):
             max_active=10
         )
         
-        # 构建完整 prompt
+        # 获取历史摘要
+        history_summaries = []
+        key_events_summary = None
+        if state.novel_id:
+            history_summaries = await get_chapter_summaries(
+                state.novel_id, state.current_volume, state.current_chapter
+            )
+            key_events_summary = await get_key_events_summary(
+                state.novel_id, state.current_volume, state.current_chapter
+            )
+        
+        # 构建完整 prompt 时传入
         prompt = compiler.build_writer_prompt(
             scene_plan=scene_plan,
             world_state=world_state,
             voiceprint_registry=voiceprint_registry,
             compiled_context=compiled_context,
-        )
+            history_summaries=history_summaries,
+            key_events_summary=key_events_summary,
+        )        
         
         # ========== 2. 添加强制 state_delta 指令 ==========
         if expected_events:
@@ -103,6 +143,10 @@ class WritingAgent(BaseAgent):
                 timeout=getattr(config, 'llm_timeout_writing', 600),
             )
         except Exception as e:
+            # 在异常信息中区分截断错误
+            if "truncated" in str(e) or "missing closing brace" in str(e):
+                logger.warning(f"Output truncated for primary model {primary_model}, retrying with larger context...")
+
             logger.warning(f"Primary model {primary_model} failed: {e}, trying fallback")
             last_error = e
             try:
@@ -221,10 +265,30 @@ class WritingAgent(BaseAgent):
     
     @retry_with_backoff(max_retries=2, base_delay=1.0)
     async def _call_llm(self, model_name: str, prompt: str, **kwargs) -> str:
-        """调用 LLM"""
-        from openai import AsyncOpenAI
-        from src.model_router import get_router
+        metadata = {
+            "model": model_name,
+            "temperature": 0.7,
+            "max_tokens": 12288,          # 增加避免截断
+        }
+        if hasattr(self, '_state') and self._state:
+            metadata.update({
+                "novel_id": getattr(self._state, 'novel_id', None),
+                "chapter": getattr(self._state, 'current_chapter', None),
+                "scene": getattr(self._state, 'current_scene_index', None),
+            })
         
+        # 提取约束用于哈希
+        constraints = None
+        if hasattr(self, '_state') and self._state and hasattr(self._state, 'current_state'):
+            from src.writing.state_projection import extract_hard_constraints
+            from src.writing.world_state import WorldState
+            world = WorldState.from_dict(self._state.current_state) if self._state.current_state else None
+            if world:
+                constraints = extract_hard_constraints(world)
+        
+        log_prompt("writer", prompt, metadata, constraints=constraints)
+        
+        # 调用 LLM
         actual_model = model_name
         base_url = kwargs.get('base_url')
         if not base_url:
@@ -232,12 +296,27 @@ class WritingAgent(BaseAgent):
             base_url = pool.get_base_url(actual_model)
         
         client = AsyncOpenAI(api_key="not-needed", base_url=base_url)
+        
+        # 添加 grammar 约束
+        extra_body = {}
+        grammar_str = self._get_grammar()
+        if grammar_str:
+            extra_body["grammar"] = grammar_str
+        
         response = await client.chat.completions.create(
             model=actual_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=4096,
+            max_tokens=12288,               # 与 metadata 保持一致
+            extra_body=extra_body if extra_body else None,
         )
         content = response.choices[0].message.content or ""
+        # 新增：检查是否完整（以 '}' 结尾，或至少包含闭合括号）
+        stripped = content.strip()
+        if not (stripped.endswith('}') or stripped.endswith(']')):
+            logger.warning(f"Response from {actual_model} appears truncated (ends with '...{stripped[-50:]}')")
+            # 可选：触发重试（通过抛出异常）
+            raise ValueError("Response truncated, missing closing brace")
+        
         logger.info(f"Received response from {actual_model}, length={len(content)}")
-        return content
+        return content        

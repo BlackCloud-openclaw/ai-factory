@@ -8,6 +8,7 @@ from src.writing.world_state import WorldState
 from src.writing.events import event_from_dict
 from src.orchestrator.state_patch import StatePatch, WorkflowPhase
 from src.common.timing import timed
+from src.writing.causality.initializer import ensure_core_predicates
 from .models import SceneCompletionCommand, SceneCompletionResult
 import logging
 
@@ -27,6 +28,14 @@ class SceneCompletionService:
             return SceneCompletionResult(
                 state_patch=StatePatch(error="Database pool unavailable"),
                 error="No db pool"
+            )
+
+        # 增加空值检查
+        if cmd.parsed_output is None:
+            logger.error("SceneCompletionService: parsed_output is None")
+            return SceneCompletionResult(
+                state_patch=StatePatch(error="Missing parsed_output from validator", phase=WorkflowPhase.VALIDATING),
+                error="Missing parsed_output"
             )
 
         new_world = WorldState.from_dict(cmd.current_world_state) if cmd.current_world_state else WorldState()
@@ -66,11 +75,14 @@ class SceneCompletionService:
                     new_world = delta.apply_to(new_world)
                     events_applied = len(events)
 
+                    # 保存事件
                     event_store = NarrativeEventStore(pool)
                     for evt in events:
                         await event_store.append_event(
                             cmd.novel_id, evt, cmd.volume, cmd.chapter, cmd.scene_idx
                         )
+
+                    await ensure_core_predicates(cmd.novel_id, new_world)
 
                     # 最后一个场景保存快照
                     if cmd.scene_idx + 1 >= cmd.total_scenes:

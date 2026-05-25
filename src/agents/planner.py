@@ -14,6 +14,7 @@ from src.model_router import get_router
 from src.execution.llm_router_pool import get_llm_router_pool
 from src.prompts.planner_prompts import PROMPT_REGISTRY
 from src.writing.causality.rule_engine import RuleEngine
+from src.common.prompt_logger import log_prompt
 
 logger = setup_logging("agents.planner")
 
@@ -72,6 +73,8 @@ class PlannerAgent(BaseAgent):
         return self.rule_engine
 
     async def run(self, state: AgentState) -> Dict[str, Any]:
+        self._state = state  # 保存供日志使用
+        
         agent_name = "PlannerAgent"
         state.step_count += 1
         step = state.step_count
@@ -218,10 +221,6 @@ class PlannerAgent(BaseAgent):
     # ========== 以下是原有的辅助方法，保持不变 ==========
     async def _plan_request_with_prompt(self, prompt: str, task_type: str) -> str:
         """直接发送自定义 prompt 给 LLM，返回原始响应。"""
-        from src.model_router import get_router
-        from src.execution.llm_router_pool import get_llm_router_pool
-        from src.config import config
-
         router = get_router()
         pool = get_llm_router_pool()
 
@@ -258,7 +257,18 @@ class PlannerAgent(BaseAgent):
             except Exception as e:
                 logger.error(f"LLM call failed: {e}")
                 raise
-
+            
+        # 提取约束（用于日志）
+        constraints = None
+        if hasattr(self, '_state') and self._state:
+            from src.writing.state_projection import extract_hard_constraints
+            from src.writing.world_state import WorldState
+            if self._state.current_state:
+                world = WorldState.from_dict(self._state.current_state)
+                constraints = extract_hard_constraints(world)
+        
+        # 记录 prompt
+        log_prompt("planner", prompt, metadata={"task_type": task_type}, constraints=constraints)        
         return await pool.call_with_fallback(candidates, _call_llm, timeout=config.llm_timeout_planning)
 
     async def _call_llm_with_fallback(self, user_request: str) -> str:

@@ -39,8 +39,19 @@ class CausalityValidator:
                         return {"passed": True, "severity": "info", "missing_preconditions": [], "suggestions": []}
                     else:
                         logger.warning(f"First realm upgrade for {actor} to {to_major_realm} not allowed (must be 炼气)")
-                        return {"passed": False, "severity": "error", "missing_preconditions": [],
-                                "suggestions": ["首次突破只能达到炼气期"]}
+                        return {
+                            "passed": False,
+                            "severity": "error",
+                            "missing_preconditions": [],
+                            "suggestions": ["首次突破只能达到炼气期"],
+                            "error_details": {
+                                "type": "realm_upgrade_violation",
+                                "current_realm": None,
+                                "expected_realm": "炼气",
+                                "actual_realm": to_major_realm,
+                                "message": f"首次突破只能达到炼气期，不能直接到 {to_major_realm}"
+                            }
+                        }
 
                 # 情况2：同大境界内层级提升（to_major_realm 与 current_realm 相同）
                 if current_realm == to_major_realm:
@@ -55,14 +66,37 @@ class CausalityValidator:
                         logger.debug(f"Valid realm upgrade from {current_realm} to {to_major_realm}")
                         return {"passed": True, "severity": "info", "missing_preconditions": [], "suggestions": []}
                     else:
+                        # 计算允许的下一境界
+                        next_realm = REALM_ORDER[current_idx + 1] if current_idx + 1 < len(REALM_ORDER) else None
                         logger.warning(f"Invalid realm upgrade: {current_realm} → {to_major_realm} (must be sequential)")
-                        return {"passed": False, "severity": "error", "missing_preconditions": [],
-                                "suggestions": [f"境界必须逐级突破，当前{current_realm}无法直接突破到{to_major_realm}"]}
+                        return {
+                            "passed": False,
+                            "severity": "error",
+                            "missing_preconditions": [],
+                            "suggestions": [f"境界必须逐级突破，当前{current_realm}只能突破到{next_realm}，不能直接到{to_major_realm}"],
+                            "error_details": {
+                                "type": "realm_upgrade_violation",
+                                "current_realm": current_realm,
+                                "expected_realm": next_realm,
+                                "actual_realm": to_major_realm,
+                                "message": f"境界必须逐级突破，当前{current_realm}只能突破到{next_realm}，不能直接到{to_major_realm}"
+                            }
+                        }
                 except ValueError as e:
                     logger.error(f"Unknown realm in order list: {current_realm} or {to_major_realm}: {e}")
                     # 未知境界，降级为允许（避免阻塞），但记录警告
-                    return {"passed": True, "severity": "warning", "missing_preconditions": [],
-                            "suggestions": [f"未知境界 {current_realm} 或 {to_major_realm}，已跳过顺序检查"]}
+                    return {
+                        "passed": True,
+                        "severity": "warning",
+                        "missing_preconditions": [],
+                        "suggestions": [f"未知境界 {current_realm} 或 {to_major_realm}，已跳过顺序检查"],
+                        "error_details": {
+                            "type": "unknown_realm",
+                            "current_realm": current_realm,
+                            "actual_realm": to_major_realm,
+                            "message": f"未知境界 {current_realm} 或 {to_major_realm}"
+                        }
+                    }
 
         # ===== 正常规则检查（其他事件类型）=====
         rules = self.rule_engine.get_rules_for_event(event_type)
