@@ -25,10 +25,13 @@ from .events import (
     NPCIntroduceEvent,
     event_from_dict,
     MajorRealm,
+    PerceptionUpdateEvent,
 )
 
 if TYPE_CHECKING:
     from .world_state import WorldState, CharacterState, ItemState, MapState, LocationState
+
+logger = logging.getLogger(__name__)
 
 
 class StateDelta(BaseModel):
@@ -104,15 +107,22 @@ class StateDelta(BaseModel):
                 state.characters = new_chars
         
         elif isinstance(event, ItemAcquireEvent):
-            if event.actor in state.characters:
-                old_char = state.characters[event.actor]
-                new_char = old_char.model_copy(deep=True)
-                for _ in range(event.quantity):
-                    new_char.inventory.append(event.item)
-                new_char.last_active = event.timestamp
+            # 确保角色存在
+            if event.actor not in state.characters:
+                logger.warning(f"ItemAcquireEvent: actor '{event.actor}' not found, creating")
+                new_char = CharacterState(name=event.actor, last_active=event.timestamp)
                 new_chars = dict(state.characters)
                 new_chars[event.actor] = new_char
                 state.characters = new_chars
+            
+            old_char = state.characters[event.actor]
+            new_char = old_char.model_copy(deep=True)
+            for _ in range(event.quantity):
+                new_char.inventory.append(event.item)
+            new_char.last_active = event.timestamp
+            new_chars = dict(state.characters)
+            new_chars[event.actor] = new_char
+            state.characters = new_chars
             
             # 更新 items 表
             new_items = dict(state.items)
@@ -129,6 +139,8 @@ class StateDelta(BaseModel):
                 for _ in range(event.quantity):
                     if event.item in new_char.inventory:
                         new_char.inventory.remove(event.item)
+                    else:
+                        logger.warning(f"ItemLoseEvent: item '{event.item}' not in inventory of '{event.actor}'")
                 new_char.last_active = event.timestamp
                 new_chars = dict(state.characters)
                 new_chars[event.actor] = new_char
@@ -171,7 +183,7 @@ class StateDelta(BaseModel):
             if event.actor in state.characters:
                 old_char = state.characters[event.actor]
                 new_char = old_char.model_copy(deep=True)
-                new_char.hp = event.new_hp
+                new_char.hp = max(0, event.new_hp)   # 钳位
                 new_char.last_active = event.timestamp
                 new_chars = dict(state.characters)
                 new_chars[event.actor] = new_char
@@ -181,7 +193,7 @@ class StateDelta(BaseModel):
             if event.actor in state.characters:
                 old_char = state.characters[event.actor]
                 new_char = old_char.model_copy(deep=True)
-                new_char.mp = event.new_mp
+                new_char.mp = max(0, event.new_mp)   # 钳位
                 new_char.last_active = event.timestamp
                 new_chars = dict(state.characters)
                 new_chars[event.actor] = new_char
@@ -209,7 +221,26 @@ class StateDelta(BaseModel):
                 new_chars = dict(state.characters)
                 new_chars[event.actor] = new_char
                 state.characters = new_chars
-        
+
+        elif isinstance(event, PerceptionUpdateEvent):
+            if event.observer in state.characters:
+                old_char = state.characters[event.observer]
+                new_char = old_char.model_copy(deep=True)
+                # 获取当前认知
+                current = new_char.perceived_relationships.get(event.target, {"value": 0, "confidence": 0.0})
+                # 更新值
+                new_value = event.new_value
+                # 更新确信度（增量并钳位）
+                new_confidence = min(1.0, max(0.0, current.get("confidence", 0.0) + event.confidence_delta))
+                new_char.perceived_relationships[event.target] = {
+                    "value": new_value,
+                    "confidence": new_confidence
+                }
+                new_char.last_active = event.timestamp
+                new_chars = dict(state.characters)
+                new_chars[event.observer] = new_char
+                state.characters = new_chars
+
         elif isinstance(event, CombatResultEvent):
             # 复合事件，不修改状态
             pass

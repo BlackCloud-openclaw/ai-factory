@@ -174,9 +174,22 @@ async def _run_workflow(req: ExecuteRequest) -> dict:
             logger.error(f"Failed to load outline for novel {req.novel_id}: {e}", exc_info=True)
 
     workflow = get_workflow()
-    result = await asyncio.wait_for(
-        workflow.ainvoke(initial_state.model_dump(), config={"recursion_limit": config.langgraph_recursion_limit}),
-        timeout=3600,
+    
+    # 构建 LangGraph 配置，包含 thread_id 用于 checkpoint（仅当 checkpointer 可用时生效）
+    thread_id = req.novel_id if req.novel_id else f"session_{session_id}"
+    langgraph_config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "checkpoint_ns": "ai_factory",
+        },
+        "recursion_limit": config.langgraph_recursion_limit,
+    }
+    
+    # 正确调用 workflow.ainvoke
+    result = await workflow.ainvoke(
+        initial_state.model_dump(),
+        config=langgraph_config,
+        # 不设置 timeout，让工作流自然完成（大纲生成可能需要数小时）
     )
     return result
 

@@ -31,15 +31,21 @@ class ProjectionScheduler:
             success = await self._store.apply_delta(delta)
             elapsed = time.perf_counter() - start
             
-            # 记录投影延迟（如果启用）
+            # 记录投影延迟并更新投影健康状态（如果启用）
             if config.enable_projection_metrics:
                 async with self._store.pool.acquire() as conn:
+                    # 更新投影健康表：记录最后投影的事件ID，重置滞后计数
+                    # 使用 INSERT ... ON CONFLICT 确保行存在
                     await conn.execute("""
-                        UPDATE projection_health
-                        SET projection_lag_events = projection_lag_events + 1,
+                        INSERT INTO projection_health (novel_id, last_projected_event_id, projection_lag_events, updated_at)
+                        VALUES ($1, $2, 0, NOW())
+                        ON CONFLICT (novel_id) DO UPDATE SET
+                            last_projected_event_id = EXCLUDED.last_projected_event_id,
+                            projection_lag_events = 0,
                             updated_at = NOW()
-                        WHERE novel_id = $1
-                    """, novel_id)
+                    """, novel_id, delta.event_id)
+                    
+                    # 记录投影延迟指标
                     await conn.execute("""
                         INSERT INTO projection_metrics (novel_id, event_id, latency_seconds, created_at)
                         VALUES ($1, $2, $3, NOW())

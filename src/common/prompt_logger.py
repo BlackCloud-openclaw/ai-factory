@@ -30,6 +30,8 @@ def log_prompt(
     """保存 prompt 快照，包含 constraint_hash"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
     role_dir = PROMPT_LOG_DIR / role
+    # 确保目录存在
+    role_dir.mkdir(parents=True, exist_ok=True)
     filename = role_dir / f"{timestamp}.txt"
     
     if metadata is None:

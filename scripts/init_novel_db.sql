@@ -74,7 +74,8 @@ CREATE TABLE IF NOT EXISTS world_snapshots (
     world_state JSONB NOT NULL,
     compressed_state JSONB,
     created_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (novel_id, snapshot_id)
+    PRIMARY KEY (novel_id, snapshot_id),
+    snapshot_schema_version INT DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS event_embeddings (
@@ -301,3 +302,21 @@ CREATE TABLE IF NOT EXISTS projection_metrics (
     latency_seconds FLOAT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 状态审计表
+CREATE TABLE IF NOT EXISTS state_audit (
+    id BIGSERIAL PRIMARY KEY,
+    novel_id VARCHAR(32) NOT NULL,
+    node_name VARCHAR(64) NOT NULL,
+    step_count INT NOT NULL,
+    last_event_id BIGINT,                    -- 当前状态对应的最后一个事件ID
+    state_hash VARCHAR(64) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_state_audit_novel ON state_audit(novel_id);
+CREATE INDEX IF NOT EXISTS idx_state_audit_node ON state_audit(node_name);
+CREATE INDEX IF NOT EXISTS idx_state_audit_created ON state_audit(created_at);
+
+-- 为 projection_health 添加 last_full_rebuild_at 列（如果不存在）
+ALTER TABLE projection_health ADD COLUMN IF NOT EXISTS last_full_rebuild_at TIMESTAMPTZ;

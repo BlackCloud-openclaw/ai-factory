@@ -38,11 +38,15 @@ class Settings(BaseSettings):
     # LLM Pool
     llm_max_concurrent: int = 4
     llm_timeout: int = 600
-    llm_timeout_planning: int = 1800
+    llm_timeout_planning: int = 14400
     llm_timeout_coding: int = 900
     llm_timeout_validation: int = 600
     llm_timeout_research: int = 600
-    llm_timeout_writing: int = 900  # 15分钟
+    llm_timeout_writing: int = 1200  # 15分钟
+    llm_timeout_director: int = 7200   # Director Agent 超时时间（秒），默认 5 分钟
+    workflow_timeout_outline: int = 14400   # 大纲生成工作流超时（秒）
+    workflow_timeout_writing: int = 7200    # 写作工作流超时
+    workflow_timeout_default: int = 3600
 
     # LLM 容器与内存管理
     memory_safety_margin_gb: int = 2
@@ -85,12 +89,14 @@ class Settings(BaseSettings):
     max_timeline_events: int = 100
     snapshot_interval_events: int = 1000
     auto_snapshot_on_chapter: bool = True
-    must_events_similarity_threshold: float = 0.3
+    must_events_similarity_threshold: float = 0.25
     langgraph_recursion_limit: int = 5000   #LangGraph递归限制
     
     # 可观测性
     enable_projection_metrics: bool = True
     dead_letter_alert_threshold: int = 3
+
+    enable_perception_propagation: bool = True   # 是否启用感知传播
 
     # 任务模型映射（可被环境变量覆盖为 JSON 字符串，未实现动态加载）
     task_model_map: Dict[str, List[str]] = {

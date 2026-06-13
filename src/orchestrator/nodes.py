@@ -39,6 +39,9 @@ from src.writing.services.models import ScenePlanningCommand
 from src.writing.services.writing import WritingService
 from src.writing.services.models import WritingCommand
 from src.writing.services.chapter_transition import ChapterTransitionService, ChapterTransitionCommand
+from src.writing.narrative_entropy import NarrativeEntropyCalculator
+from src.writing.memory_hierarchy import CompressedState
+from src.orchestrator.audit import audit_state
 
 # 全局 logger
 logger = setup_logging("orchestrator.nodes")
@@ -206,11 +209,19 @@ async def load_memory_node(state: AgentState) -> dict[str, Any]:
 
 
 async def save_memory_node(state: AgentState) -> dict[str, Any]:
-    """保存小说大纲到数据库，并同步 writing_progress"""
+    """保存小说大纲到数据库，并同步 writing_progress，初始化 character_arcs"""
     logger.info(f"save_memory_node: state.outline={state.outline}, state.task_type={state.task_type}")
     logger.info(f"save_memory_node: outline type={type(state.outline)}, value={state.outline}")
     logger.info(f"Save memory for {state.novel_id}, outline exists: {state.outline is not None}")
     logger.info(f"outline value: {state.outline}")  # 新增调试
+    
+    logger.info(f"=== save_memory_node called ===")
+    logger.info(f"novel_id={state.novel_id}, outline is None? {state.outline is None}")
+    if state.outline:
+        logger.info(f"outline keys: {list(state.outline.keys())}")
+        logger.info(f"volumes count: {len(state.outline.get('volumes', []))}")
+    else:
+        logger.warning("state.outline is None, cannot save")    
     
     if state.outline and state.novel_id:
         pool = get_db_pool()
@@ -273,9 +284,42 @@ async def save_memory_node(state: AgentState) -> dict[str, Any]:
                     chapter_completed=False
                 )
                 logger.info(f"Synced writing_progress for {state.novel_id} (volume={state.current_volume}, chapter={state.current_chapter}, scene={state.current_scene_index})")
+                
+                # ========== 初始化 character_arcs（如果未初始化） ==========
+                if state.compressed_state:
+                    # 如果 compressed_state 是字典，直接操作；否则可能是对象
+                    if isinstance(state.compressed_state, dict):
+                        compressed = state.compressed_state
+                    else:
+                        compressed = state.compressed_state.model_dump() if hasattr(state.compressed_state, 'model_dump') else {}
+                    
+                    existing_arcs = compressed.get("character_arcs", {})
+                    if not existing_arcs and state.outline:
+                        arcs = {}
+                        volumes = state.outline.get("volumes", [])
+                        for vol in volumes:
+                            vol_num = vol.get("volume_num")
+                            core_conflict = vol.get("core_conflict", "")
+                            if core_conflict:
+                                arcs[f"volume_{vol_num}_conflict"] = "open"
+                            # 可选：为每个章节的 must_events 添加弧线（这里简化）
+                        if arcs:
+                            compressed["character_arcs"] = arcs
+                            # 更新回 state.compressed_state
+                            if isinstance(state.compressed_state, dict):
+                                state.compressed_state = compressed
+                            else:
+                                # 如果是 CompressedState 对象，尝试更新字段
+                                state.compressed_state.character_arcs = arcs
+                            logger.info(f"Initialized character_arcs for novel {state.novel_id}: {len(arcs)} arcs")
+                        else:
+                            logger.debug("No core conflicts found in outline to initialize arcs")
+                # ========================================================
     else:
         logger.warning(f"state.outline is empty for {state.novel_id}, cannot save")
 
+    # 在最后添加审计
+    await audit_state(state, "save_memory")
     return {"metadata": state.metadata, "novel_id": state.novel_id}
 
 
@@ -297,12 +341,11 @@ async def plan_node(state: AgentState) -> dict:
         planner = PlannerAgent()
         result = await planner.run(state)
         outline = result.get("outline")
+        logger.info(f"plan_node: outline generated, type={type(outline)}, keys={list(outline.keys()) if outline else None}")        
         if not outline:
             logger.error("Failed to generate outline")
             return {"error": "Outline generation failed"}
-        # 直接返回字典，LangGraph 会合并到 state
-        return {"outline": outline, "phase": WorkflowPhase.PLANNING}
-
+        
     # 2) 场景计划生成
     if state.task_type == "scene_plan":
         cmd = ScenePlanningCommand(
@@ -315,12 +358,15 @@ async def plan_node(state: AgentState) -> dict:
             user_input=state.user_input,
             resume=state.resume,
             total_chapters_in_volume=getattr(state, 'total_chapters_in_volume', 0),
+            metadata=state.metadata,  # 新增
         )
         result = await ScenePlanningService.execute(cmd)
         if result.error:
-            logger.error(f"ScenePlanningService failed: {result.error}")
             return StatePatch(error=result.error).to_dict()
-        return result.state_patch.to_dict()
+        patch = result.state_patch
+        if patch.metadata and "gravity_warning" in patch.metadata:
+            state.metadata["gravity_warning"] = patch.metadata["gravity_warning"]
+        return patch.to_dict()
 
     # 3) 其他任务
     planner = PlannerAgent()
@@ -353,6 +399,9 @@ async def writer_node(state: AgentState) -> dict:
         scene_plan=current_scene_plan,
         current_state=state.current_state,
         writing_feedback=getattr(state, "writing_feedback", ""),
+        narrative_blueprint=state.narrative_blueprint,   # 新增
+        knowledge_deltas=state.knowledge_deltas,         # 新增
+        character_intent=state.character_intent,         # 新增
     )
     result = await WritingService.execute(cmd)
 
@@ -364,6 +413,14 @@ async def writer_node(state: AgentState) -> dict:
 
 
 async def validate_node(state: AgentState) -> dict:
+    # 在 validate_node 开始时，从 compressed_state 恢复 recent_scene_roles
+    if state.compressed_state:
+        if isinstance(state.compressed_state, dict):
+            if "recent_scene_roles" in state.compressed_state:
+                state.metadata["recent_scene_roles"] = state.compressed_state["recent_scene_roles"]
+        elif hasattr(state.compressed_state, 'recent_scene_roles'):
+            state.metadata["recent_scene_roles"] = state.compressed_state.recent_scene_roles
+
     """验证场景并推进工作流"""
     state.validation_mode = "novel"
 
@@ -378,10 +435,8 @@ async def validate_node(state: AgentState) -> dict:
     if not passed and should_retry:
         retry_count = state.retry_count + 1
         if retry_count < state.max_retries_per_subtask:
-            # 构建精确反馈
             validation_result = updates.get("validation_result", {})
             feedback = validation_result.get("feedback", "")
-            # 如果 feedback 为空但 error_details 中有缺失事件，构造默认反馈
             if not feedback and "missing_events" in validation_result.get("error_details", {}):
                 missing = validation_result["error_details"]["missing_events"]
                 feedback = f"缺失必须事件：{', '.join(missing)}，请在下一次输出中完整包含。"
@@ -391,13 +446,16 @@ async def validate_node(state: AgentState) -> dict:
                 validation_result=validation_result,
                 retry_count=retry_count,
                 needs_retry=True,
-                writing_feedback=feedback,      # 确保传递到 writer
+                writing_feedback=feedback,
                 phase=WorkflowPhase.WRITING,
             ).to_dict()
 
     # 3. 验证通过，调用服务
     parsed_output = validation_result.get("parsed_output", {})
     
+    character_intents = state.metadata.get("character_intents")
+    voice_memory = getattr(state, 'voice_memory', None)
+
     cmd = SceneCompletionCommand(
         novel_id=state.novel_id,
         volume=state.current_volume,
@@ -407,6 +465,8 @@ async def validate_node(state: AgentState) -> dict:
         current_world_state=state.current_state,
         parsed_output=parsed_output,
         scene_plan=state.scene_plan,
+        character_intents=character_intents,
+        voice_memory=voice_memory,
     )
     result = await SceneCompletionService.execute(cmd)
     logger.info(f"validate_node: service returned chapter_finished={result.chapter_finished}")
@@ -417,6 +477,128 @@ async def validate_node(state: AgentState) -> dict:
 
     # 5. 章节切换
     if result.chapter_finished:
+        # ========== 计算多尺度叙事熵并更新 compressed_state ==========
+        new_world_state = WorldState.from_dict(result.state_patch.current_state)
+        compressed_state_dict = state.compressed_state or {}
+
+        # 构建 CompressedState 对象
+        try:
+            if compressed_state_dict:
+                comp_state = CompressedState(**compressed_state_dict)
+            else:
+                comp_state = CompressedState(volume_num=state.current_volume)
+        except Exception as e:
+            logger.warning(f"Failed to load compressed_state for entropy calculation: {e}")
+            comp_state = CompressedState(volume_num=state.current_volume)
+        
+        # ========== 改进：收集最近场景角色标签（从多个来源） ==========
+        recent_scene_roles = state.metadata.get("recent_scene_roles", [])
+        scene_role = None
+        
+        # 优先从 narrative_blueprint 获取
+        if state.narrative_blueprint:
+            scene_role = state.narrative_blueprint.get("scene_role")
+        # 如果还没有，从 scene_plan 获取（某些旧场景可能没有 blueprint）
+        if not scene_role and state.scene_plan:
+            scene_role = state.scene_plan.get("scene_role")
+        
+        if scene_role:
+            recent_scene_roles.append(scene_role)
+            # 保留最近 20 个
+            if len(recent_scene_roles) > 20:
+                recent_scene_roles = recent_scene_roles[-20:]
+            state.metadata["recent_scene_roles"] = recent_scene_roles
+        else:
+            # 记录警告，便于调试
+            logger.warning(f"No scene_role found for scene {state.current_scene_index}. "
+                           f"narrative_blueprint={state.narrative_blueprint is not None}, "
+                           f"scene_plan={state.scene_plan is not None}")
+        # ============================================================
+        
+        # 收集最近事件（从事件存储中获取最近 50 个事件）
+        recent_events = []
+        try:
+            from src.writing.event_store import NarrativeEventStore
+            pool = get_db_pool()
+            if pool:
+                event_store = NarrativeEventStore(pool)
+                events_with_id = await event_store.get_events_since(
+                    state.novel_id, 
+                    since_event_id=0, 
+                    limit=50
+                )
+                # 转换为字典列表，供熵计算使用
+                for _, evt in events_with_id:
+                    recent_events.append({
+                        "event_type": evt.type.value if hasattr(evt, 'type') else "unknown",
+                        "scene_role": getattr(evt, 'scene_role', None),
+                        "characters": getattr(evt, 'characters', []),
+                        "new_lore": getattr(evt, 'new_lore', False),
+                    })
+                logger.debug(f"Loaded {len(recent_events)} recent events for entropy calculation")
+            else:
+                logger.warning("No db pool, cannot load recent events")
+        except Exception as e:
+            logger.warning(f"Failed to load recent events for entropy: {e}")
+        
+        # 获取活跃弧线（从 compressed_state 或 state）
+        active_arcs = comp_state.character_arcs if hasattr(comp_state, 'character_arcs') else {}
+        
+        # 记录熵计算输入状态（用于调试）
+        logger.info(f"Entropy inputs: recent_scene_roles={recent_scene_roles}, "
+                    f"active_arcs_count={len(active_arcs)}, "
+                    f"recent_events_count={len(recent_events)}")
+        
+        # 计算多尺度熵报告
+        try:
+            entropy_report = NarrativeEntropyCalculator.calculate_full(
+                world_state=new_world_state,
+                compressed_state=comp_state,
+                recent_scene_roles=recent_scene_roles,
+                recent_events=recent_events,
+                active_arcs=active_arcs,
+            )
+            # 存储三维熵到 compressed_state
+            comp_state.local_entropy = entropy_report.local
+            comp_state.arc_entropy = entropy_report.arc
+            comp_state.civilization_entropy = entropy_report.civilization
+            # 新增：将最近的场景角色列表持久化，以便下次加载
+            comp_state.recent_scene_roles = recent_scene_roles  # 需要 CompressedState 增加该字段    
+
+            # 同时保留旧版单值熵用于兼容
+            comp_state.narrative_entropy = (entropy_report.local + entropy_report.arc + entropy_report.civilization) / 3
+            # 更新历史（保留最近10次）
+            comp_state.entropy_history = comp_state.entropy_history[-9:] + [comp_state.narrative_entropy]
+            
+            logger.info(f"Narrative entropy for volume {state.current_volume}, chapter {state.current_chapter}: "
+                       f"local={entropy_report.local:.3f}, arc={entropy_report.arc:.3f}, civ={entropy_report.civilization:.3f}")
+            
+            state.compressed_state = comp_state.model_dump()
+        except Exception as e:
+            logger.error(f"Failed to calculate narrative entropy: {e}", exc_info=True)
+        # ======================================================
+
+        # ========== 手动保存快照（修复熵丢失） ==========
+        pool = get_db_pool()
+        if pool:
+            from src.writing.snapshot import SnapshotManager
+            from src.writing.event_store import NarrativeEventStore
+            snap_mgr = SnapshotManager(pool)
+            event_store = NarrativeEventStore(pool)
+            last_event_id = await event_store.get_last_event_id(state.novel_id)
+            if last_event_id is None:
+                last_event_id = 0
+            await snap_mgr.save_snapshot(
+                state.novel_id,
+                new_world_state,
+                last_event_id,
+                state.current_volume,
+                state.current_chapter,
+                compressed_state=comp_state,   # 关键：使用我们填充好的 comp_state
+            )
+            logger.info(f"Manually saved snapshot with entropy local={comp_state.local_entropy}, arc={comp_state.arc_entropy}, civ={comp_state.civilization_entropy}")
+        
+        # 章节切换
         transition_cmd = ChapterTransitionCommand(
             novel_id=state.novel_id,
             current_volume=state.current_volume,
@@ -427,10 +609,13 @@ async def validate_node(state: AgentState) -> dict:
         transition_result = await ChapterTransitionService.execute(transition_cmd)
         transition_result.state_patch.current_state = result.state_patch.current_state
         transition_result.state_patch.validation_result = result.state_patch.validation_result
+        
+        if state.compressed_state:
+            state.metadata["compressed_state"] = state.compressed_state
+        
         return transition_result.state_patch.to_dict()
     else:
         return result.state_patch.to_dict()
-
 
 # ============================================================================
 # 其他节点（保留原有实现）

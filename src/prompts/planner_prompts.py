@@ -255,23 +255,31 @@ class OutlineChaptersPromptBuilder(PromptBuilder):
     def build(self, state: AgentState) -> str:
         volume = state.metadata.get("current_volume_info", {})
         chapters_per_vol = state.metadata.get("chapters_per_vol", 10)
-        return f"""根据下面卷的信息，生成该卷的 {chapters_per_vol} 章详细大纲。
+        chapter_range = state.metadata.get("chapter_range", (1, chapters_per_vol))
+        start_ch, end_ch = chapter_range
+        num_to_gen = end_ch - start_ch + 1
+        
+        return f"""根据下面卷的信息，生成该卷的第 {start_ch} 到第 {end_ch} 章的详细大纲。
 卷信息：卷{volume.get('volume_num')} 《{volume.get('title')}》
 目标境界：{volume.get('target_realm')}
 核心冲突：{volume.get('core_conflict')}
 
 输出JSON数组，每个元素包含：
-- chapter_num: 章节序号
+- chapter_num: 章节序号（必须是 {start_ch} 到 {end_ch} 之间的整数）
 - title: 章节标题
 - must_events: 必须发生的事件（字符串数组）
 - forbidden_events: 禁止发生的事件（字符串数组）
 
 输出格式：
 [
-    {{"chapter_num": 1, "title": "初遇机缘", "must_events": ["捡到神秘玉佩"], "forbidden_events": []}},
+    {{"chapter_num": {start_ch}, "title": "...", "must_events": [...], "forbidden_events": [...]}},
     ...
 ]
-注意：长度必须恰好为 {chapters_per_vol} 章。"""
+
+**重要**：
+- 必须恰好生成 {num_to_gen} 个章节对象，序号连续。
+- 不要输出任何额外文本，只输出 JSON 数组。
+- 注意：如果前序章节已经发生过某些事件，请不要在本批次章节中重复（例如第1章“捡到玉佩”不要在第5章再出现）。"""
 
     def parse_response(self, response: str) -> Dict[str, Any]:
         data = extract_json_from_response(response)
@@ -288,7 +296,6 @@ class ScenePlanPromptBuilder(PromptBuilder):
         volume = getattr(state, 'current_volume', 1)
         
         # 添加调试日志
-        import logging
         logger = logging.getLogger("agents.planner")
         logger.info(f"ScenePlanPrompt: volume={volume}, chapter={chapter}, outline exists: {outline is not None}")
         
@@ -375,6 +382,56 @@ class ScenePlanPromptBuilder(PromptBuilder):
             for hint in affordance_hints:
                 base_prompt += f"- {hint}\n"
             base_prompt += "建议：生成的事件最好不超出上述能力范围，但允许特殊情况。\n"
+
+        # ========== 熵控制动作注入（取代旧熵警告） ==========
+        control_actions = state.metadata.get("entropy_control_actions", [])
+        if control_actions:
+            base_prompt += "\n\n【🔒 叙事稳态强制约束（优先级高于所有）】\n"
+            for action in control_actions:
+                action_type = action.get("type")
+                params = action.get("params", {})
+                if action_type == "limit_scene_role":
+                    allowed = params.get("allowed", [])
+                    forbidden = params.get("forbidden", [])
+                    if allowed:
+                        base_prompt += f"- 只允许使用以下场景角色: {', '.join(allowed)}。\n"
+                    if forbidden:
+                        base_prompt += f"- 禁止使用场景角色: {', '.join(forbidden)}。\n"
+                elif action_type == "resolve_arcs":
+                    max_open = params.get("max_open", 5)
+                    arc_ids = params.get("arc_ids", [])
+                    base_prompt += f"- 当前未解决弧线过多（超过 {max_open} 个）。"
+                    if arc_ids:
+                        base_prompt += f" 请优先解决以下弧线: {', '.join(arc_ids)}。\n"
+                    else:
+                        base_prompt += " 请优先安排弧线回收场景，不要新增弧线。\n"
+                elif action_type == "forbid_new_lore":
+                    duration = params.get("duration_chapters", 1)
+                    lore_types = params.get("types", [])
+                    if lore_types:
+                        type_desc = []
+                        if "character" in lore_types:
+                            type_desc.append("新角色")
+                        if "location" in lore_types:
+                            type_desc.append("新地点")
+                        if "item" in lore_types:
+                            type_desc.append("新物品/道具")
+                        if "realm" in lore_types:
+                            type_desc.append("新境界/功法")
+                        base_prompt += f"- 接下来 {duration} 章禁止引入: {', '.join(type_desc)}。\n"
+                    else:
+                        base_prompt += f"- 接下来 {duration} 章禁止引入新角色、新地点、新物品、新功法。\n"
+                elif action_type == "force_low_stakes":
+                    reason = params.get("reason", "熵过高")
+                    base_prompt += f"- 强制进入低烈度章节（原因: {reason}），禁止战斗、突破、重大冲突。\n"
+                elif action_type == "forbid_new_arcs":
+                    duration = params.get("duration_chapters", 2)
+                    base_prompt += f"- 接下来 {duration} 章禁止开启新的剧情弧线。\n"
+
+        # 在 build 方法末尾，返回之前添加
+        gravity_warning = state.metadata.get("gravity_warning")
+        if gravity_warning:
+            base_prompt += f"\n\n{gravity_warning}\n"
 
         return base_prompt
 

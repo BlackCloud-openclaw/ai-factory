@@ -35,40 +35,59 @@ class NarrativeEventStore:
         volume_num: int = None,
         chapter_num: int = None,
         scene_id: int = None,
+        conn: Optional[asyncpg.Connection] = None,  # 新增
     ) -> str:
         """存储单个事件（幂等），返回事件UUID"""
+        if conn is None:
+            async with self.pool.acquire() as conn:
+                return await self._append_event(
+                    conn, novel_id, event, volume_num, chapter_num, scene_id
+                )
+        else:
+            return await self._append_event(
+                conn, novel_id, event, volume_num, chapter_num, scene_id
+            )
+
+    async def _append_event(
+        self,
+        conn: asyncpg.Connection,
+        novel_id: str,
+        event: NarrativeEvent,
+        volume_num: int = None,
+        chapter_num: int = None,
+        scene_id: int = None,
+    ) -> str:
+        """内部实现，使用传入的连接"""
         event_data = event_to_dict(event)
         event_data["event_schema_version"] = LATEST_EVENT_SCHEMA_VERSION
-        # 确保事件信封已升级到最新 schema（幂等）
         event_data = upcast_event_envelope(event_data)
 
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow(
-                """
-                INSERT INTO narrative_events 
-                (event_uuid, novel_id, volume_num, chapter_num, scene_id, 
-                event_type, event_data, event_version, timestamp)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                ON CONFLICT (event_uuid) DO UPDATE SET event_uuid = EXCLUDED.event_uuid
-                RETURNING id
-                """,
-                event.event_id,
-                novel_id,
-                volume_num,
-                chapter_num,
-                scene_id,
-                event.type.value,
-                json.dumps(event_data),
-                event.event_version,
-                datetime.now(),
-            )
-            event_db_id = row["id"] if row else None
+        row = await conn.fetchrow(
+            """
+            INSERT INTO narrative_events 
+            (event_uuid, novel_id, volume_num, chapter_num, scene_id, 
+            event_type, event_data, event_version, timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (event_uuid) DO UPDATE SET event_uuid = EXCLUDED.event_uuid
+            RETURNING id
+            """,
+            event.event_id,
+            novel_id,
+            volume_num,
+            chapter_num,
+            scene_id,
+            event.type.value,
+            json.dumps(event_data),
+            event.event_version,
+            datetime.now(),
+        )
+        event_db_id = row["id"] if row else None
 
         # 触发投影（同步，可后续改为异步队列）
         try:
             delta_engine = DeltaEngine()
             scheduler = ProjectionScheduler()
-            current_active = await self._load_active_predicates(novel_id)
+            current_active = await self._load_active_predicates(novel_id, conn)
 
             # 构建事件字典：复制 upcast 后的数据，补充必要字段
             event_dict = event_data.copy()
@@ -79,6 +98,7 @@ class NarrativeEventStore:
                 event_dict["semantic"] = "state_mutation"
 
             delta = delta_engine.compute_delta(current_active, event_dict)
+            # 投影调度器内部会使用自己的连接，这里不传入 conn（投影可以独立提交）
             await scheduler.schedule(novel_id, delta)
         except Exception as e:
             logger.error(f"Projection failed for event {event.event_id}: {e}", exc_info=True)
@@ -92,17 +112,36 @@ class NarrativeEventStore:
         volume_num: int = None,
         chapter_num: int = None,
         scene_id: int = None,
+        conn: Optional[asyncpg.Connection] = None,
     ) -> List[str]:
         """批量存储事件（事务内）"""
-        async with self.pool.acquire() as conn:
-            async with conn.transaction():
-                uuids = []
-                for event in events:
-                    uuid = await self.append_event(
-                        novel_id, event, volume_num, chapter_num, scene_id
+        if conn is None:
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():
+                    return await self._append_events_batch(
+                        conn, novel_id, events, volume_num, chapter_num, scene_id
                     )
-                    uuids.append(uuid)
-                return uuids
+        else:
+            return await self._append_events_batch(
+                conn, novel_id, events, volume_num, chapter_num, scene_id
+            )
+
+    async def _append_events_batch(
+        self,
+        conn: asyncpg.Connection,
+        novel_id: str,
+        events: List[NarrativeEvent],
+        volume_num: int = None,
+        chapter_num: int = None,
+        scene_id: int = None,
+    ) -> List[str]:
+        uuids = []
+        for event in events:
+            uuid = await self._append_event(
+                conn, novel_id, event, volume_num, chapter_num, scene_id
+            )
+            uuids.append(uuid)
+        return uuids
 
     async def get_events_since(
         self,
@@ -129,7 +168,6 @@ class NarrativeEventStore:
                 event_data = row["event_data"]
                 if isinstance(event_data, str):
                     event_data = json.loads(event_data)
-                # 升级事件信封到最新 schema
                 event_data = upcast_event_envelope(event_data)
                 event = event_from_dict(row["event_type"], event_data)
                 if event:
@@ -184,18 +222,22 @@ class NarrativeEventStore:
                 event_db_id,
             )
 
-    async def _load_active_predicates(self, novel_id: str) -> Dict[str, Predicate]:
+    async def _load_active_predicates(
+        self, novel_id: str, conn: Optional[asyncpg.Connection] = None
+    ) -> Dict[str, Predicate]:
         """加载当前小说的所有活跃谓词（用于 delta 计算）"""
-        async with self.pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                SELECT subject, relation, object, negated, confidence, priority, scope,
-                    event_id AS source_event_id, source_event_type, source_event_semantic
-                FROM predicates
-                WHERE novel_id = $1 AND is_active = true
-                """,
-                novel_id
-            )
+        if conn is None:
+            async with self.pool.acquire() as conn:
+                return await self._load_active_predicates(novel_id, conn)
+        rows = await conn.fetch(
+            """
+            SELECT subject, relation, object, negated, confidence, priority, scope,
+                event_id AS source_event_id, source_event_type, source_event_semantic
+            FROM predicates
+            WHERE novel_id = $1 AND is_active = true
+            """,
+            novel_id
+        )
         predicates = {}
         for row in rows:
             obj = row["object"]

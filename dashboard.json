@@ -1,0 +1,139 @@
+{
+  "title": "AI Factory - 叙事引擎监控",
+  "tags": ["ai-factory"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "局部熵 (Local Entropy)",
+      "type": "timeseries",
+      "targets": [{ "expr": "ai_factory_entropy_local", "legendFormat": "local" }],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 }
+    },
+    {
+      "title": "弧线熵 (Arc Entropy)",
+      "type": "timeseries",
+      "targets": [{ "expr": "ai_factory_entropy_arc", "legendFormat": "arc" }],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 }
+    },
+    {
+      "title": "文明熵 (Civilization Entropy)",
+      "type": "timeseries",
+      "targets": [{ "expr": "ai_factory_entropy_civilization", "legendFormat": "civilization" }],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 }
+    },
+    {
+      "title": "投影滞后事件数",
+      "type": "timeseries",
+      "targets": [{ "expr": "ai_factory_projection_lag_events", "legendFormat": "lag" }],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 }
+    },
+    {
+      "title": "死信队列数量",
+      "type": "stat",
+      "targets": [{ "expr": "ai_factory_dead_letter_count", "legendFormat": "dead letters" }],
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 8 }
+    },
+    {
+      "title": "活跃谓词数量",
+      "type": "stat",
+      "targets": [{ "expr": "ai_factory_active_predicates", "legendFormat": "active predicates" }],
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 8 }
+    },
+    {
+      "title": "LLM P99 延迟 (按 Agent)",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "histogram_quantile(0.99, sum(rate(ai_factory_llm_request_duration_seconds_bucket[5m])) by (le, agent))",
+        "legendFormat": "{{agent}}"
+      }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 }
+    },{
+  "dashboard": {
+    "title": "AI Factory - 叙事引擎监控",
+    "tags": ["ai-factory", "narrative"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "局部熵 (Local Entropy)",
+        "type": "graph",
+        "targets": [
+          { "expr": "ai_factory_entropy_local", "legendFormat": "local" }
+        ],
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 }
+      },
+      {
+        "title": "弧线熵 (Arc Entropy)",
+        "type": "graph",
+        "targets": [
+          { "expr": "ai_factory_entropy_arc", "legendFormat": "arc" }
+        ],
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 }
+      },
+      {
+        "title": "文明熵 (Civilization Entropy)",
+        "type": "graph",
+        "targets": [
+          { "expr": "ai_factory_entropy_civilization", "legendFormat": "civilization" }
+        ],
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 }
+      },
+      {
+        "title": "投影滞后事件数",
+        "type": "graph",
+        "targets": [
+          { "expr": "ai_factory_projection_lag_events", "legendFormat": "lag" }
+        ],
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 }
+      },
+      {
+        "title": "死信队列数量",
+        "type": "stat",
+        "targets": [
+          { "expr": "ai_factory_dead_letter_count", "legendFormat": "dead letters" }
+        ],
+        "gridPos": { "h": 4, "w": 4, "x": 8, "y": 8 }
+      },
+      {
+        "title": "活跃谓词数量",
+        "type": "stat",
+        "targets": [
+          { "expr": "ai_factory_active_predicates", "legendFormat": "active predicates" }
+        ],
+        "gridPos": { "h": 4, "w": 4, "x": 12, "y": 8 }
+      },
+      {
+        "title": "LLM P99 延迟 (按 Agent)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(ai_factory_llm_request_duration_seconds_bucket[5m])) by (le, agent))",
+            "legendFormat": "{{agent}}"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 }
+      },
+      {
+        "title": "LLM 请求成功率",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(ai_factory_llm_requests_total{status=\"success\"}[5m])) / sum(rate(ai_factory_llm_requests_total[5m]))",
+            "legendFormat": "success rate"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 }
+      }
+    ]
+  }
+}
+    {
+      "title": "LLM 请求成功率",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sum(rate(ai_factory_llm_requests_total{status=\"success\"}[5m])) / sum(rate(ai_factory_llm_requests_total[5m]))",
+        "legendFormat": "success rate"
+      }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+groups:
+  - name: ai_factory_alerts
+    interval: 30s
+    rules:
+      - alert: ProjectionLagHigh
+        expr: ai_factory_projection_lag_events > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "投影滞后超过100个事件"
+          description: "当前投影滞后事件数: {{ $value }}"
+
+      - alert: ProjectionLagCritical
+        expr: ai_factory_projection_lag_events > 500
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "投影滞后严重超过500个事件"
+          description: "当前投影滞后事件数: {{ $value }}"
+
+      - alert: DeadLetterQueueNonZero
+        expr: ai_factory_dead_letter_count > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "投影死信队列出现事件"
+          description: "死信数量: {{ $value }}"
+
+      - alert: LLMSuccessRateLow
+        expr: sum(rate(ai_factory_llm_requests_total{status="success"}[5m])) / sum(rate(ai_factory_llm_requests_total[5m])) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM 请求成功率低于70%"
+          description: "当前成功率: {{ $value | humanizePercentage }}"
+
+      - alert: NoActivePredicates
+        expr: ai_factory_active_predicates == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "没有活跃谓词，投影可能未初始化"

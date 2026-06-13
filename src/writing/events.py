@@ -34,6 +34,8 @@ class EventType(str, Enum):
     DISCOVERY = "discovery"
     NPC_INTRODUCE = "npc_introduce"
 
+    PERCEPTION_UPDATE = "perception_update"    
+
 class MajorRealm(str, Enum):
     """大境界枚举（不含层级）"""
     QI_REFINING = "炼气"
@@ -55,6 +57,14 @@ class BaseNarrativeEvent(BaseModel):
     scene_id: Optional[int] = None
     chapter_id: Optional[int] = None
 
+class PerceptionUpdateEvent(BaseNarrativeEvent):
+    """认知关系更新事件（由系统自动生成）"""
+    type: EventType = EventType.PERCEPTION_UPDATE
+    observer: str          # 观察者
+    target: str            # 被观察的角色
+    new_value: int         # 新的认知值 (-100..100)
+    confidence_delta: float = 0.0   # 确信度变化（增量，最终值会被钳位）
+    reason: str = ""       # 更新原因（观察、对话、推理）
 
 # ========== 状态变更事件 ==========
 
@@ -199,6 +209,7 @@ NarrativeEvent = Union[
     DialogueEvent,
     DiscoveryEvent,
     NPCIntroduceEvent,
+    PerceptionUpdateEvent,
 ]
 
 
@@ -226,7 +237,8 @@ def event_from_dict(event_type: str, data: dict) -> Optional[NarrativeEvent]:
         "dialogue": DialogueEvent,
         "discovery": DiscoveryEvent,
         "npc_introduce": NPCIntroduceEvent,
-        "item_discovery": DiscoveryEvent,  # 将 item_discovery 映射到 DiscoveryEvent
+        "item_discovery": DiscoveryEvent,
+        "perception_update": PerceptionUpdateEvent,
     }
     
     cls = event_map.get(event_type)

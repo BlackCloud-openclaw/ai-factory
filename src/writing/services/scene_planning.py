@@ -12,6 +12,7 @@ from src.writing.context_compiler import ContextCompiler
 from src.writing.causality.initializer import ensure_core_predicates
 from .models import ScenePlanningCommand, ScenePlanningResult
 from src.orchestrator.state import AgentState
+from src.writing.attractor import NarrativeAttractorField
 
 logger = logging.getLogger(__name__)
 
@@ -98,14 +99,9 @@ class ScenePlanningService:
             world, cmd.volume, cmd.chapter,
             current_volume_outline or outline or {}
         )
-        # 注意：compiled 将被注入到 PlannerAgent 的 metadata 中
-        # 由于我们无法直接修改 cmd 对象，我们需要通过临时状态传递给 planner
-        # 更好的方式：让 PlannerAgent 从 state.metadata 读取，我们在调用前临时构造一个 state
-        # 但为了保持服务独立性，我们可以在调用 PlannerAgent 之前构造一个临时 AgentState
 
         # 5. 调用 PlannerAgent
         planner = PlannerAgent()
-        # 构造临时 AgentState 以传递必要信息
         temp_state = AgentState(
             novel_id=cmd.novel_id,
             task_type=cmd.task_type,
@@ -152,6 +148,25 @@ class ScenePlanningService:
             if "scene_id" not in scene:
                 scene["scene_id"] = i + 1
 
+        # ========== 新增：计算叙事引力 ==========
+        # 获取当前世界状态（用于吸引子计算，此时 world 已是最新）
+        attractor_field = NarrativeAttractorField()
+        if hasattr(world, 'attractor_field') and world.attractor_field:
+            attractor_field = NarrativeAttractorField.from_dict(world.attractor_field)
+        
+        min_gravity_threshold = 0.5
+        total_gravity = 0.0
+        for scene in scenes:
+            gravity = attractor_field.calculate_gravity(scene, world, cmd.chapter)
+            total_gravity += gravity
+        
+        avg_gravity = total_gravity / max(len(scenes), 1)
+        gravity_warning = None
+        if avg_gravity < min_gravity_threshold:
+            gravity_warning = attractor_field.get_attractor_prompt(min_gravity_threshold)
+            logger.warning(f"Low narrative gravity: avg={avg_gravity:.2f}, scenes may drift from attractors")
+        # ====================================
+
         # 7. 持久化到 scene_execution_units
         if cmd.novel_id and pool:
             await ScenePlanningService._persist_scene_plans(
@@ -161,13 +176,20 @@ class ScenePlanningService:
         # 8. 构建 StatePatch
         total_scenes = len(scenes)
         first_scene = scenes[0] if scenes else {}
+        
+        # 准备 metadata（如果存在引力警告）
+        patch_metadata = None
+        if gravity_warning:
+            patch_metadata = {"gravity_warning": gravity_warning}
+        
         patch = StatePatch(
             scene_plan_list=scenes,
             total_scenes_in_chapter=total_scenes,
             scene_plan=first_scene,
-            phase=WorkflowPhase.WRITING,  # 计划生成后进入写作阶段
-            current_scene_index=0,        # 重置场景索引
-            current_state=world.to_dict(),  # 新增：确保世界状态被传递
+            phase=WorkflowPhase.WRITING,
+            current_scene_index=0,
+            current_state=world.to_dict(),
+            metadata=patch_metadata,  # 新增：传递引力警告
         )
 
         # 9. 确保 total_chapters_in_volume
@@ -180,7 +202,7 @@ class ScenePlanningService:
         if total_chapters == 0:
             total_chapters = 10
             logger.warning(f"Could not determine total_chapters_in_volume, using default {total_chapters}")
-        patch.total_chapters_in_volume = total_chapters  # 注意：该字段需要在 StatePatch 中添加
+        patch.total_chapters_in_volume = total_chapters
 
         return ScenePlanningResult(
             state_patch=patch,
@@ -191,9 +213,7 @@ class ScenePlanningService:
     async def _persist_scene_plans(
         pool, novel_id: str, volume: int, chapter: int, scenes: List[Dict]
     ):
-        """持久化场景计划到 scene_execution_units（复用原有辅助函数）"""
-        # 复用 nodes.py 中的 _persist_scene_plans 函数，为避免循环导入，这里重新实现简单版
-        from src.db import get_db_pool
+        """持久化场景计划到 scene_execution_units"""
         async with pool.acquire() as conn:
             for idx, scene in enumerate(scenes):
                 plan_json = json.dumps(scene, ensure_ascii=False)

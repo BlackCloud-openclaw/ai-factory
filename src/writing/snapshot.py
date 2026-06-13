@@ -1,4 +1,6 @@
 import asyncpg
+import json
+
 from typing import Optional, Tuple
 from datetime import datetime
 from .world_state import WorldState
@@ -17,6 +19,7 @@ class SnapshotManager:
         volume_num: int = None,
         chapter_num: int = None,
         compressed_state: Optional[CompressedState] = None,
+        conn: Optional[asyncpg.Connection] = None,  # 必须存在
     ) -> int:
         async with self.pool.acquire() as conn:
             async with conn.transaction():
@@ -46,7 +49,8 @@ class SnapshotManager:
             """, novel_id)
             if not row:
                 return None, None, 0
-            world = WorldState.model_validate_json(row["world_state"])
+            data = json.loads(row["world_state"])
+            world = WorldState.from_dict(data)
             comp = None
             if row["compressed_state"]:
                 comp = CompressedState.model_validate_json(row["compressed_state"])

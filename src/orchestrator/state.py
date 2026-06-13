@@ -2,7 +2,7 @@ from typing import Annotated, Any, List, Dict, Optional
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 from src.orchestrator.state_patch import WorkflowPhase
-
+from src.common.canonical import canonical_hash  
 
 class AgentState(BaseModel):
     """State definition for the AI Factory LangGraph workflow."""
@@ -13,6 +13,7 @@ class AgentState(BaseModel):
     project_id: str = ""                # 记忆隔离
     novel_id: Optional[str] = None      # 当前小说ID（用于写作场景）
     metadata: Dict[str, Any] = {}       # 仅用于临时、非结构化数据
+    state_hash: Optional[str] = None   # 新增：状态哈希，用于审计
 
     # ===== 消息历史 =====
     messages: Annotated[list, add_messages] = []
@@ -69,6 +70,8 @@ class AgentState(BaseModel):
     applied_events: List[Any] = []                  # 已应用的事件（可选）
     current_state: Dict[str, Any] = {}              # 当前世界状态缓存
     last_sequence_id: int = 0                       # 最新事件 sequence_id
+    compressed_state: Optional[Dict[str, Any]] = None   # 卷级别压缩状态，包含角色意图等
+    voice_memory: Optional[Dict[str, Any]] = None   # 存储 VoiceFingerprint 的字典
 
     # ===== 小说写作专用字段（结构化）=====
     chapter_id: Optional[str] = None
@@ -84,6 +87,11 @@ class AgentState(BaseModel):
     current_scene_index: Optional[int] = 0   # 0‑based 已完成场景数（下一个要生成的场景索引）
     writing_constraints: Optional[Dict[str, Any]] = None
     scene_text: str = ""
+
+    # Director 输出字段（阶段2新增）
+    narrative_blueprint: Optional[Dict[str, Any]] = None
+    knowledge_deltas: Optional[List[Dict[str, Any]]] = None
+    character_intent: Optional[Dict[str, Any]] = None
 
     # ===== 工作流阶段（显式状态机）=====
     phase: Optional[WorkflowPhase] = None
@@ -102,3 +110,24 @@ class AgentState(BaseModel):
 
     def should_retry(self) -> bool:
         return self.retry_count < self.max_retries and self.error is not None
+    
+    def compute_state_hash(self) -> str:
+        """计算 AgentState 的确定性哈希（忽略非持久化字段）"""
+        # 选择影响叙事状态的字段，忽略 step_count, retry_count 等运行时计数
+        hash_fields = {
+            "novel_id": self.novel_id,
+            "current_volume": self.current_volume,
+            "current_chapter": self.current_chapter,
+            "current_scene_index": self.current_scene_index,
+            "current_state": self.current_state,
+            "outline": self.outline,
+            "scene_plan_list": self.scene_plan_list,
+            "scene_plan": self.scene_plan,
+            "compressed_state": self.compressed_state,
+            "phase": self.phase.value if self.phase else None,
+            "last_sequence_id": self.last_sequence_id,
+            "total_scenes_in_chapter": self.total_scenes_in_chapter,
+            "total_chapters_in_volume": self.total_chapters_in_volume,
+            # 忽略容易变化的字段：messages, research_results, code_generated, execution_result, validation_result 等
+        }
+        return canonical_hash(hash_fields)    

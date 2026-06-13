@@ -11,6 +11,14 @@ from src.common.timing import timed
 from src.writing.causality.initializer import ensure_core_predicates
 from .models import SceneCompletionCommand, SceneCompletionResult
 import logging
+from src.writing.memory_hierarchy import CompressedState
+from src.writing.services.perception_propagation import PerceptionPropagationService
+
+# 相变与吸引子系统导入
+from src.writing.phase_transition import (
+    PhaseTransitionDetector, PhaseTransitionHandler, PhaseTransition, PhaseTransitionType
+)
+from src.writing.attractor import NarrativeAttractorField, Attractor, AttractorType
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +38,6 @@ class SceneCompletionService:
                 error="No db pool"
             )
 
-        # 增加空值检查
         if cmd.parsed_output is None:
             logger.error("SceneCompletionService: parsed_output is None")
             return SceneCompletionResult(
@@ -40,15 +47,22 @@ class SceneCompletionService:
 
         new_world = WorldState.from_dict(cmd.current_world_state) if cmd.current_world_state else WorldState()
         events_applied = 0
+        event_store = NarrativeEventStore(pool)
+
+        # 用于相变检测的 compressed_state（将在合适时机构建）
+        compressed_state_for_detection = None
 
         async with pool.acquire() as conn:
             async with conn.transaction():
-                # 1. 应用事件
                 events_data = cmd.parsed_output.get("events", [])
                 events = []
                 for evt_dict in events_data:
-                    # ----- 修复 discovery.importance 类型 -----
-                    if evt_dict.get("type") == "discovery" and "importance" in evt_dict:
+                    evt_type = evt_dict.get("type")
+                    if not evt_type:
+                        logger.warning(f"Event missing 'type' field: {evt_dict}")
+                        continue
+                    
+                    if evt_type == "discovery" and "importance" in evt_dict:
                         imp = evt_dict["importance"]
                         if isinstance(imp, int):
                             if imp >= 5:
@@ -60,39 +74,121 @@ class SceneCompletionService:
                             else:
                                 evt_dict["importance"] = "low"
                         elif isinstance(imp, float):
-                            evt_dict["importance"] = "critical" if imp >= 5 else "high" if imp >= 3 else "normal" if imp >= 1 else "low"
+                            if imp >= 5:
+                                evt_dict["importance"] = "critical"
+                            elif imp >= 3:
+                                evt_dict["importance"] = "high"
+                            elif imp >= 1:
+                                evt_dict["importance"] = "normal"
+                            else:
+                                evt_dict["importance"] = "low"
                         elif isinstance(imp, bool):
                             evt_dict["importance"] = "critical" if imp else "low"
-                    # ---------------------------------------
-                    evt_type = evt_dict.get("type")
-                    if evt_type:
-                        evt = event_from_dict(evt_type, evt_dict)
-                        if evt:
-                            events.append(evt)
+                    evt = event_from_dict(evt_type, evt_dict)
+                    if evt:
+                        events.append(evt)
 
                 if events:
                     delta = StateDelta(events=events)
                     new_world = delta.apply_to(new_world)
                     events_applied = len(events)
 
-                    # 保存事件
-                    event_store = NarrativeEventStore(pool)
+                    # 保存原始事件 - 传入同一个 conn
                     for evt in events:
                         await event_store.append_event(
-                            cmd.novel_id, evt, cmd.volume, cmd.chapter, cmd.scene_idx
+                            cmd.novel_id, evt, cmd.volume, cmd.chapter, cmd.scene_idx,
+                            conn=conn  # 关键：复用事务连接
                         )
+
+                    # 感知传播
+                    world_before = WorldState.from_dict(cmd.current_world_state) if cmd.current_world_state else WorldState()
+                    perception_events = await PerceptionPropagationService.propagate(
+                        novel_id=cmd.novel_id,
+                        volume=cmd.volume,
+                        chapter=cmd.chapter,
+                        scene_idx=cmd.scene_idx,
+                        events=events,
+                        world_state_before=world_before,
+                    )
+                    for pe in perception_events:
+                        await event_store.append_event(
+                            cmd.novel_id, pe, cmd.volume, cmd.chapter, cmd.scene_idx,
+                            conn=conn  # 复用连接
+                        )
+                        delta_pe = StateDelta(events=[pe])
+                        new_world = delta_pe.apply_to(new_world)
+                        events_applied += 1
 
                     await ensure_core_predicates(cmd.novel_id, new_world)
 
-                    # 最后一个场景保存快照
-                    if cmd.scene_idx + 1 >= cmd.total_scenes:
-                        last_id = await event_store.get_last_event_id(cmd.novel_id)
-                        snap_mgr = SnapshotManager(pool)
-                        await snap_mgr.save_snapshot(
-                            cmd.novel_id, new_world, last_id, cmd.volume, cmd.chapter
-                        )
+                # ========== 相变检测与处理（放在事件应用之后、快照保存之前） ==========
+                # 构建 compressed_state（用于相变检测）
+                if cmd.character_intents or cmd.voice_memory:
+                    compressed_state_for_detection = CompressedState(
+                        volume_num=cmd.volume,
+                        character_intents=cmd.character_intents or {},
+                        voice_fingerprint=cmd.voice_memory or {},
+                    )
+                elif hasattr(cmd, 'compressed_state') and cmd.compressed_state:
+                    compressed_state_for_detection = cmd.compressed_state
+                
+                # 加载已有相变
+                existing_transitions = []
+                if hasattr(new_world, 'phase_transitions') and new_world.phase_transitions:
+                    existing_transitions = [
+                        PhaseTransition.from_dict(pt) for pt in new_world.phase_transitions
+                    ]
+                
+                # 检测新相变
+                new_transitions = PhaseTransitionDetector.detect(
+                    new_world,
+                    compressed_state_for_detection,
+                    existing_transitions,
+                )
+                
+                # 应用相变
+                for transition in new_transitions:
+                    new_world = PhaseTransitionHandler.apply_transition(transition, new_world)
+                    if not hasattr(new_world, 'phase_transitions'):
+                        new_world.phase_transitions = []
+                    new_world.phase_transitions.append(transition.to_dict())
+                    logger.info(f"✅ Phase transition triggered: {transition.type.value}")
+                
+                # 如果触发了世界冲突相变，更新吸引子
+                if any(t.type == PhaseTransitionType.WORLD_CONFLICT for t in new_transitions):
+                    attractor_field = NarrativeAttractorField()
+                    if hasattr(new_world, 'attractor_field') and new_world.attractor_field:
+                        attractor_field = NarrativeAttractorField.from_dict(new_world.attractor_field)
+                    attractor_field.register_attractor(Attractor(
+                        id="world_conflict",
+                        name="世界冲突",
+                        type=AttractorType.CONFLICT,
+                        weight=2.0,
+                        decay_distance=20,
+                    ))
+                    new_world.attractor_field = attractor_field.to_dict()
+                # ================================================================
 
-                # 2. 更新 scene_execution_units 状态为 succeeded
+                # 如果是章节最后一个场景，保存快照（包含可能更新的 phase_transitions 和 attractor_field）
+                if cmd.scene_idx + 1 >= cmd.total_scenes:
+                    last_id = await event_store.get_last_event_id(cmd.novel_id)
+                    snap_mgr = SnapshotManager(pool)
+                    # 构建最终的 compressed_state（优先使用已有，否则使用检测用的）
+                    final_compressed = compressed_state_for_detection
+                    if final_compressed is None and (cmd.character_intents or cmd.voice_memory):
+                        final_compressed = CompressedState(
+                            volume_num=cmd.volume,
+                            character_intents=cmd.character_intents or {},
+                            voice_fingerprint=cmd.voice_memory or {},
+                        )
+                    # 传入同一个 conn，确保快照与事件在同一个事务中
+                    await snap_mgr.save_snapshot(
+                        cmd.novel_id, new_world, last_id, cmd.volume, cmd.chapter,
+                        compressed_state=final_compressed,
+                        conn=conn
+                    )
+
+                # 更新 scene_execution_units 状态（这些操作不需要与事件在同一事务，可以独立，但已在事务内）
                 await conn.execute(
                     """
                     UPDATE scene_execution_units
@@ -102,7 +198,7 @@ class SceneCompletionService:
                     cmd.novel_id, cmd.volume, cmd.chapter, cmd.scene_idx
                 )
 
-                # 3. 更新 writing_progress
+                # 更新 writing_progress
                 new_scene_idx = cmd.scene_idx + 1
                 await conn.execute(
                     """
@@ -115,16 +211,13 @@ class SceneCompletionService:
                     cmd.novel_id, cmd.volume, cmd.chapter, new_scene_idx
                 )
 
-        # 4. 构建 StatePatch
         chapter_finished = (cmd.total_scenes > 0 and new_scene_idx >= cmd.total_scenes)
-
         patch = StatePatch(
             current_scene_index=new_scene_idx,
             current_state=new_world.to_dict(),
             retry_count=0,
             validation_result=cmd.parsed_output,
         )
-
         if chapter_finished:
             patch.phase = WorkflowPhase.TRANSITIONING
         else:

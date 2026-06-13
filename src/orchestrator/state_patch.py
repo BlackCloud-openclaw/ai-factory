@@ -46,6 +46,8 @@ class StatePatch:
     # Agent 输出缓存（transient）
     validation_result: Optional[Dict[str, Any]] = None
     writing_feedback: Optional[str] = None
+
+    metadata: Optional[Dict[str, Any]] = None   # 新增
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为 LangGraph 可合并的字典（仅非 None 字段）"""

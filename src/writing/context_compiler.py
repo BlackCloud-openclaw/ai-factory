@@ -153,7 +153,7 @@ class ContextCompiler:
             result = result[:max_tokens] + "\n... (truncated)"
         return result
 
-    def build_writer_prompt(self, scene_plan, world_state, voiceprint_registry, compiled_context, history_summaries: List[str] = None, key_events_summary: str = None):
+    def build_writer_prompt(self, scene_plan, world_state, voiceprint_registry, compiled_context, history_summaries: List[str] = None, key_events_summary: str = None, voice_memory=None):
         lines = []
         
         # ========== 硬状态注入（最高优先级）==========
@@ -293,5 +293,12 @@ class ContextCompiler:
         lines.append("8. 如果某个必须事件在之前章节已经发生过，在本章节中不要再次出现")
         lines.append("9. **events 数组请根据实际剧情填写，不要总是写 realm_upgrade**")
         lines.append("10. 输出前请检查 JSON 格式是否正确，确保没有语法错误。")
-        
+
+        lines.append("- 如果引入了全新设定（新角色/新地点/新物品/新功法），请在事件中添加 'new_lore': true")
+
+        if voice_memory:
+            style_constraints = voice_memory.get_style_constraints_prompt()
+            if style_constraints:
+                lines.append("\n" + style_constraints)
+
         return "\n".join(lines)

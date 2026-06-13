@@ -59,7 +59,7 @@ services:
       --threads-batch 32
       --no-mmap
       --parallel 1
-      --n-predict 1024
+      --n-predict 8192
       --batch-size 128
       --ubatch-size 64
       --ctx-size 32768
@@ -257,5 +257,3 @@ services:
 networks:
   ai_factory_net:
     driver: bridge
-
- 

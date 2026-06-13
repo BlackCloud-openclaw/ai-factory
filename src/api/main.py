@@ -1,4 +1,4 @@
-# src/api/main.py (修改后)
+# src/api/main.py
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +14,7 @@ from src.common.logging import setup_logging
 from src.execution.llm_router_pool import get_llm_router_pool
 from src.db import init_db_pool, close_db_pool
 from src.api.endpoints.novel import router as novel_router
+from src.api.metrics import metrics_endpoint
 
 logger = setup_logging("api.main")
 
@@ -35,7 +36,6 @@ limiter = Limiter(key_func=get_remote_address)
 # ========== 生命周期管理 ==========
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 启动时执行
     logger.info("AI Factory starting up...")
     
     # 初始化数据库连接池
@@ -102,7 +102,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 注册路由
 app.include_router(router, prefix="/api/v1")
-app.include_router(novel_router, prefix="/api/v1")   # 新增
+app.include_router(novel_router, prefix="/api/v1")
+
+app.add_api_route("/metrics", metrics_endpoint, methods=["GET"])
 
 # 健康检查端点
 @app.get("/health")
@@ -116,7 +118,6 @@ async def readiness():
 @app.get("/live")
 async def liveness():
     return {"status": "alive"}
-
 
 @app.get("/debug_routes")
 async def debug_routes():

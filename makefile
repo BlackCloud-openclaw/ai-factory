@@ -84,3 +84,11 @@ reset-test-db:
 help:
 	@echo "Available targets:"
 	@grep -E '^[a-zA-Z_-]+:' $(MAKEFILE_LIST) | awk -F':' '{print "  " $$1}'
+
+.PHONY: audit
+audit:
+	python scripts/audit_replay.py $(NOVEL_ID)	
+
+.PHONY: verify-projection
+verify-projection:
+	python scripts/verify_projection.py $(NOVEL_ID) --rebuild	

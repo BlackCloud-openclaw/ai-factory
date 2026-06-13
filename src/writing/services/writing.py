@@ -34,11 +34,6 @@ class WritingService:
         )
 
         # 4. 构建 prompt（复用 WritingAgent 的逻辑，但这里直接构建）
-        # 为了避免重复代码，我们可以临时构造一个 AgentState 并调用 WritingAgent.run
-        # 但为了服务独立性，我们将 prompt 构建逻辑内联或调用独立函数。
-        # 为简单起见，仍然复用 WritingAgent，但不通过节点，直接实例化并传入所需字段。
-        # 注意：WritingAgent.run 期望接收一个完整的 AgentState，我们需要构造一个最小状态。
-
         from src.orchestrator.state import AgentState
         temp_state = AgentState(
             novel_id=cmd.novel_id,
@@ -48,6 +43,10 @@ class WritingService:
             scene_plan=cmd.scene_plan,
             current_state=cmd.current_state,
             metadata={},
+            # ========== 传递 Director 输出 ==========
+            narrative_blueprint=cmd.narrative_blueprint,
+            knowledge_deltas=cmd.knowledge_deltas,
+            character_intent=cmd.character_intent,
         )
         # 注入反馈
         if cmd.writing_feedback:
@@ -82,12 +81,6 @@ class WritingService:
         else:
             clean_text = raw_json
             
-        # 6. 更新 scene_execution_units 状态为 running（可选，但可以在节点中做，也可以在这里做）
-        # 为了保持服务原子性，这里只返回 patch，不在 service 中直接修改数据库。
-        # 节点中会单独调用 _update_scene_unit_status，但我们可以将状态更新也纳入服务吗？
-        # 按照设计，service 应该是完整的事务边界。但 writing 本身不改变持久化状态（除了更新 running 状态），
-        # 这个更新更适合放在节点中，因为不是事务核心。我们保持原方案：节点中更新 running 状态。
-
         # 7. 构建 StatePatch
         patch = StatePatch(
             scene_text=raw_json,          # 原始输出
@@ -95,7 +88,6 @@ class WritingService:
             deviation_detected=deviation_detected,
             missing_goal_keywords=missing_goal,
             missing_conflict_keywords=missing_conflict,
-            # 注意：写作后不改变 phase，保持在 WRITING 等待验证
         )
 
         return WritingResult(

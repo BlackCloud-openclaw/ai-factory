@@ -2,6 +2,7 @@
 fastapi
 uvicorn[standard]
 pydantic-settings
+prometheus-client
 
 # Orchestration & LLM
 langgraph

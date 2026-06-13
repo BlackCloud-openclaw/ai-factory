@@ -1,7 +1,9 @@
+# src/orchestrator/graph.py
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from src.orchestrator.state import AgentState
 from src.orchestrator.nodes import (
@@ -22,21 +24,32 @@ from src.scheduler.task_scheduler import TaskScheduler
 from src.common.logging import setup_logging
 from src.orchestrator.phase_resolver import WorkflowPhaseResolver
 from src.orchestrator.state_patch import WorkflowPhase
+from src.agents.director import DirectorAgent
 
 logger = setup_logging("orchestrator.graph")
+
+# 全局 checkpointer（由 main.py 初始化）
+_checkpointer: Optional[BaseCheckpointSaver] = None
+
+def set_checkpointer(checkpointer: BaseCheckpointSaver) -> None:
+    """设置全局 checkpointer（在应用启动时调用）"""
+    global _checkpointer
+    _checkpointer = checkpointer
+
+async def director_node(state: AgentState) -> dict:
+    """导演节点：生成叙事蓝图和知识变化序列"""
+    agent = DirectorAgent()
+    return await agent.run(state)
 
 
 def route_after_analyze(state: AgentState) -> str:
     # 续写模式：需要检查是否有有效的场景计划
     if state.resume:
-        # 检查当前章节是否有未完成的场景计划
         scene_plan_list = getattr(state, 'scene_plan_list', [])
         current_scene_index = getattr(state, 'current_scene_index', 0)        
         if scene_plan_list and current_scene_index < len(scene_plan_list):
-            # 还有未完成的场景，继续写作
             return "writer"
         else:
-            # 需要生成新场景计划（新章节或缺少计划）
             return "planning"
 
     task_type = getattr(state, 'task_type', 'code')
@@ -48,6 +61,8 @@ def route_after_analyze(state: AgentState) -> str:
 
 
 def after_plan(state: AgentState) -> str:
+    logger.info(f"after_plan: task_type={state.task_type}, outline exists? {state.outline is not None}")
+    
     if state.pending_tool_calls:
         return "tool_node"
     
@@ -57,7 +72,7 @@ def after_plan(state: AgentState) -> str:
         return "save_memory"
     
     if task_type == "scene_plan" and state.scene_plan:
-        return "writer"
+        return "director"
     
     task_plan = getattr(state, 'task_plan', None)
     if not task_plan:
@@ -94,7 +109,6 @@ def route_after_validate(state: AgentState) -> str:
         return "writer"
     if phase == WorkflowPhase.TRANSITIONING:
         return "planning"
-    # 其他可能的路由（如 save_memory, 默认）
     return "save_memory"
 
 def create_workflow() -> StateGraph:
@@ -111,6 +125,7 @@ def create_workflow() -> StateGraph:
     workflow.add_node("advance_subtask", advance_subtask_node)
     workflow.add_node("tool_node", tool_node_v2)
     workflow.add_node("writer", writer_node)
+    workflow.add_node("director", director_node)
 
     workflow.set_entry_point("load_memory")
     workflow.add_edge("load_memory", "analyze")
@@ -137,7 +152,7 @@ def create_workflow() -> StateGraph:
             "save_memory": "save_memory",
             "research": "research",
             "tool_node": "tool_node",
-            "writer": "writer",
+            "director": "director",
         },
     )
 
@@ -185,11 +200,18 @@ def create_workflow() -> StateGraph:
     workflow.add_edge("save_memory", END)
     workflow.add_edge("advance_subtask", "code")
     workflow.add_edge("tool_node", "planning")
+    workflow.add_edge("director", "writer")
     workflow.add_edge("writer", "validate")
 
     return workflow
 
 
 def compile_workflow() -> any:
+    """编译工作流，如果全局 checkpointer 已设置则使用它"""
     workflow = create_workflow()
-    return workflow.compile()
+    if _checkpointer is not None:
+        return workflow.compile(checkpointer=_checkpointer)
+    else:
+        # 回退到无 checkpointer（内存模式）
+        logger.warning("No checkpointer set, using in-memory checkpointer")
+        return workflow.compile()

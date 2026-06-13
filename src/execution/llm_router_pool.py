@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
 
 from src.common.logging import setup_logging
+from src.api.metrics import llm_request_duration, llm_requests_total
 
 logger = setup_logging("execution.llm_router_pool")
 
@@ -279,64 +280,73 @@ class LLMRouterPool:
         slot = self.model_slots.get(model_name)
         return f"http://localhost:{slot.host_port}" if slot else "http://localhost:8081"
         
-    async def call(self, model_name: str, func: Callable, *args, timeout: Optional[int] = None, **kwargs) -> Any:
-        for _ in range(2):
-            if model_name not in self.model_slots:
-                async with self._lock:
-                    if model_name not in self.model_slots:
-                        self.register_model(model_name)
-            slot = self.model_slots.get(model_name)
-            if slot:
-                break
-            await asyncio.sleep(0.1)
-        else:
-            raise RuntimeError(f"Model slot '{model_name}' not found")
+    async def call(self, model_name: str, func: Callable, *args, agent: str = "unknown", timeout: Optional[int] = None, **kwargs) -> Any:
+        start_time = time.perf_counter()
+        status = "success"
+        try:
+            for _ in range(2):
+                if model_name not in self.model_slots:
+                    async with self._lock:
+                        if model_name not in self.model_slots:
+                            self.register_model(model_name)
+                slot = self.model_slots.get(model_name)
+                if slot:
+                    break
+                await asyncio.sleep(0.1)
+            else:
+                raise RuntimeError(f"Model slot '{model_name}' not found")
 
-        await self._ensure_model_ready(model_name)
-        kwargs['base_url'] = self.get_base_url(model_name)
+            await self._ensure_model_ready(model_name)
+            kwargs['base_url'] = self.get_base_url(model_name)
 
-        # 重试 503 / Loading model 错误
-        max_retries = 3
-        last_exception = None
-        for attempt in range(max_retries):
-            try:
-                if model_name in LARGE_MODELS:
-                    async with self.large_model_semaphore:
+            # 重试 503 / Loading model 错误
+            max_retries = 3
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    if model_name in LARGE_MODELS:
+                        async with self.large_model_semaphore:
+                            await slot.acquire()
+                            try:
+                                return await asyncio.wait_for(func(model_name, *args, **kwargs),
+                                                            timeout=timeout or self.default_timeout)
+                            finally:
+                                slot.release()
+                    else:
                         await slot.acquire()
                         try:
                             return await asyncio.wait_for(func(model_name, *args, **kwargs),
                                                         timeout=timeout or self.default_timeout)
                         finally:
                             slot.release()
-                else:
-                    await slot.acquire()
-                    try:
-                        return await asyncio.wait_for(func(model_name, *args, **kwargs),
-                                                    timeout=timeout or self.default_timeout)
-                    finally:
-                        slot.release()
-            except Exception as e:
-                last_exception = e
-                # 仅对 503 或 "Loading model" 错误进行重试
-                error_str = str(e)
-                if "503" in error_str or "Loading model" in error_str:
-                    if attempt < max_retries - 1:
-                        logger.warning(f"Model {model_name} returned {type(e).__name__}: {error_str[:100]}, retrying in 5s... (attempt {attempt+1}/{max_retries})")
-                        await asyncio.sleep(5)
-                        continue
-                # 其他错误或最后一次重试失败，直接抛出
-                break
+                except Exception as e:
+                    last_exception = e
+                    # 仅对 503 或 "Loading model" 错误进行重试
+                    error_str = str(e)
+                    if "503" in error_str or "Loading model" in error_str:
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Model {model_name} returned {type(e).__name__}: {error_str[:100]}, retrying in 5s... (attempt {attempt+1}/{max_retries})")
+                            await asyncio.sleep(5)
+                            continue
+                    # 其他错误或最后一次重试失败，直接抛出
+                    break
 
-        logger.error(f"Model {model_name} call failed after {max_retries} attempts: {type(last_exception).__name__}: {str(last_exception)}", exc_info=True)
-        raise last_exception
+            logger.error(f"Model {model_name} call failed after {max_retries} attempts: {type(last_exception).__name__}: {str(last_exception)}", exc_info=True)
+            status = "failure"
+            raise last_exception
+        finally:
+            duration = time.perf_counter() - start_time
+            # 记录 Prometheus 指标
+            llm_request_duration.labels(agent=agent, model=model_name).observe(duration)
+            llm_requests_total.labels(agent=agent, model=model_name, status=status).inc()
 
-    async def call_with_fallback(self, model_candidates: List[str], func: Callable, *args,**kwargs) -> Any:
+    async def call_with_fallback(self, model_candidates: List[str], func: Callable, *args, agent: str = "unknown", **kwargs) -> Any:
         # 禁止外部传递 base_url，由内部决定
         kwargs.pop('base_url', None)
         last_exception = None
         for model in model_candidates:
             try:
-                return await self.call(model, func, *args, **kwargs)
+                return await self.call(model, func, *args, agent=agent, **kwargs)
             except Exception as e:
                 logger.warning(f"Model {model} failed: {type(e).__name__}: {str(e)}", exc_info=True)
                 last_exception = e

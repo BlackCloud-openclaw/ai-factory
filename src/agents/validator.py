@@ -10,8 +10,8 @@ import os
 import asyncio
 from typing import Any, Optional, Dict, List, Tuple
 from openai import AsyncOpenAI
-from src.model_router import get_router
 
+from src.model_router import get_router
 from src.config import config
 from src.common.logging import setup_logging
 from src.common.retry import retry_with_backoff
@@ -29,7 +29,7 @@ from src.writing.event_store import NarrativeEventStore
 from src.writing.causality.budget import ConsistencyBudget
 from src.writing.causality.health import HealthChecker
 from src.common.prompt_logger import log_prompt
-
+from src.writing.world_state import WorldState
 
 logger = setup_logging("agents.validator")
 
@@ -68,7 +68,16 @@ class ValidatorAgent(BaseAgent):
                 "must_events": [],
                 "goal": "",
                 "conflict": "",
+                "current_state": state.current_state,   # 新增：用于认知关系检查
             }
+
+            # ========== 新增：注入 Director 输出（用于职责边界检查）==========
+            constraints["narrative_blueprint"] = state.narrative_blueprint or {}
+            constraints["knowledge_deltas"] = state.knowledge_deltas or []
+            constraints["character_intent"] = state.character_intent or {}
+            # ========== 新增：注入场景目标（阶段5） ==========
+            constraints["scene_objective"] = state.scene_plan.get("scene_objective", "") if state.scene_plan else ""
+            # ================================================================
 
             # 加载当前活跃谓词（用于因果关系校验）
             if state.novel_id:
@@ -286,12 +295,17 @@ class ValidatorAgent(BaseAgent):
             }
 
         # 读取配置
-        must_events_threshold = getattr(config, 'must_events_similarity_threshold', 0.50)
+        must_events_threshold = getattr(config, 'must_events_similarity_threshold', 0.30)
         goal_conflict_threshold = 0.25
 
         must_events = constraints.get("must_events", [])
         goal = constraints.get("goal", "")
         conflict = constraints.get("conflict", "")
+        narrative_blueprint = constraints.get("narrative_blueprint", {})
+        knowledge_deltas = constraints.get("knowledge_deltas", [])
+        character_intent = constraints.get("character_intent", {})
+        scene_objective = constraints.get("scene_objective", "")  # 阶段5新增
+        current_state_dict = constraints.get("current_state", {})  # 新增：世界状态
 
         # 辅助函数：安全的单个 embedding 请求
         async def safe_embedding(text: str, desc: str) -> Optional[List[float]]:
@@ -317,7 +331,8 @@ class ValidatorAgent(BaseAgent):
             }
 
         errors = []
-        error_details = {}   # 新增初始化
+        error_details = {}
+        
         # 检查 must_events
         missing_events = []
         for evt in must_events:
@@ -344,27 +359,156 @@ class ValidatorAgent(BaseAgent):
                 sim = cosine_similarity(conflict_emb, scene_emb)
                 conflict_ok = sim >= goal_conflict_threshold
 
+        # 检查 scene_objective（阶段5新增）
+        scene_obj_ok = True
+        if scene_objective:
+            obj_emb = await safe_embedding(scene_objective, "scene_objective")
+            if obj_emb is not None:
+                sim = cosine_similarity(obj_emb, scene_emb)
+                scene_obj_ok = sim >= goal_conflict_threshold
+                if not scene_obj_ok:
+                    errors.append(f"场景目标未达成: {scene_objective[:40]}...")
+                    error_details["scene_objective_semantic_match"] = False
+
         if missing_events:
-            # 精确列出缺失的事件
             missing_list = "、".join(missing_events)
             feedback = f"❌ 缺失必须事件：{missing_list}\n请确保在下一次生成的 scene_text 中**原样包含**以上短语，不可改写或省略。"
             errors.append(feedback)
+            error_details["missing_events"] = missing_events
         if not goal_ok:
             errors.append(f"场景目标语义不符: {goal[:40]}...")
+            error_details["goal_semantic_match"] = False
         if not conflict_ok:
             errors.append(f"核心冲突语义不符: {conflict[:40]}...")
+            error_details["conflict_semantic_match"] = False
 
-        should_retry = bool(missing_events or not goal_ok or not conflict_ok)
-        error_details = {
-            "missing_events": missing_events,
-            "goal_semantic_match": goal_ok,
-            "conflict_semantic_match": conflict_ok,
-        }
+        # ========== Director 输出职责边界检查 ==========
+        # 1. 知识变化检查（使用 embedding 相似度，阈值与 must_events 一致）
+        missing_knowledge = []
+        if knowledge_deltas:
+            for kd in knowledge_deltas:
+                info = kd.get("information", "")
+                if not info:
+                    continue
+                info_emb = await safe_embedding(info, f"knowledge '{info[:30]}'")
+                if info_emb is None:
+                    continue
+                sim = cosine_similarity(info_emb, scene_emb)
+                if sim < must_events_threshold:
+                    missing_knowledge.append(info)
+                    errors.append(f"知识变化未体现: {info} (相似度 {sim:.2f} < {must_events_threshold})")
+                
+                # 阶段5新增：低可靠性信息不应导致绝对化表述
+                reliability = kd.get("reliability", 1.0)
+                if reliability < 0.5:
+                    absolute_words = ["绝对", "肯定", "一定", "无疑", "必然", "肯定是", "一定是"]
+                    if any(word in scene_text for word in absolute_words):
+                        errors.append(f"低可靠性信息被过度确信: {info} (可靠性 {reliability})")
+            
+            # 隐藏信息不得提前暴露（简单字符串检查）
+            for kd in knowledge_deltas:
+                if kd.get("visibility") == "hidden" and kd.get("information") in scene_text:
+                    errors.append(f"隐藏信息不得提前暴露: {kd.get('information')}")
+        if missing_knowledge:
+            error_details["missing_knowledge"] = missing_knowledge
+
+        # 2. 场景角色节奏检查
+        scene_role = narrative_blueprint.get("scene_role", "")
+        if scene_role == "REVEAL":
+            reveal_beat = narrative_blueprint.get("reveal_beat", "")
+            if reveal_beat and reveal_beat not in scene_text:
+                errors.append(f"揭示节拍未出现: {reveal_beat}")
+        elif scene_role == "AFTERMATH":
+            if len(scene_text) < 200:
+                errors.append("余波场景过短，需要更充分的情感沉淀")
+
+        # 3. 角色意图违背检查（增强版）
+        if character_intent:
+            fear = character_intent.get("fear")
+            actor = character_intent.get("actor")
+            if fear and actor:
+                # 检查恐惧词是否出现在正文中
+                if fear in scene_text:
+                    # 检查是否有恐惧相关的词汇
+                    fear_words = ["害怕", "恐惧", "颤抖", "后退", "退缩", "心悸", "胆寒", "色变", "惊惧"]
+                    if not any(fw in scene_text for fw in fear_words):
+                        errors.append(f"角色意图可能违背: {actor} 恐惧 {fear} 但未表现出恐惧反应")
+                    # 检查是否主动靠近恐惧源（如果剧本要求克服恐惧，则不应警告，这里简单处理）
+                    # 更精确的检查需要结合上下文，MVP 阶段保持简单
+
+        # ========== 4. 认知身份一致性检查（新增） ==========
+        if current_state_dict and character_intent:
+            try:
+                world = WorldState.from_dict(current_state_dict)
+                actor = character_intent.get("actor")
+                if actor and actor in world.characters:
+                    char = world.characters[actor]
+                    
+                    # 4.1 检查信念是否被违背
+                    if char.beliefs:
+                        # 信念违背的关键词映射（简单启发式）
+                        belief_violations = {
+                            "不杀无辜": ["杀", "斩杀", "屠杀", "灭口", "处决"],
+                            "不背叛朋友": ["出卖", "背叛", "告密", "陷害"],
+                            "强者为尊": ["屈服", "求饶", "认输"],  # 违背是屈服，而不是强
+                            "丹药不可靠": ["服用丹药", "吞服丹药", "嗑药"],
+                            "不食言": ["毁约", "失信", "食言"],
+                        }
+                        for belief in char.beliefs:
+                            violation_keywords = belief_violations.get(belief, [])
+                            if violation_keywords and any(kw in scene_text for kw in violation_keywords):
+                                errors.append(f"认知身份违背: {actor} 的信念「{belief}」被违背")
+                    
+                    # 4.2 检查自我认知一致性
+                    if char.self_image:
+                        # 自我认知与行为矛盾检查
+                        self_image_lower = char.self_image.lower()
+                        # "天弃之子" - 不应轻易获得好运
+                        if "天弃" in self_image_lower or "弃子" in self_image_lower:
+                            luck_words = ["机缘", "奇遇", "天赐", "传承", "神兵"]
+                            if any(word in scene_text for word in luck_words):
+                                errors.append(f"认知身份可能不一致: {actor} 自我认知为「{char.self_image}」，但获得了不应得的机缘")
+                        
+                        # "复仇者" - 不应轻易放弃仇恨
+                        if "复仇" in self_image_lower or "报仇" in self_image_lower:
+                            forgive_words = ["原谅", "宽恕", "放下仇恨", "释怀"]
+                            if any(word in scene_text for word in forgive_words):
+                                errors.append(f"认知身份可能不一致: {actor} 自我认知为「{char.self_image}」，但表现出宽容行为")
+                    
+                    # 4.3 检查依恋关系是否被破坏
+                    if char.attachments:
+                        attachment_keywords = [att for att in char.attachments if len(att) >= 2]
+                        for attachment in attachment_keywords:
+                            # 如果依恋对象出现在正文中，检查是否有负面行为
+                            if attachment in scene_text:
+                                negative_words = ["丢弃", "毁掉", "遗弃", "破坏", "砸"]
+                                idx = scene_text.find(attachment)
+                                if idx != -1:
+                                    context = scene_text[max(0, idx-30):min(len(scene_text), idx+30)]
+                                    if any(word in context for word in negative_words):
+                                        errors.append(f"认知身份可能不一致: {actor} 的依恋「{attachment}」被表现出负面行为")
+                    
+                    # 4.4 检查道德底线是否被突破
+                    if char.moral_boundaries:
+                        boundary_violations = {
+                            "不杀无辜": ["杀", "斩杀", "屠杀"],
+                            "不背叛宗门": ["背叛", "出卖", "投敌"],
+                            "不偷盗": ["偷", "盗", "窃取"],
+                            "不欺骗": ["欺骗", "撒谎", "骗"],
+                        }
+                        for boundary in char.moral_boundaries:
+                            violation_keywords = boundary_violations.get(boundary, [])
+                            if violation_keywords and any(kw in scene_text for kw in violation_keywords):
+                                errors.append(f"道德底线突破: {actor} 突破了「{boundary}」底线")
+                    
+            except Exception as e:
+                logger.warning(f"Failed to check cognitive identity: {e}")
+        # ==================================================== 
 
         # ==================== 因果关系校验（集成预算 + 漂移降级） ====================
         predicates = constraints.get("predicates", {})
         budget = constraints.get("budget")
-        degraded = constraints.get("degraded", False)   # 漂移降级标志
+        degraded = constraints.get("degraded", False)
         causality_failed = False
         causality_suggestions = []
 
@@ -382,12 +526,10 @@ class ValidatorAgent(BaseAgent):
                 result = causality_validator.validate(temp_event, predicates)
                 if not result["passed"]:
                     severity = result.get("severity", "error")
-                    # 漂移降级：若处于降级模式，将 error 转为 warning
                     if degraded and severity == "error":
                         severity = "warning"
                         result["passed"] = True
                         logger.warning(f"Drift degradation: rule {result.get('rule_id', 'unknown')} downgraded from error to warning")
-                    # 处理 warning 预算（仅当仍为 warning 时）
                     if severity == "warning" and budget:
                         if not await budget.consume("warning"):
                             severity = "error"
@@ -395,7 +537,6 @@ class ValidatorAgent(BaseAgent):
                     if severity == "error":
                         causality_failed = True
                         causality_suggestions.extend(result["suggestions"])
-                        should_retry = True
                         errors.append(f"因果规则违反: {result['suggestions'][0] if result['suggestions'] else '未知'}")
                     elif severity == "warning":
                         logger.warning(f"Causality warning: {result['suggestions']}")
@@ -406,18 +547,34 @@ class ValidatorAgent(BaseAgent):
                 "passed": False,
                 "suggestions": causality_suggestions
             }
-        # ================================================================
+
+        # 计算是否需要重试（扩展包含知识变化缺失和场景目标缺失）
+        has_missing_knowledge = bool(missing_knowledge)
+        should_retry = bool(missing_events or not goal_ok or not conflict_ok or not scene_obj_ok or has_missing_knowledge or causality_failed)
 
         if errors:
             feedback = "；".join(errors)
             logger.warning(f"Validation failed: {feedback}")
+            # 构建建议
+            suggestions = [
+                "请严格遵循场景计划中的 goal、conflict 和 must_events 的语义要求",
+                "确保生成的正文完整表达所有必须事件的核心含义",
+                "请严格按照导演蓝图中的知识变化序列和场景角色要求",
+            ]
+            if missing_knowledge:
+                missing_list = "、".join(missing_knowledge)
+                suggestions.append(f"请确保在正文中明确体现以下知识变化：{missing_list}")
+            if not scene_obj_ok and scene_objective:
+                suggestions.append(f"请确保场景完成其存在理由：{scene_objective}")
+            if causality_suggestions:
+                suggestions.extend(causality_suggestions)
+            # 添加认知关系建议
+            if "认知关系不一致" in feedback:
+                suggestions.append("请检查角色行为是否与其认知中的关系一致")
             return {
                 "passed": False,
                 "feedback": feedback,
-                "suggestions": [
-                    "请严格遵循场景计划中的 goal、conflict 和 must_events 的语义要求",
-                    "确保生成的正文完整表达所有必须事件的核心含义",
-                ] + (causality_suggestions if predicates else []),
+                "suggestions": suggestions,
                 "should_retry": should_retry,
                 "error_details": error_details,
                 "parsed_output": parsed_data,

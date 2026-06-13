@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 from src.orchestrator.state_patch import StatePatch
-
+from dataclasses import dataclass, field
 
 @dataclass
 class SceneCompletionCommand:
@@ -15,8 +15,9 @@ class SceneCompletionCommand:
     current_world_state: Dict[str, Any]
     parsed_output: Dict[str, Any]      # 包含 events, scene_text
     scene_plan: Optional[Dict[str, Any]] = None
-
-
+    character_intents: Optional[Dict[str, Any]] = None   # 新增
+    voice_memory: Optional[Dict[str, Any]] = None   # 新增
+    
 @dataclass
 class SceneCompletionResult:
     """场景完成事务的输出 - 只返回事实，不返回路由"""
@@ -40,6 +41,7 @@ class ScenePlanningCommand:
     resume: bool = False
     # 可选：当前卷的总章节数，可从外部传入避免重复查询
     total_chapters_in_volume: int = 0
+    metadata: Dict[str, Any] = field(default_factory=dict)  # 新增
 
 
 @dataclass
@@ -62,6 +64,10 @@ class WritingCommand:
     writing_feedback: str  # 来自上一次验证失败时的反馈
     # 可选：声纹注册表路径等
     voiceprint_config_path: Optional[str] = None
+    # ========== Director 输出字段（阶段2新增）==========
+    narrative_blueprint: Optional[Dict[str, Any]] = None
+    knowledge_deltas: Optional[List[Dict[str, Any]]] = None
+    character_intent: Optional[Dict[str, Any]] = None
 
 
 @dataclass
