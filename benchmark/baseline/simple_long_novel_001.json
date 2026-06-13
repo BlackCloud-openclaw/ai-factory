@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "novel_id": "simple_long_novel_001",
+  "git_commit": "0bdd0c3f65288f9ccfd02bbe24314ff83d356ea2",
+  "generated_at": "2026-06-13T09:51:17.857068+00:00",
+  "generator_version": "benchmark_v1",
+  "chapter_count": 14,
+  "chapters": {
+    "1_1": {
+      "protagonist_progression": "\u70bc\u6c14\u4e8c\u5c42",
+      "jade_pendant_owner": "none",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_2": {
+      "protagonist_progression": "\u70bc\u6c14\u4e8c\u5c42",
+      "jade_pendant_owner": "none",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_3": {
+      "protagonist_progression": "\u70bc\u6c14\u4e8c\u5c42",
+      "jade_pendant_owner": "none",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_4": {
+      "protagonist_progression": "\u70bc\u6c14\u4e8c\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_5": {
+      "protagonist_progression": "\u70bc\u6c14\u4e09\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_6": {
+      "protagonist_progression": "\u70bc\u6c14\u4e09\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_7": {
+      "protagonist_progression": "\u70bc\u6c14\u4e09\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_8": {
+      "protagonist_progression": "\u70bc\u6c14\u4e09\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_9": {
+      "protagonist_progression": "\u70bc\u6c14\u4e09\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_10": {
+      "protagonist_progression": "\u70bc\u6c14\u4e09\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_11": {
+      "protagonist_progression": "\u70bc\u6c14\u4e09\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_12": {
+      "protagonist_progression": "\u70bc\u6c14\u4e09\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_13": {
+      "protagonist_progression": "\u70bc\u6c14\u4e09\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    },
+    "1_14": {
+      "protagonist_progression": "\u70bc\u6c14\u4e09\u5c42",
+      "jade_pendant_owner": "\u6797\u9038",
+      "relationship_with_second_uncle": 0,
+      "unresolved_arcs_count": 0,
+      "major_conflict": "unknown"
+    }
+  }
+}
