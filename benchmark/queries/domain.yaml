@@ -1,0 +1,14 @@
+version: 1
+queries:
+  - id: protagonist_progression
+    extractor: get_protagonist_progression
+  - id: jade_pendant_owner
+    extractor: get_item_owner
+    args: ["神秘玉佩"]
+  - id: relationship_with_second_uncle
+    extractor: get_relationship_value
+    args: ["林逸", "二叔"]
+  - id: unresolved_arcs_count
+    extractor: get_active_arcs_count
+  - id: major_conflict
+    extractor: get_major_conflict

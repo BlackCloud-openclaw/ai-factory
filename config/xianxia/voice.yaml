@@ -1,0 +1,10 @@
+repetition:
+  max_keyword_frequency: 3
+dialogue:
+  max_catchphrase_per_chapter: 2
+  catchphrases:
+    - "有意思"
+    - "哼"
+    - "我偏不信"
+sentence:
+  avg_length_range: [12, 35]

@@ -30,6 +30,7 @@ from src.writing.causality.budget import ConsistencyBudget
 from src.writing.causality.health import HealthChecker
 from src.common.prompt_logger import log_prompt
 from src.writing.world_state import WorldState
+from src.config_loader import get_xianxia_config
 
 logger = setup_logging("agents.validator")
 
@@ -304,8 +305,8 @@ class ValidatorAgent(BaseAgent):
         narrative_blueprint = constraints.get("narrative_blueprint", {})
         knowledge_deltas = constraints.get("knowledge_deltas", [])
         character_intent = constraints.get("character_intent", {})
-        scene_objective = constraints.get("scene_objective", "")  # 阶段5新增
-        current_state_dict = constraints.get("current_state", {})  # 新增：世界状态
+        scene_objective = constraints.get("scene_objective", "")
+        current_state_dict = constraints.get("current_state", {})
 
         # 辅助函数：安全的单个 embedding 请求
         async def safe_embedding(text: str, desc: str) -> Optional[List[float]]:
@@ -359,7 +360,7 @@ class ValidatorAgent(BaseAgent):
                 sim = cosine_similarity(conflict_emb, scene_emb)
                 conflict_ok = sim >= goal_conflict_threshold
 
-        # 检查 scene_objective（阶段5新增）
+        # 检查 scene_objective
         scene_obj_ok = True
         if scene_objective:
             obj_emb = await safe_embedding(scene_objective, "scene_objective")
@@ -383,7 +384,6 @@ class ValidatorAgent(BaseAgent):
             error_details["conflict_semantic_match"] = False
 
         # ========== Director 输出职责边界检查 ==========
-        # 1. 知识变化检查（使用 embedding 相似度，阈值与 must_events 一致）
         missing_knowledge = []
         if knowledge_deltas:
             for kd in knowledge_deltas:
@@ -398,21 +398,19 @@ class ValidatorAgent(BaseAgent):
                     missing_knowledge.append(info)
                     errors.append(f"知识变化未体现: {info} (相似度 {sim:.2f} < {must_events_threshold})")
                 
-                # 阶段5新增：低可靠性信息不应导致绝对化表述
                 reliability = kd.get("reliability", 1.0)
                 if reliability < 0.5:
                     absolute_words = ["绝对", "肯定", "一定", "无疑", "必然", "肯定是", "一定是"]
                     if any(word in scene_text for word in absolute_words):
                         errors.append(f"低可靠性信息被过度确信: {info} (可靠性 {reliability})")
             
-            # 隐藏信息不得提前暴露（简单字符串检查）
             for kd in knowledge_deltas:
                 if kd.get("visibility") == "hidden" and kd.get("information") in scene_text:
                     errors.append(f"隐藏信息不得提前暴露: {kd.get('information')}")
         if missing_knowledge:
             error_details["missing_knowledge"] = missing_knowledge
 
-        # 2. 场景角色节奏检查
+        # 场景角色节奏检查
         scene_role = narrative_blueprint.get("scene_role", "")
         if scene_role == "REVEAL":
             reveal_beat = narrative_blueprint.get("reveal_beat", "")
@@ -422,21 +420,17 @@ class ValidatorAgent(BaseAgent):
             if len(scene_text) < 200:
                 errors.append("余波场景过短，需要更充分的情感沉淀")
 
-        # 3. 角色意图违背检查（增强版）
+        # 角色意图违背检查
         if character_intent:
             fear = character_intent.get("fear")
             actor = character_intent.get("actor")
             if fear and actor:
-                # 检查恐惧词是否出现在正文中
                 if fear in scene_text:
-                    # 检查是否有恐惧相关的词汇
                     fear_words = ["害怕", "恐惧", "颤抖", "后退", "退缩", "心悸", "胆寒", "色变", "惊惧"]
                     if not any(fw in scene_text for fw in fear_words):
                         errors.append(f"角色意图可能违背: {actor} 恐惧 {fear} 但未表现出恐惧反应")
-                    # 检查是否主动靠近恐惧源（如果剧本要求克服恐惧，则不应警告，这里简单处理）
-                    # 更精确的检查需要结合上下文，MVP 阶段保持简单
 
-        # ========== 4. 认知身份一致性检查（新增） ==========
+        # ========== 认知身份一致性检查 ==========
         if current_state_dict and character_intent:
             try:
                 world = WorldState.from_dict(current_state_dict)
@@ -444,13 +438,11 @@ class ValidatorAgent(BaseAgent):
                 if actor and actor in world.characters:
                     char = world.characters[actor]
                     
-                    # 4.1 检查信念是否被违背
                     if char.beliefs:
-                        # 信念违背的关键词映射（简单启发式）
                         belief_violations = {
                             "不杀无辜": ["杀", "斩杀", "屠杀", "灭口", "处决"],
                             "不背叛朋友": ["出卖", "背叛", "告密", "陷害"],
-                            "强者为尊": ["屈服", "求饶", "认输"],  # 违背是屈服，而不是强
+                            "强者为尊": ["屈服", "求饶", "认输"],
                             "丹药不可靠": ["服用丹药", "吞服丹药", "嗑药"],
                             "不食言": ["毁约", "失信", "食言"],
                         }
@@ -459,27 +451,21 @@ class ValidatorAgent(BaseAgent):
                             if violation_keywords and any(kw in scene_text for kw in violation_keywords):
                                 errors.append(f"认知身份违背: {actor} 的信念「{belief}」被违背")
                     
-                    # 4.2 检查自我认知一致性
                     if char.self_image:
-                        # 自我认知与行为矛盾检查
                         self_image_lower = char.self_image.lower()
-                        # "天弃之子" - 不应轻易获得好运
                         if "天弃" in self_image_lower or "弃子" in self_image_lower:
                             luck_words = ["机缘", "奇遇", "天赐", "传承", "神兵"]
                             if any(word in scene_text for word in luck_words):
                                 errors.append(f"认知身份可能不一致: {actor} 自我认知为「{char.self_image}」，但获得了不应得的机缘")
                         
-                        # "复仇者" - 不应轻易放弃仇恨
                         if "复仇" in self_image_lower or "报仇" in self_image_lower:
                             forgive_words = ["原谅", "宽恕", "放下仇恨", "释怀"]
                             if any(word in scene_text for word in forgive_words):
                                 errors.append(f"认知身份可能不一致: {actor} 自我认知为「{char.self_image}」，但表现出宽容行为")
                     
-                    # 4.3 检查依恋关系是否被破坏
                     if char.attachments:
                         attachment_keywords = [att for att in char.attachments if len(att) >= 2]
                         for attachment in attachment_keywords:
-                            # 如果依恋对象出现在正文中，检查是否有负面行为
                             if attachment in scene_text:
                                 negative_words = ["丢弃", "毁掉", "遗弃", "破坏", "砸"]
                                 idx = scene_text.find(attachment)
@@ -488,7 +474,6 @@ class ValidatorAgent(BaseAgent):
                                     if any(word in context for word in negative_words):
                                         errors.append(f"认知身份可能不一致: {actor} 的依恋「{attachment}」被表现出负面行为")
                     
-                    # 4.4 检查道德底线是否被突破
                     if char.moral_boundaries:
                         boundary_violations = {
                             "不杀无辜": ["杀", "斩杀", "屠杀"],
@@ -500,12 +485,51 @@ class ValidatorAgent(BaseAgent):
                             violation_keywords = boundary_violations.get(boundary, [])
                             if violation_keywords and any(kw in scene_text for kw in violation_keywords):
                                 errors.append(f"道德底线突破: {actor} 突破了「{boundary}」底线")
-                    
             except Exception as e:
                 logger.warning(f"Failed to check cognitive identity: {e}")
-        # ==================================================== 
 
-        # ==================== 因果关系校验（集成预算 + 漂移降级） ====================
+        # ========== 5. 模板化表达检测（从配置读取） ==========
+        from src.config_loader import get_xianxia_config
+        from collections import Counter
+        import re
+        
+        config_obj = get_xianxia_config()
+        voice_cfg = config_obj.voice if hasattr(config_obj, 'voice') else {}
+        
+        voice_violations = []
+        
+        # 检查口头禅（主角常用短语）
+        catchphrases = voice_cfg.get("dialogue", {}).get("catchphrases", ["有意思", "哼", "我偏不信"])
+        max_catchphrase = voice_cfg.get("dialogue", {}).get("max_catchphrase_per_chapter", 2)
+        
+        for phrase in catchphrases:
+            count = scene_text.count(phrase)
+            if count > max_catchphrase:
+                voice_violations.append(f"口头禅 '{phrase}' 出现 {count} 次，超过限制 {max_catchphrase}")
+                error_details.setdefault("voice_violations", []).append({
+                    "phrase": phrase,
+                    "count": count,
+                    "limit": max_catchphrase
+                })
+        
+        # 检查重复关键词频率
+        words = re.findall(r'[\u4e00-\u9fff]{2,4}', scene_text)
+        max_keyword_freq = voice_cfg.get("repetition", {}).get("max_keyword_frequency", 3)
+        keyword_freq = Counter(words)
+        for keyword, freq in keyword_freq.most_common(5):
+            if freq > max_keyword_freq and keyword not in catchphrases:
+                voice_violations.append(f"高频词 '{keyword}' 出现 {freq} 次")
+                error_details.setdefault("voice_violations", []).append({
+                    "phrase": keyword,
+                    "count": freq,
+                    "limit": max_keyword_freq
+                })
+        
+        # 记录文笔违规到日志（不阻断）
+        if voice_violations:
+            logger.warning(f"Voice violations: {voice_violations}")
+
+        # ==================== 因果关系校验 ====================
         predicates = constraints.get("predicates", {})
         budget = constraints.get("budget")
         degraded = constraints.get("degraded", False)
@@ -548,14 +572,13 @@ class ValidatorAgent(BaseAgent):
                 "suggestions": causality_suggestions
             }
 
-        # 计算是否需要重试（扩展包含知识变化缺失和场景目标缺失）
+        # 计算是否需要重试
         has_missing_knowledge = bool(missing_knowledge)
         should_retry = bool(missing_events or not goal_ok or not conflict_ok or not scene_obj_ok or has_missing_knowledge or causality_failed)
 
         if errors:
             feedback = "；".join(errors)
             logger.warning(f"Validation failed: {feedback}")
-            # 构建建议
             suggestions = [
                 "请严格遵循场景计划中的 goal、conflict 和 must_events 的语义要求",
                 "确保生成的正文完整表达所有必须事件的核心含义",
@@ -568,9 +591,6 @@ class ValidatorAgent(BaseAgent):
                 suggestions.append(f"请确保场景完成其存在理由：{scene_objective}")
             if causality_suggestions:
                 suggestions.extend(causality_suggestions)
-            # 添加认知关系建议
-            if "认知关系不一致" in feedback:
-                suggestions.append("请检查角色行为是否与其认知中的关系一致")
             return {
                 "passed": False,
                 "feedback": feedback,

@@ -1,0 +1,4 @@
+core_relations:
+  - realm
+  - is_alive
+  - location
