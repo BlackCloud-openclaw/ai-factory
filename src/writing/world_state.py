@@ -7,6 +7,7 @@ from datetime import datetime
 from .delta import StateDelta
 from src.common.canonical import canonical_hash
 from pydantic import BaseModel, Field, field_validator, ValidationInfo
+from src.writing.constraint import Constraint
 
 class Realm(str, Enum):
     """境界枚举"""
@@ -128,6 +129,12 @@ class WorldState(BaseModel):
         default_factory=dict,
         description="叙事引力场配置"
     )
+    
+    # ========== 全局约束系统 ==========
+    constraints: List[Constraint] = Field(
+        default_factory=list,
+        description="全局约束列表（誓言、契约、规则）"
+    )
     # =================================
     
     def get_active_characters(self, max_count: int = 20) -> List[str]:
@@ -168,6 +175,14 @@ class WorldState(BaseModel):
     def get_state_hash(self) -> str:
         return canonical_hash(self.model_dump())
     
+    def add_constraint(self, constraint: Constraint):
+        """添加全局约束"""
+        self.constraints.append(constraint)
+    
+    def get_constraints_for(self, owner: str) -> List[Constraint]:
+        """获取指定所有者的活跃约束"""
+        return [c for c in self.constraints if c.owner == owner and c.is_active]
+    
     def model_dump(self, **kwargs) -> Dict[str, Any]:
         """序列化，处理 Enum 等，并对所有不关心顺序的字段排序以保证哈希稳定"""
         data = super().model_dump(**kwargs)
@@ -203,12 +218,10 @@ class WorldState(BaseModel):
                 for k in sorted(data['global_flags'].keys())
             }
         if 'phase_transitions' in data and isinstance(data['phase_transitions'], list):
-            # 按 triggered_at 排序，并对每个字典内部键排序
             data['phase_transitions'] = sorted(
                 data['phase_transitions'],
                 key=lambda x: x.get('triggered_at', 0)
             )
-            # 对每个字典的键排序（通过递归函数处理）
         if 'attractor_field' in data and isinstance(data['attractor_field'], dict):
             if 'attractors' in data['attractor_field']:
                 data['attractor_field']['attractors'] = {
@@ -228,6 +241,9 @@ class WorldState(BaseModel):
                 k: data['items'][k]
                 for k in sorted(data['items'].keys())
             }
+        if 'constraints' in data and isinstance(data['constraints'], list):
+            # 按 id 排序保证稳定性
+            data['constraints'] = sorted(data['constraints'], key=lambda x: x.get('id', ''))
         
         # 递归规范化所有字典键（确保深层嵌套的字典也有序）
         def normalize(obj):

@@ -1,0 +1,28 @@
+thresholds:
+  local_warning: 0.55          # 原 0.6，更早警告
+  local_critical: 0.7          # 原 0.8，更早强制冷却
+  arc_warning: 0.55
+  arc_critical: 0.7
+  civ_warning: 0.65            # 原 0.7
+  civ_critical: 0.85           # 原 0.9
+  consecutive_escalation_warning: 2   # 原 3，连续2次 escalation 就警告
+  consecutive_escalation_critical: 3  # 原 4，连续3次强制冷却
+  reveal_density_warning: 0.4         # 原 0.5
+  reveal_density_critical: 0.6        # 原 0.7
+
+# 局部熵权重（可选调整）
+local_entropy_weights:
+  consecutive_escalation: 0.5   # 增加 escalation 的权重
+  reveal_density: 0.3
+  aftermath_penalty: 0.2
+
+# 弧线熵权重
+arc_entropy_weights:
+  unresolved_arcs: 0.8          # 增加弧线权重
+  escalation_penalty: 0.2
+
+# 文明熵权重（保持）
+civilization_entropy_weights:
+  new_lore_rate: 0.5
+  realm_inflation: 0.3
+  character_count: 0.2

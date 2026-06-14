@@ -1,10 +1,37 @@
 repetition:
   max_keyword_frequency: 3
+  forbidden_patterns:
+    - "哼，有意思"
+    - "有意思。*哼"
+    - "我偏不信"
+
 dialogue:
   max_catchphrase_per_chapter: 2
   catchphrases:
     - "有意思"
     - "哼"
     - "我偏不信"
+  character_overrides:
+    林逸:
+      - "有意思"
+      - "哼"
+    反派:
+      - "呵呵"
+      - "不知死活"
+
 sentence:
   avg_length_range: [12, 35]
+  max_consecutive_short_sentences: 3
+  short_sentence_threshold: 8
+
+structure:
+  dialogue_ratio_range: [0.25, 0.6]
+  inner_monologue_ratio_max: 0.3
+absolute_words:
+  - "绝对"
+  - "肯定"
+  - "一定"
+  - "无疑"
+  - "必然"
+  - "肯定是"
+  - "一定是"

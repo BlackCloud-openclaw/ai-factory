@@ -349,6 +349,19 @@ class WritingAgent(BaseAgent):
         if scene_text:
             voice_memory.update_from_chapter(scene_text)
 
+        # ========== 新增：后处理清洗 ==========
+        # 1. 删除 "推进主线剧情（场景X）" 占位符（包括感叹号）
+        scene_text = re.sub(r'推进主线剧情（场景\d+）[！!]?', '', scene_text)
+        # 2. 统一引号为中文双引号（将单引号包裹的对话转为双引号）
+        # 简单规则：将 '...' 形式的对话转为 “...” 
+        # 注意：不处理缩写或所有格，中文场景下几乎都是对话
+        scene_text = re.sub(r"'([^']*)'", r"“\1”", scene_text)
+        # 3. 可选：去除多余空行
+        scene_text = re.sub(r'\n{3,}', '\n\n', scene_text)
+        # ====================================
+
+        # 然后将清洗后的 scene_text 放回 parsed（或直接使用）
+
         return {
             "scene_text": raw_output,
             "final_answer": scene_text,

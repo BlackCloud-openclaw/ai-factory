@@ -10,6 +10,7 @@
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
+from src.config_loader import get_xianxia_config
 
 
 # ============================================================================
@@ -72,27 +73,33 @@ class ControlAction:
 class EntropyController:
     """叙事稳态控制器 - 根据熵报告生成规划约束"""
 
-    THRESHOLDS = {
-        "local_warning": 0.6,
-        "local_critical": 0.8,
-        "arc_warning": 0.6,
-        "arc_critical": 0.8,
-        "civ_warning": 0.7,
-        "civ_critical": 0.9,
-        "escalation_warning": 3,      # 连续 escalation ≥ 3 触发警告
-        "escalation_critical": 4,     # 连续 escalation ≥ 4 强制冷却
-        "reveal_density_warning": 0.5, # 最近场景中 REVEAL 比例 ≥ 50%
-        "reveal_density_critical": 0.7,
-    }
+    @classmethod
+    def _get_thresholds(cls):
+        from src.config_loader import get_xianxia_config
+        cfg = get_xianxia_config()
+        thresholds = cfg.entropy.get("thresholds", {})
+        # 默认值兜底
+        return {
+            "local_warning": thresholds.get("local_warning", 0.6),
+            "local_critical": thresholds.get("local_critical", 0.8),
+            "arc_warning": thresholds.get("arc_warning", 0.6),
+            "arc_critical": thresholds.get("arc_critical", 0.8),
+            "civ_warning": thresholds.get("civ_warning", 0.7),
+            "civ_critical": thresholds.get("civ_critical", 0.9),
+            "escalation_warning": thresholds.get("consecutive_escalation_warning", 3),
+            "escalation_critical": thresholds.get("consecutive_escalation_critical", 4),
+            "reveal_density_warning": thresholds.get("reveal_density_warning", 0.5),
+            "reveal_density_critical": thresholds.get("reveal_density_critical", 0.7),
+        }
 
     @classmethod
     def regulate(cls, entropy: EntropyReport) -> List[ControlAction]:
+        thresholds = cls._get_thresholds()
         actions = []
         details = entropy.details
 
-        # ----- 节奏控制：基于连续 escalation -----
         consecutive_esc = details.get("consecutive_escalation", 0)
-        if consecutive_esc >= cls.THRESHOLDS["escalation_critical"]:
+        if consecutive_esc >= thresholds["escalation_critical"]:
             actions.append(ControlAction(
                 type="limit_scene_role",
                 params={
@@ -101,7 +108,7 @@ class EntropyController:
                     "reason": f"连续 {consecutive_esc} 次 escalation，必须冷却"
                 }
             ))
-        elif consecutive_esc >= cls.THRESHOLDS["escalation_warning"]:
+        elif consecutive_esc >= thresholds["escalation_warning"]:
             actions.append(ControlAction(
                 type="limit_scene_role",
                 params={
@@ -111,9 +118,8 @@ class EntropyController:
                 }
             ))
 
-        # ----- 节奏控制：基于 reveal 密度 -----
         reveal_density = details.get("reveal_density", 0.0)
-        if reveal_density >= cls.THRESHOLDS["reveal_density_critical"]:
+        if reveal_density >= thresholds["reveal_density_critical"]:
             actions.append(ControlAction(
                 type="limit_scene_role",
                 params={
@@ -122,7 +128,7 @@ class EntropyController:
                     "reason": f"揭示密度过高 ({reveal_density:.0%})，必须冷却"
                 }
             ))
-        elif reveal_density >= cls.THRESHOLDS["reveal_density_warning"]:
+        elif reveal_density >= thresholds["reveal_density_warning"]:
             actions.append(ControlAction(
                 type="limit_scene_role",
                 params={
@@ -132,7 +138,6 @@ class EntropyController:
                 }
             ))
 
-        # ----- AFTERMATH 缺失惩罚 -----
         has_aftermath = details.get("has_aftermath_recent", False)
         if not has_aftermath and consecutive_esc >= 2:
             actions.append(ControlAction(
@@ -140,8 +145,7 @@ class EntropyController:
                 params={"recommended": "AFTERMATH", "reason": "最近无余波场景，建议补充"}
             ))
 
-        # ----- 原有熵阈值控制（保留）-----
-        if entropy.local >= cls.THRESHOLDS["local_critical"]:
+        if entropy.local >= thresholds["local_critical"]:
             actions.append(ControlAction(
                 type="limit_scene_role",
                 params={
@@ -153,7 +157,7 @@ class EntropyController:
                 type="force_low_stakes",
                 params={"reason": "local entropy critical"}
             ))
-        elif entropy.local >= cls.THRESHOLDS["local_warning"]:
+        elif entropy.local >= thresholds["local_warning"]:
             actions.append(ControlAction(
                 type="limit_scene_role",
                 params={
@@ -162,7 +166,7 @@ class EntropyController:
                 }
             ))
 
-        if entropy.arc >= cls.THRESHOLDS["arc_critical"]:
+        if entropy.arc >= thresholds["arc_critical"]:
             actions.append(ControlAction(
                 type="resolve_arcs",
                 params={"max_open": 3, "force_resolve": True}
@@ -171,13 +175,13 @@ class EntropyController:
                 type="forbid_new_arcs",
                 params={"duration_chapters": 2}
             ))
-        elif entropy.arc >= cls.THRESHOLDS["arc_warning"]:
+        elif entropy.arc >= thresholds["arc_warning"]:
             actions.append(ControlAction(
                 type="resolve_arcs",
                 params={"max_open": 5, "force_resolve": False}
             ))
 
-        if entropy.civilization >= cls.THRESHOLDS["civ_critical"]:
+        if entropy.civilization >= thresholds["civ_critical"]:
             actions.append(ControlAction(
                 type="forbid_new_lore",
                 params={"duration_chapters": 3, "types": ["character", "location", "item", "realm"]}
@@ -186,7 +190,7 @@ class EntropyController:
                 type="force_low_stakes",
                 params={"reason": "civilization entropy critical"}
             ))
-        elif entropy.civilization >= cls.THRESHOLDS["civ_warning"]:
+        elif entropy.civilization >= thresholds["civ_warning"]:
             actions.append(ControlAction(
                 type="forbid_new_lore",
                 params={"duration_chapters": 1, "types": ["character", "location"]}
@@ -455,7 +459,10 @@ class NarrativeEntropyCalculator:
         if protagonist is None:
             return 0.0
 
-        realm_order = ["凡人", "炼气", "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫"]
+        # 从配置加载境界顺序
+        cfg = get_xianxia_config()
+        realm_order = cfg.rank.get("levels", ["凡人", "炼气", "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫"])
+
         current_realm = getattr(protagonist, 'realm', None)
         if current_realm is None:
             return 0.0

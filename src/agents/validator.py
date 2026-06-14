@@ -10,6 +10,7 @@ import os
 import asyncio
 from typing import Any, Optional, Dict, List, Tuple
 from openai import AsyncOpenAI
+from collections import Counter
 
 from src.model_router import get_router
 from src.config import config
@@ -31,6 +32,7 @@ from src.writing.causality.health import HealthChecker
 from src.common.prompt_logger import log_prompt
 from src.writing.world_state import WorldState
 from src.config_loader import get_xianxia_config
+
 
 logger = setup_logging("agents.validator")
 
@@ -489,16 +491,12 @@ class ValidatorAgent(BaseAgent):
                 logger.warning(f"Failed to check cognitive identity: {e}")
 
         # ========== 5. 模板化表达检测（从配置读取） ==========
-        from src.config_loader import get_xianxia_config
-        from collections import Counter
-        import re
-        
         config_obj = get_xianxia_config()
         voice_cfg = config_obj.voice if hasattr(config_obj, 'voice') else {}
         
         voice_violations = []
         
-        # 检查口头禅（主角常用短语）
+        # 1. 检查口头禅（主角常用短语）
         catchphrases = voice_cfg.get("dialogue", {}).get("catchphrases", ["有意思", "哼", "我偏不信"])
         max_catchphrase = voice_cfg.get("dialogue", {}).get("max_catchphrase_per_chapter", 2)
         
@@ -512,7 +510,16 @@ class ValidatorAgent(BaseAgent):
                     "limit": max_catchphrase
                 })
         
-        # 检查重复关键词频率
+        # 2. 检查角色特有口头禅覆盖
+        character_overrides = voice_cfg.get("dialogue", {}).get("character_overrides", {})
+        for char, phrases in character_overrides.items():
+            if char in scene_text:
+                for phrase in phrases:
+                    count = scene_text.count(phrase)
+                    if count > max_catchphrase:
+                        voice_violations.append(f"{char} 特有口头禅 '{phrase}' 出现 {count} 次")
+        
+        # 3. 检查重复关键词频率
         words = re.findall(r'[\u4e00-\u9fff]{2,4}', scene_text)
         max_keyword_freq = voice_cfg.get("repetition", {}).get("max_keyword_frequency", 3)
         keyword_freq = Counter(words)
@@ -525,9 +532,53 @@ class ValidatorAgent(BaseAgent):
                     "limit": max_keyword_freq
                 })
         
+        # 4. 检查禁止组合模式
+        forbidden_patterns = voice_cfg.get("repetition", {}).get("forbidden_patterns", [])
+        for pattern in forbidden_patterns:
+            if re.search(pattern, scene_text):
+                voice_violations.append(f"禁止模式 '{pattern}' 出现")
+                error_details.setdefault("voice_violations", []).append({
+                    "pattern": pattern,
+                    "matched": True
+                })
+        
+        # 5. 检查连续短句
+        max_consecutive = voice_cfg.get("sentence", {}).get("max_consecutive_short_sentences", 3)
+        short_threshold = voice_cfg.get("sentence", {}).get("short_sentence_threshold", 8)
+        sentences = re.split(r'[。！？；]', scene_text)
+        consecutive_short = 0
+        for sent in sentences:
+            if len(sent.strip()) < short_threshold:
+                consecutive_short += 1
+                if consecutive_short > max_consecutive:
+                    voice_violations.append(f"连续短句过多（{consecutive_short}句）")
+                    error_details.setdefault("voice_violations", []).append({
+                        "type": "consecutive_short_sentences",
+                        "count": consecutive_short,
+                        "limit": max_consecutive
+                    })
+                    break
+            else:
+                consecutive_short = 0
+        
+        # 6. 检查对话占比
+        dialogue_ratio_range = voice_cfg.get("structure", {}).get("dialogue_ratio_range", [0.25, 0.6])
+        # 提取引号内容（简单估测）
+        dialogue_chars = len(re.findall(r'[\u4e00-\u9fff，。！？；：“”‘’]+', scene_text))
+        total_chars = len(scene_text)
+        ratio = dialogue_chars / total_chars if total_chars > 0 else 0
+        if ratio < dialogue_ratio_range[0] or ratio > dialogue_ratio_range[1]:
+            voice_violations.append(f"对话占比 {ratio:.0%} 超出范围 {dialogue_ratio_range[0]:.0%}-{dialogue_ratio_range[1]:.0%}")
+            error_details.setdefault("voice_violations", []).append({
+                "type": "dialogue_ratio",
+                "ratio": ratio,
+                "range": dialogue_ratio_range
+            })
+        
         # 记录文笔违规到日志（不阻断）
         if voice_violations:
             logger.warning(f"Voice violations: {voice_violations}")
+
 
         # ==================== 因果关系校验 ====================
         predicates = constraints.get("predicates", {})

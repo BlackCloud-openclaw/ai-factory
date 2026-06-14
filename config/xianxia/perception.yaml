@@ -1,0 +1,17 @@
+# 事件感知效果配置
+event_effects:
+  combat_result:
+    winner_effect: 10
+    loser_effect: -10
+    confidence_delta: 0.3
+  realm_upgrade:
+    observer_effect: 5
+    confidence_delta: 0.1
+  item_acquire:
+    observer_effect: 2
+    confidence_delta: 0.05
+  dialogue_with_revelation:
+    base_effect: 5
+    negative_effect: -5
+    confidence_delta: 0.1
+smoothing_factor: 0.7

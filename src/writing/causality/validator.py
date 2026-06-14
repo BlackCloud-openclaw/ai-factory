@@ -1,21 +1,36 @@
 # src/writing/causality/validator.py
 
 import logging
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from .rule_engine import RuleEngine
 from .predicate import Predicate
+from src.writing.constraint import Constraint, ConstraintRegistry
+from src.config_loader import get_xianxia_config
 
 logger = logging.getLogger(__name__)
-
-# 境界顺序列表（必须与 MajorRealm 枚举的值完全一致）
-REALM_ORDER = ["炼气", "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫"]
 
 
 class CausalityValidator:
     def __init__(self, rule_engine: RuleEngine = None):
         self.rule_engine = rule_engine or RuleEngine()
+        self._load_realm_order()
 
-    def validate(self, event_dict: Dict[str, Any], predicates: Dict[str, Predicate]) -> Dict[str, Any]:
+    def _load_realm_order(self):
+        """从配置加载境界顺序，如果失败则使用默认值"""
+        try:
+            cfg = get_xianxia_config()
+            self.realm_order = cfg.rank.get("levels", [])
+            if not self.realm_order:
+                self.realm_order = ["炼气", "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫"]
+        except Exception:
+            self.realm_order = ["炼气", "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫"]
+
+    def validate(
+        self,
+        event_dict: Dict[str, Any],
+        predicates: Dict[str, Predicate],
+        world_state: Optional[Any] = None
+    ) -> Dict[str, Any]:
         event_type = event_dict.get('type')
         if not event_type:
             return {"passed": True, "severity": "info", "missing_preconditions": [], "suggestions": []}
@@ -32,24 +47,25 @@ class CausalityValidator:
                         current_realm = pred.object
                         break
 
-                # 情况1：没有当前境界（首次突破）→ 只能突破到炼气
+                # 情况1：没有当前境界（首次突破）→ 只能突破到最低级
                 if current_realm is None:
-                    if to_major_realm == "炼气":
-                        logger.debug(f"First realm upgrade for {actor} to 炼气, allowing")
+                    lowest_realm = self.realm_order[0] if self.realm_order else "炼气"
+                    if to_major_realm == lowest_realm:
+                        logger.debug(f"First realm upgrade for {actor} to {lowest_realm}, allowing")
                         return {"passed": True, "severity": "info", "missing_preconditions": [], "suggestions": []}
                     else:
-                        logger.warning(f"First realm upgrade for {actor} to {to_major_realm} not allowed (must be 炼气)")
+                        logger.warning(f"First realm upgrade for {actor} to {to_major_realm} not allowed (must be {lowest_realm})")
                         return {
                             "passed": False,
                             "severity": "error",
                             "missing_preconditions": [],
-                            "suggestions": ["首次突破只能达到炼气期"],
+                            "suggestions": [f"首次突破只能达到{lowest_realm}期"],
                             "error_details": {
                                 "type": "realm_upgrade_violation",
                                 "current_realm": None,
-                                "expected_realm": "炼气",
+                                "expected_realm": lowest_realm,
                                 "actual_realm": to_major_realm,
-                                "message": f"首次突破只能达到炼气期，不能直接到 {to_major_realm}"
+                                "message": f"首次突破只能达到{lowest_realm}期，不能直接到{to_major_realm}"
                             }
                         }
 
@@ -60,14 +76,13 @@ class CausalityValidator:
 
                 # 情况3：跨大境界突破 → 检查顺序（只能提升一级）
                 try:
-                    current_idx = REALM_ORDER.index(current_realm)
-                    target_idx = REALM_ORDER.index(to_major_realm)
+                    current_idx = self.realm_order.index(current_realm)
+                    target_idx = self.realm_order.index(to_major_realm)
                     if target_idx == current_idx + 1:
                         logger.debug(f"Valid realm upgrade from {current_realm} to {to_major_realm}")
                         return {"passed": True, "severity": "info", "missing_preconditions": [], "suggestions": []}
                     else:
-                        # 计算允许的下一境界
-                        next_realm = REALM_ORDER[current_idx + 1] if current_idx + 1 < len(REALM_ORDER) else None
+                        next_realm = self.realm_order[current_idx + 1] if current_idx + 1 < len(self.realm_order) else None
                         logger.warning(f"Invalid realm upgrade: {current_realm} → {to_major_realm} (must be sequential)")
                         return {
                             "passed": False,
@@ -84,7 +99,6 @@ class CausalityValidator:
                         }
                 except ValueError as e:
                     logger.error(f"Unknown realm in order list: {current_realm} or {to_major_realm}: {e}")
-                    # 未知境界，降级为允许（避免阻塞），但记录警告
                     return {
                         "passed": True,
                         "severity": "warning",
@@ -119,6 +133,24 @@ class CausalityValidator:
                 elif rule.severity == "warning" and worst_severity != "error":
                     worst_severity = "warning"
         passed = (worst_severity != "error")
+
+        # ===== 约束检查（如果提供了 world_state 且包含 constraints）=====
+        if world_state is not None and hasattr(world_state, 'constraints') and world_state.constraints:
+            try:
+                registry = ConstraintRegistry(world_state.constraints)
+                actor = event_dict.get("actor") or event_dict.get("name")
+                target = event_dict.get("target") or event_dict.get("to_char")
+                violated = registry.check_violation(event_type, actor, target)
+                if violated:
+                    return {
+                        "passed": False,
+                        "severity": "error",
+                        "missing_preconditions": [],
+                        "suggestions": [f"违反约束: {v.description}" for v in violated]
+                    }
+            except Exception as e:
+                logger.warning(f"Constraint check failed: {e}")
+
         return {
             "passed": passed,
             "severity": worst_severity,
