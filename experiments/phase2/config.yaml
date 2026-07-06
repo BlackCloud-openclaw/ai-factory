@@ -1,0 +1,20 @@
+# experiments/phase2/config.yaml
+groups:
+  - id: D
+    execution: single
+    segments: 1
+
+  - id: I2
+    execution: incremental
+    segments: 2
+
+  - id: I3
+    execution: incremental
+    segments: 3
+
+  - id: I4
+    execution: incremental
+    segments: 4
+
+scenes_per_group: 10
+repetitions: 1

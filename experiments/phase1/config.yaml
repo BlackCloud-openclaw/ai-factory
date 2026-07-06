@@ -1,0 +1,32 @@
+groups:
+  - id: A
+    representation: summary
+    density: sparse
+    execution: single
+  - id: B
+    representation: beat
+    density: sparse
+    execution: single
+  - id: C
+    representation: action
+    density: sparse
+    execution: single
+  - id: D
+    representation: action
+    density: dense
+    execution: single
+  - id: E
+    representation: intent
+    density: sparse
+    execution: single
+  - id: F
+    representation: intent
+    density: dense
+    execution: incremental
+  - id: G
+    representation: constraint
+    density: sparse
+    execution: single
+
+scenes_per_group: 10
+repetitions: 2

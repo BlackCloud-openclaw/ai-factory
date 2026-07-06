@@ -1,0 +1,48 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_beat_sparse_003"
+  
+  intent:
+    goal: "林逸在最终决战前完成最后的准备"
+    conflict: "时间紧迫，且林逸的伤势未痊愈"
+    expected_outcome: "林逸完成装备和策略准备，但仍留有一个隐患"
+  
+  execution:
+    units:
+      - id: "B1"
+        label: "beat"
+        description: "检查：林逸检查自己的法器与丹药储备"
+      - id: "B2"
+        label: "beat"
+        description: "策略：林逸与苏清雪推演敌我战力"
+      - id: "B3"
+        label: "beat"
+        description: "犹豫：林逸在是否动用某件危险法器上产生犹豫"
+      - id: "B4"
+        label: "beat"
+        description: "决定：林逸最终决定不使用它，留下隐患"
+  
+  observables:
+    state_changes:
+      - type: "plot_flag"
+        name: "战前准备完成"
+        value: true
+    story_events:
+      - type: "dialogue"
+        description: "林逸与苏清雪在策略讨论中产生分歧"
+        participants: ["林逸", "苏清雪"]
+        importance: "normal"
+    narrative_flags:
+      - name: "readiness_level"
+        value: "85%"
+  
+  constraints:
+    - type: "required"
+      target: "林逸做出不使用危险法器的决定"
+    - type: "required"
+      target: "林逸和苏清雪至少讨论两个战术方案"
+  
+  metadata:
+    chapter: 9
+    scene_index: 2
+    arc: "背叛与反制"

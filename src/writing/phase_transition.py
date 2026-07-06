@@ -127,7 +127,11 @@ class PhaseTransitionDetector:
                     a, b = parts
                     # 获取 A 对 B 的认知确信度
                     if a in world_state.characters:
-                        perception = world_state.characters[a].perceived_relationships.get(b, {})
+                        char_a = world_state.get_character(a)
+                        if char_a:
+                            perception = char_a.perceived_relationships.get(b, {})
+                        else:
+                            perception = {}                        
                         confidence = perception.get("confidence", 0.0)
                         if confidence >= cls.THRESHOLDS["relationship_collapse_confidence"]:
                             logger.info(f"Relationship collapse detected: {key} = {value}, confidence={confidence}")
@@ -190,7 +194,7 @@ class PhaseTransitionDetector:
         # 检测主角境界
         protagonist = "林逸"
         if protagonist in world_state.characters:
-            char = world_state.characters[protagonist]
+            char = world_state.get_character(protagonist)
             # 跨大境界突破检测（金丹及以上视为重要突破）
             major_ascension_realms = ["金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫"]
             if char.realm.value in major_ascension_realms and char.realm_level == 1:

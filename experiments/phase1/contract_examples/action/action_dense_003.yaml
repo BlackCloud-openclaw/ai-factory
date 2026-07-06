@@ -1,0 +1,99 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_action_dense_003"
+  
+  intent:
+    goal: "林逸在秘境深处获取'玄天镜'神器"
+    conflict: "玄天镜被封印在九宫阵法中，需破解机关，且赵虎的追兵正在逼近"
+    expected_outcome: "林逸成功破解九宫阵，获得玄天镜，并利用阵法余波阻挡追兵"
+  
+  execution:
+    units:
+      - id: "A1"
+        label: "action"
+        description: "林逸在石室中观察九宫阵的光纹流转，发现脉动间隔为三息"
+        attributes:
+          location: "秘境石室"
+          observation: "光纹脉动"
+          pattern: "三息间隔"
+      - id: "A2"
+        label: "action"
+        description: "林逸在光纹熄灭的瞬间，按'震-巽-离-坎'顺序踩中节点"
+        attributes:
+          sequence: "震-巽-离-坎"
+          timing: "光纹熄灭瞬间"
+          precision: "至关重要"
+      - id: "A3"
+        label: "action"
+        description: "阵法解除时，玄天镜从祭坛升起，林逸用灵力包裹将其取走"
+        attributes:
+          action: "灵力包裹"
+          caution: "镜面温度极高"
+      - id: "A4"
+        label: "action"
+        description: "林逸在撤出时，故意触动阵法残余，引爆灵力波阻挡追兵"
+        attributes:
+          secondary_action: "引爆阵法"
+          target: "追兵"
+          effect: "通道坍塌"
+      - id: "A5"
+        label: "action"
+        description: "林逸在脱离后确认玄天镜完好，并感受到其中蕴含的镜像之力"
+        attributes:
+          confirmation: "玄天镜完好"
+          feeling: "镜像之力"
+  
+  observables:
+    state_changes:
+      - type: "inventory"
+        actor: "林逸"
+        item: "玄天镜"
+        operation: "acquire"
+        quantity: 1
+      - type: "plot_flag"
+        name: "玄天镜获得"
+        value: true
+      - type: "plot_flag"
+        name: "追兵被阻"
+        value: true
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "赵虎"
+        delta: 10
+    story_events:
+      - type: "discovery"
+        description: "林逸成功破解九宫阵法获取玄天镜"
+        participants: ["林逸"]
+        importance: "critical"
+      - type: "discovery"
+        description: "林逸触发阵法余波阻挡追兵"
+        participants: ["林逸"]
+        importance: "high"
+    narrative_flags:
+      - name: "artifact_acquired"
+        value: "玄天镜"
+      - name: "escape_success"
+        value: true
+      - name: "artifact_power"
+        value: "镜像之力"
+  
+  constraints:
+    - type: "required"
+      target: "林逸按'震-巽-离-坎'顺序破解阵法"
+    - type: "required"
+      target: "林逸用灵力包裹玄天镜取走"
+    - type: "required"
+      target: "林逸利用阵法阻挡追兵"
+    - type: "required"
+      target: "林逸确认玄天镜完好"
+    - type: "forbidden"
+      target: "林逸触发阵法的反击机制"
+    - type: "forbidden"
+      target: "玄天镜在获取过程中受损"
+    - type: "forbidden"
+      target: "追兵在通道坍塌前追上林逸"
+  
+  metadata:
+    chapter: 10
+    scene_index: 1
+    arc: "神器出世"

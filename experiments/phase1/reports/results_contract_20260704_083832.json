@@ -1,0 +1,14 @@
+[
+  {
+    "error": "Contract validation failed: 2 validation errors for PlanningContract\nobservables.story_events.0.type\n  Field required [type=missing, input_value={'event_id': 'EVT_001', '...者现身遗迹外围'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nobservables.narrative_flags.0.name\n  Field required [type=missing, input_value={'flag': '功法残缺度', 'value': '70%'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+    "group": "D"
+  },
+  {
+    "error": "Contract validation failed: 3 validation errors for PlanningContract\nobservables.story_events.0\n  Input should be a valid dictionary or instance of StoryEvent [type=model_type, input_value='沼泽瘴气异动', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\nobservables.story_events.1\n  Input should be a valid dictionary or instance of StoryEvent [type=model_type, input_value='幻境对决', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\nobservables.narrative_flags.0\n  Input should be a valid dictionary or instance of NarrativeFlag [type=model_type, input_value='凝煞经线索解锁', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type",
+    "group": "D"
+  },
+  {
+    "error": "Contract validation failed: 4 validation errors for PlanningContract\nobservables.story_events.0\n  Input should be a valid dictionary or instance of StoryEvent [type=model_type, input_value='冰魄玄蛇尸体化为玉简浮现上古阵法', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\nobservables.story_events.1\n  Input should be a valid dictionary or instance of StoryEvent [type=model_type, input_value='血迹中混入伪造的筑基丹残渣', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\nobservables.narrative_flags.0\n  Input should be a valid dictionary or instance of NarrativeFlag [type=model_type, input_value='开启宗门内斗支线', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\nobservables.narrative_flags.1\n  Input should be a valid dictionary or instance of NarrativeFlag [type=model_type, input_value='解锁寒毒修炼系统', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type",
+    "group": "D"
+  }
+]

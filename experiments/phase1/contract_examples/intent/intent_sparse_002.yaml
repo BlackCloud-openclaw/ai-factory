@@ -1,0 +1,43 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_intent_sparse_002"
+  
+  intent:
+    goal: "让苏清雪主动提出与林逸结盟"
+    conflict: "苏清雪背负着为师叔复仇的沉重使命"
+    expected_outcome: "苏清雪试探性提出结盟，林逸同意"
+  
+  execution:
+    units:
+      - id: "I1"
+        label: "intent"
+        description: "让苏清雪在对话中主动提及'合作'或'结盟'"
+        attributes:
+          trigger: "林逸展示自己的价值后"
+  
+  observables:
+    state_changes:
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "苏清雪"
+        delta: 20
+      - type: "plot_flag"
+        name: "正式结盟"
+        value: true
+    story_events:
+      - type: "dialogue"
+        description: "苏清雪主动说出'也许我们可以合作'"
+        participants: ["苏清雪"]
+        importance: "critical"
+    narrative_flags:
+      - name: "alliance_type"
+        value: "平等结盟"
+  
+  constraints:
+    - type: "required"
+      target: "苏清雪主动提出结盟（而非林逸）"
+  
+  metadata:
+    chapter: 8
+    scene_index: 2
+    arc: "秘境探索"

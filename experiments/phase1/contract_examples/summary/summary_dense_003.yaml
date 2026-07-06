@@ -1,0 +1,79 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_summary_dense_003"
+  
+  intent:
+    goal: "林逸发现赵虎在背后向长老告密"
+    conflict: "赵虎曾以盟友身份接近林逸，获取信任，且告密内容涉及秘境之行"
+    expected_outcome: "林逸确认赵虎的背叛，但没有立即揭穿，而是计划反制"
+  
+  execution:
+    units:
+      - id: "U1"
+        label: "intent"
+        description: "林逸在藏书阁偷听赵虎与长老对话，确认赵虎将秘境计划全盘托出"
+        attributes:
+          actor: "林逸"
+          target: "赵虎"
+          location: "藏书阁密室"
+          method: "偷听"
+          information_revealed: "秘境计划"
+      - id: "U2"
+        label: "intent"
+        description: "林逸在听到长老说要'密切关注林逸的动向'时，明白了自己的处境"
+        attributes:
+          actor: "林逸"
+          realization: "已被监视"
+          danger_level: "高"
+      - id: "U3"
+        label: "intent"
+        description: "林逸在赵虎离开后，悄然跟随，确认赵虎与长老的约定时间"
+        attributes:
+          actor: "林逸"
+          target: "赵虎"
+          follow: true
+          discovered: "约定时间"
+  
+  observables:
+    state_changes:
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "赵虎"
+        delta: -40
+      - type: "plot_flag"
+        name: "赵虎背叛确认"
+        value: true
+      - type: "plot_flag"
+        name: "长老监视林逸"
+        value: true
+    story_events:
+      - type: "discovery"
+        description: "林逸确认赵虎的背叛身份"
+        participants: ["林逸"]
+        importance: "critical"
+      - type: "dialogue"
+        description: "赵虎与长老约定三天后在戒律堂见面"
+        participants: ["赵虎", "长老"]
+        importance: "high"
+    narrative_flags:
+      - name: "betrayal_confirmed"
+        value: true
+      - name: "counter_plan_phase"
+        value: "观察阶段"
+      - name: "trust_shift"
+        value: "赵虎→提防"
+  
+  constraints:
+    - type: "required"
+      target: "林逸确认赵虎的告密行为"
+    - type: "required"
+      target: "林逸获知长老与赵虎的约定时间"
+    - type: "forbidden"
+      target: "林逸当场与赵虎对质"
+    - type: "required"
+      target: "林逸意识到自己已被监视"
+  
+  metadata:
+    chapter: 9
+    scene_index: 1
+    arc: "背叛与反制"

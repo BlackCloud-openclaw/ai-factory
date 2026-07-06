@@ -1,0 +1,89 @@
+{
+  "chapter": 16,
+  "style": "xianhu",
+  "timestamp": "20260617_095616",
+  "validation": {
+    "passed": false,
+    "event_retention": 1.0,
+    "character_consistency": 0.2,
+    "length_ratio": 0.57,
+    "issues": [
+      "Character consistency: 20.0% (target: 100%)",
+      "Length ratio: 0.57 (target: 0.8-2.0)"
+    ]
+  },
+  "orig_wqi": {
+    "total": 40.8,
+    "scores": {
+      "dialogue": 4.2,
+      "sensory": 6.9,
+      "inner": 4.0,
+      "rhythm": 10.0,
+      "voice": 2.0,
+      "repetition": 13.6
+    },
+    "metrics": {
+      "total_chars": 1042,
+      "total_sentences": 47,
+      "dialogue_ratio": 0.04222648752399232,
+      "sensory_density": 0.046065259117082535,
+      "inner_monologue_density": 0.02127659574468085,
+      "avg_sentence_length": 20.829787234042552
+    },
+    "length_ratio": 1.0,
+    "length_ok": true
+  },
+  "new_wqi": {
+    "total": 35.3,
+    "scores": {
+      "dialogue": 3.4,
+      "sensory": 8.3,
+      "inner": 0.0,
+      "rhythm": 0,
+      "voice": 10.0,
+      "repetition": 13.6
+    },
+    "metrics": {
+      "total_chars": 594,
+      "total_sentences": 15,
+      "dialogue_ratio": 0.03367003367003367,
+      "sensory_density": 0.05555555555555555,
+      "inner_monologue_density": 0.0,
+      "avg_sentence_length": 38.06666666666667
+    },
+    "length_ratio": 0.57,
+    "length_ok": false
+  },
+  "wqi_gain": -5.5,
+  "metrics_compare": {
+    "original": {
+      "total_chars": 1042,
+      "total_sentences": 47,
+      "dialogue_ratio": 0.0422,
+      "dialogue_blocks": 5,
+      "inner_monologue_density": 0.0213,
+      "inner_monologue_blocks": 1,
+      "sensory_density": 0.048,
+      "sensory_words": 50,
+      "avg_sentence_length": 20.83
+    },
+    "rewritten": {
+      "total_chars": 594,
+      "total_sentences": 15,
+      "dialogue_ratio": 0.0337,
+      "dialogue_blocks": 2,
+      "inner_monologue_density": 0.0,
+      "inner_monologue_blocks": 0,
+      "sensory_density": 0.0556,
+      "sensory_words": 33,
+      "avg_sentence_length": 38.07
+    },
+    "deltas": {
+      "dialogue_ratio": -0.008556453853958652,
+      "inner_monologue_density": -0.02127659574468085,
+      "sensory_density": 0.007570910641927914,
+      "avg_sentence_length": 17.236879432624118,
+      "total_chars": -448
+    }
+  }
+}

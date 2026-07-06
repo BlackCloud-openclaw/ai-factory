@@ -1,0 +1,44 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_summary_sparse_003"
+  
+  intent:
+    goal: "林逸发现赵虎在背后向长老告密"
+    conflict: "赵虎曾以盟友身份接近林逸，获取信任"
+    expected_outcome: "林逸确认赵虎的背叛，但没有立即揭穿"
+  
+  execution:
+    units:
+      - id: "U1"
+        label: "intent"
+        description: "林逸无意中听到赵虎与长老的对话"
+        attributes:
+          actor: "林逸"
+          target: "赵虎"
+          method: "偷听"
+  
+  observables:
+    state_changes:
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "赵虎"
+        delta: -30
+    story_events:
+      - type: "discovery"
+        description: "林逸确认赵虎的背叛身份"
+        participants: ["林逸"]
+        importance: "critical"
+    narrative_flags:
+      - name: "betrayal_confirmed"
+        value: true
+  
+  constraints:
+    - type: "required"
+      target: "林逸证实赵虎的告密行为"
+    - type: "forbidden"
+      target: "林逸当场与赵虎对质"
+  
+  metadata:
+    chapter: 9
+    scene_index: 1
+    arc: "背叛与反制"

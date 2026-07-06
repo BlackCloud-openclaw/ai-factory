@@ -42,11 +42,13 @@ class WritingService:
             current_scene_index=cmd.scene_idx,
             scene_plan=cmd.scene_plan,
             current_state=cmd.current_state,
-            metadata={},
             # ========== 传递 Director 输出 ==========
             narrative_blueprint=cmd.narrative_blueprint,
             knowledge_deltas=cmd.knowledge_deltas,
             character_intent=cmd.character_intent,
+            # ====== 新增：传递戏剧结构 ======
+            drama_structure=cmd.drama_structure,
+            metadata=cmd.metadata or {},  # 添加这一行
         )
         # 注入反馈
         if cmd.writing_feedback:

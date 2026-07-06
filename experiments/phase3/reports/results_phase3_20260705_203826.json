@@ -1,0 +1,3529 @@
+[
+  {
+    "group": "R2",
+    "scene_idx": 0,
+    "rep": 0,
+    "runtime": true,
+    "segments": 2,
+    "successful_segments": 0,
+    "execution_time": 344.8950891494751,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在幽冥沼泽获取千年血灵芝以突破炼气期瓶颈",
+        "conflict": "沼泽中盘踞的三首鳄鱼妖设置重重阻碍",
+        "expected_outcome": "成功取得血灵芝但身受内伤需后续调养"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "追踪血灵芝气息穿越瘴气密布的沼泽，发现三首鳄鱼妖守护的祭坛",
+            "attributes": {
+              "spatial_challenge": 7,
+              "perception_risk": 8
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "运用幻心诀制造三个分身诱敌，本体潜入祭坛暗室",
+            "attributes": {
+              "chakra_cost": 5,
+              "deception_skill": 9
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "遭遇三首鳄鱼妖反扑，以碎星剑斩断中首但被左右首咬穿肋部",
+            "attributes": {
+              "combat_damage": 12,
+              "blood_loss": 6
+            }
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "忍痛夺取祭坛核心的血灵芝，触发空间禁制强行传送脱身",
+            "attributes": {
+              "item_acquisition": "千年血灵芝",
+              "stamina_drain": 8
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "blood_ginseng_obtained",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "player_hp",
+            "value": 42,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "千年血灵芝",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过智取而非力敌获得血灵芝",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不允许出现系统赠送或NPC直接馈赠剧情",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T17:24:25.086775"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "error": "Contract validation failed: 3 validation errors for PlanningContract\nscene_id\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nintent\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nmetadata\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+    "group": "R2"
+  },
+  {
+    "group": "R2",
+    "scene_idx": 2,
+    "rep": 0,
+    "runtime": true,
+    "segments": 2,
+    "successful_segments": 2,
+    "execution_time": 556.7366597652435,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古老洞府中寻找突破金丹期的灵药",
+        "conflict": "洞府内沉睡的上古守护兽苏醒阻挠",
+        "expected_outcome": "成功获取千年雪莲但身受内伤，触发宗门追杀剧情"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "运用敛气诀潜入云雾山脉禁地，发现刻有玄鸟纹章的洞府入口",
+            "attributes": {
+              "stealth_level": 7,
+              "discovery_chance": "85%"
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "破解机关阵法时触发警戒符箓，惊动洞府深处的青鳞蛟",
+            "attributes": {
+              "intellect_check": 12,
+              "time_limit": "30s"
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "在千年雪莲生长区与青鳞蛟近身搏杀，以碎星剑斩断其尾鳍",
+            "attributes": {
+              "combat_rating": 8,
+              "critical_injury_risk": true
+            }
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "服下刚采摘的雪莲配合《九转金丹诀》运转周天，丹田灵力暴涨三成",
+            "attributes": {
+              "cultivation_boost": "30%",
+              "side_effect": "经脉灼痛"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "alchemical_vault_discovered",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "千年雪莲",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "内腑创伤",
+            "value": -30,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过肉身战斗获得雪莲",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "使用致命禁术秒杀守护兽",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T17:34:37.685955"
+      }
+    },
+    "scene_text": "林逸盘膝坐在云雾缭绕的山巅，指尖掐着敛气诀法印。当月光穿透玄鸟纹章时，青灰色石门在雾中无声开启，寒气裹挟着千年霜雪扑面而来。他提着夜明珠缓步踏入，碎星剑在鞘中嗡鸣不止。\n\n第三重机关阵法布满九曲连环钉，林逸刚卸下最后一枚青铜机簧，整座石殿突然震颤起来。青光暴涨的符箓在穹顶炸裂，三丈长的青鳞蛟破开冰层俯冲而下，竖瞳里流转着上古封印的残光。\n\n雪莲生长区终年不冻，幽蓝灵焰在寒玉台上跳跃。蛟尾横扫震碎三根石柱时，林逸已旋身避开要害，剑锋顺着鳞甲缝隙直刺尾鳍基部。青鳞蛟发出远古巨兽的咆哮，冰霜与血雾在洞窟中肆虐，碎星剑斩断的尾鳍如断戟般坠落。\n\n当第一缕晨光穿透冰层，林逸跪坐在摇曳的雪莲前。他捏碎花瓣敷在渗血的剑伤上，丹田处《九转金丹诀》突然轰然运转。三十六道灵力漩涡在经脉中奔涌，原本枯竭的灵力源泉竟暴涨三成，金色光纹顺着玄鸟纹章蔓延至洞府深处。",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "alchemical_vault_discovered",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "None",
+        "item": "None"
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 4,
+        "total": 4,
+        "score": 1.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 3,
+        "score": 0.3333333333333333
+      },
+      "overall": 0.4444444444444444
+    },
+    "error": null
+  },
+  {
+    "group": "R2",
+    "scene_idx": 3,
+    "rep": 0,
+    "runtime": true,
+    "segments": 2,
+    "successful_segments": 0,
+    "execution_time": 405.5951769351959,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在遗迹中寻找突破金丹期的灵药",
+        "conflict": "与守护灵药的上古妖兽争夺生存权",
+        "expected_outcome": "成功获取千年灵参并触发隐藏试炼"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "林逸运用敛息术潜入血煞沼泽，规避毒瘴追踪千年灵参气息",
+            "attributes": {}
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "遭遇三首鳄妖突袭，以玄冰剑气冻结泥潭迟滞追击",
+            "attributes": {}
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "在灵参化形瞬间施展夺宝秘术，引发地底阵法共鸣",
+            "attributes": {}
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "ancient_beast_awakened",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "千年灵参",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "location",
+            "name": "坐标",
+            "value": "N32°E75°",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "林逸必须使用本命法宝完成采药",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不得在战斗中动用禁术",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T17:45:33.455698"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "R2",
+    "scene_idx": 4,
+    "rep": 0,
+    "runtime": true,
+    "segments": 2,
+    "successful_segments": 1,
+    "execution_time": 438.2164239883423,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在幽影密林中寻找传说中的九叶灵芝以突破炼气期瓶颈",
+        "conflict": "时间紧迫且密林中潜伏着抢夺灵芝的妖兽与竞争修士",
+        "expected_outcome": "成功获得九叶灵芝但触发密林守护机关"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "林逸根据古籍指引穿越瘴气区，使用驱毒丹抵消毒性",
+            "attributes": {
+              "risk_level": "high",
+              "resource_cost": {
+                "inventory": "驱毒丹-1"
+              }
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "在千年古树下发现九叶灵芝生长点，同时感知到三只影狼潜伏",
+            "attributes": {
+              "discovery_chance": 0.75,
+              "combat_trigger": true
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "以幻影步绕开主根区域采摘灵芝，触发地脉震荡",
+            "attributes": {
+              "stealth_required": true,
+              "plot_progress": "phase_2"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "九叶灵芝获取",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "九叶灵芝",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "密林震荡状态",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过智取而非硬拼获得灵芝",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "直接使用致命手段消灭所有妖兽",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T17:54:10.025190"
+      }
+    },
+    "scene_text": "林逸屏息掠过最后一片瘴气沼泽，指尖捏碎的驱毒丹在喉间化作金红火苗，将侵蚀经脉的腐毒尽数焚尽。古籍所载的千年古树矗立眼前，虬结的树根下幽光浮动，九叶灵芝正以肉眼可见的速度吞吐着天地灵气。\n\n三道阴冷气息骤然贴地游来。林逸瞳孔微缩，三头影狼的虚影已没入古树枝桠间，它们漆黑的皮毛泛着与夜色交融的银斑，利爪正轻轻叩击着灵芝生长的主根。\n\n他反手扯下腰间翠色香囊，三缕不同属性的灵气顺着地脉裂隙激射而出。当第一头影狼扑向灵芝时，幻影步第七变·九宫移位陡然发动，林逸的身形在七重树影中化作残影，每道虚像都掐着相同的手诀——「听风」。\n\n地底传来闷雷般的震颤。三头影狼突然陷入各自方位的泥沼漩涡，它们惊怒地仰天长嚎，却见整株千年古树竟如活物般舒展根系，将九叶灵芝连同半尺树根一同托出地面。林逸凌空接住这团泛着九色光晕的灵药时，分明听见地脉深处传来龙吟般的嗡鸣。",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "九叶灵芝获取",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "林逸",
+        "item": "九叶灵芝"
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 2,
+        "total": 3,
+        "score": 0.6666666666666666
+      },
+      "constraint": {
+        "passed": true,
+        "score": 1.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 3,
+        "score": 0.3333333333333333
+      },
+      "overall": 0.6666666666666666
+    },
+    "error": null
+  },
+  {
+    "group": "R3",
+    "scene_idx": 0,
+    "rep": 0,
+    "runtime": true,
+    "segments": 3,
+    "successful_segments": 1,
+    "execution_time": 671.3311161994934,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在幽冥秘境中寻找突破炼气期的机缘",
+        "conflict": "秘境内机关与妖兽威胁阻碍资源获取",
+        "expected_outcome": "成功获得上古凝气丹配方并触发血脉试炼"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "林逸以噬魂术破解石碑禁制，发现刻有远古修士炼丹手札的青铜匣",
+            "attributes": {
+              "risk_level": 3,
+              "cultivation_gain": "识海扩展"
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "遭遇变异蜈蚣王袭击，被迫以残缺剑诀斩断三根毒刺暂退妖兽",
+            "attributes": {
+              "combat_damage": 15,
+              "xp_gain": "剑意领悟+10%"
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "吞服秘境核心处的九转灵芝，引发体内混沌血脉觉醒",
+            "attributes": {
+              "mutation_chance": 70,
+              "qi_absorption": "×3倍"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "远古遗迹发现",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "青铜炼丹匣",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "血脉境界",
+            "value": "混沌初期",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须触发血脉觉醒",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "秘境出口被提前封堵",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T18:03:22.993017"
+      }
+    },
+    "scene_text": "林逸的指尖刚触到石碑表面浮动的幽蓝纹路，背后突然传来一阵灼骨剧痛。他咬紧牙关催动噬魂术，三缕黑气自丹田窜出，沿着石碑裂纹游走成三角阵型。随着禁制发出刺耳的哀鸣，石碑中央竟渗出血色液体，将他左臂经脉染得发烫。\n\n青铜匣开启时溢出的药香裹挟着血腥气，内页密布着用尸血写就的炼丹手札。当林逸的目光扫过'九转还魂丹'配方时，胸口突然爆开一道金光。他惊觉手臂浮现龙鳞状纹路，耳畔响起远古修士的低语——原来匣底暗格里藏着的，并非丹方而是觉醒千年前的渡劫期血脉。\n\n",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "远古遗迹发现",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "林逸",
+        "item": "远古炼丹手札"
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 2,
+        "total": 3,
+        "score": 0.6666666666666666
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 3,
+        "score": 0.3333333333333333
+      },
+      "overall": 0.3333333333333333
+    },
+    "error": null
+  },
+  {
+    "error": "unsupported operand type(s) for +: 'int' and 'NoneType'",
+    "group": "R3"
+  },
+  {
+    "group": "R3",
+    "scene_idx": 2,
+    "rep": 0,
+    "runtime": true,
+    "segments": 3,
+    "successful_segments": 0,
+    "execution_time": 378.29856133461,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古老洞府中寻找突破炼气期的机缘",
+        "conflict": "洞府试炼的生死考验与时间流逝的压迫感",
+        "expected_outcome": "获得上古修士遗留的《九霄雷诀》残篇"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "林逸触发洞府入口的血纹阵法，引发地面震动与石门开启",
+            "attributes": {
+              "trigger_type": "blood_seal",
+              "response_delay": 3
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "穿越迷宫时遭遇幻象侵袭，需在三息内辨识真实路径",
+            "attributes": {
+              "time_limit": 3,
+              "consequence": "mind_damage"
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "破解五行法阵时被迫吞食毒雾凝成的丹丸",
+            "attributes": {
+              "risk_reward": "poison_vs_power",
+              "hp_cost": 10
+            }
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "与石像鬼战斗中领悟雷电之力的运转轨迹",
+            "attributes": {
+              "combat_type": "boss_fight",
+              "xp_gain": 50
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "dungeon_activated",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "nine_heavens_script",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "current_hp",
+            "value": 85,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须触发洞府核心区域的传承仪式",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不得出现其他修士干扰主线进程",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T18:20:18.725909"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "R3",
+    "scene_idx": 3,
+    "rep": 0,
+    "runtime": true,
+    "segments": 3,
+    "successful_segments": 3,
+    "execution_time": 559.5439376831055,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在迷雾沼泽获取上古灵药突破境界",
+        "conflict": "毒瘴侵蚀与守护妖兽的双重威胁",
+        "expected_outcome": "成功采集中品灵药但触发血色沼气暴动"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "循着《百草经》指引定位沼泽中心的血莲踪迹，发现半透明晶石包裹的灵药根茎",
+            "attributes": {}
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "以剑气震碎护药晶石时触发地脉共鸣，三头青鳞毒蛟从泥沼中苏醒",
+            "attributes": {}
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "边抵御毒雾腐蚀边施展《玄龟御》护体，趁妖兽交缠时抢夺坠落的半截血莲",
+            "attributes": {}
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "blood_mist_activated",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "blood_lily_fragment",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "血莲必须在妖兽未完全复苏前夺取",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不可使用致命杀招引发天地异象",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T18:28:15.260196"
+      }
+    },
+    "scene_text": "林逸的指尖抚过《百草经》泛黄的纸页，血莲图谱在雾气中忽明忽暗。他踩着腐殖质堆砌的土包深入沼泽，鼻尖萦绕着腥甜的瘴气——当脚下传来异样的震颤，半透明晶石包裹的根茎突然刺破泥潭，猩红汁液顺着石纹汩汩渗出。他迅速结印封住四周气机，却见晶壳内侧浮现出密布血孔的莲藕状灵药，而三丈外淤泥正鼓起妖异的波浪。\n\n剑气如银蛇缠绕晶壳，林逸手腕陡然下压。随着一声脆响，包裹血莲的晶石迸裂成万千碎片，猩红汁液瞬间被他袖中玉瓶吸纳。地脉共鸣的震颤却在此刻撕开泥沼——三道青鳞身影裹挟着腥风破土而出，毒蛟幽蓝的竖瞳正映出少年苍白的脸。他倒退时踏碎浮萍，靴底传来腐叶下暗河奔涌的轰鸣，而最后半截血莲根须已悄然没入瓶口阵纹。当第一道毒牙刺穿方才站立的位置时，林逸袖中法诀陡转，身形如落叶般斜飘三丈，袖口残留的晶石粉末在空中划出灼热的轨迹。\n\n青光在毒雾中龟裂出蛛网状纹路，林逸咬破舌尖将血气注入《玄龟御》的咒纹。三头毒蛟纠缠着在泥潭翻滚，腥臭涎水泼溅在护体光罩上，化作缕缕白烟腾空而起。他借着蛟尾扫过浮萍的刹那，玉瓶阵纹骤然亮起赤色流光——半截血莲竟从蛟腹缝隙坠落，被袖中法诀牵引着没入瓶中。最年长的毒蛟突然昂首发出尖啸，林逸却已踏着暗河涌出的气旋倒飞九丈，身后青鳞妖兽刚苏醒的瞳孔里，映出少年腰间玉瓶上跳动的血色灵光。\n\n",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "blood_mist_activated",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "林逸",
+        "item": "血莲根茎"
+      },
+      {
+        "type": "plot_flag_set",
+        "flag": "blood_mist_activated",
+        "value": true
+      },
+      {
+        "type": "plot_flag_set",
+        "flag": "blood_mist_activated",
+        "value": true
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 3,
+        "total": 3,
+        "score": 1.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 2,
+        "score": 0.5
+      },
+      "overall": 0.5
+    },
+    "error": null
+  },
+  {
+    "group": "R3",
+    "scene_idx": 4,
+    "rep": 0,
+    "runtime": true,
+    "segments": 3,
+    "successful_segments": 3,
+    "execution_time": 648.9387137889862,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在禁地密林中寻找传说中的九叶灵芝以突破炼气期瓶颈",
+        "conflict": "妖兽巢穴与宗门禁制的双重威胁压缩了探索时间窗口",
+        "expected_outcome": "成功采集灵药但触发上古阵纹引发后续追踪"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "破晓时分潜入血枫林，运用隐匿符箓规避三眼金蟾妖兽的灵识扫描",
+            "attributes": {
+              "trigger_condition": "月相转换",
+              "risk_level": 4
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "破译石碑上残缺的上古苔文，定位九叶灵芝与噬灵虫共生系统的精确坐标",
+            "attributes": {
+              "intellect_check": true,
+              "time_limit": 180
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "以本命精血为引激活灵药护罩，同时布下反制陷阱应对可能的夺宝修士",
+            "attributes": {
+              "resource_cost": "10%灵力",
+              "cooldown": 72
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "九叶灵芝坐标确认",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "残缺苔文拓片",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "血枫林禁制强度",
+            "value": "升至Lv.3",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过精血契约获取灵药",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不得使用宗门禁制传送阵离开",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T18:39:27.890712"
+      }
+    },
+    "scene_text": "破晓雾霭中，林逸将隐匿符箓贴在三叶草形玉佩上，青光流转间与血枫林瘴气融为一体。三眼金蟾的腥臭吐息擦过他耳际时，他正用指尖在石碑苔痕上勾勒残缺的星斗纹——这是百年前陨落在此的炼虚期修士留下的坐标密码。\n\n当第七道月华方位被补全，石碑突然渗出琥珀色药香。林逸咬破舌尖将精血抹在碑文凹槽，九叶灵芝所在的方位竟在三十丈外的腐骨洞中，那里正是噬灵虫群巢穴。他迅速掏出三张缚魂符嵌入地脉裂隙，又以本命真火淬炼的朱砂画出血祭阵。\n\n暗红菌丝破土而出的瞬间，林逸丹田气海剧烈震荡。炼气期修士强行催动精血契约，经脉如沸水般滚烫，但他仍成功让九叶灵芝的灵光与噬灵虫毒腺产生共鸣。远处传来禁制法阵崩塌的轰鸣时，他正将最后三枚雷属性陷阱石钉入树根，这些用宗门戒尺碎片炼化的反制手段，足以让夺宝者付出断臂代价。",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "九叶灵芝坐标确认",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "林逸",
+        "item": "缚魂符（使用掉3张）"
+      },
+      {
+        "type": "item_acquire",
+        "actor": "林逸",
+        "item": "血祭阵材料（消耗）"
+      },
+      {
+        "type": "status_change",
+        "target": "林逸",
+        "attribute": "经脉损伤",
+        "value": "+15"
+      },
+      {
+        "type": "environment_change",
+        "location": "腐骨洞",
+        "effect": "噬灵虫巢穴进入暴怒状态"
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 1,
+        "total": 3,
+        "score": 0.3333333333333333
+      },
+      "constraint": {
+        "passed": true,
+        "score": 1.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 3,
+        "score": 0.3333333333333333
+      },
+      "overall": 0.5555555555555555
+    },
+    "error": null
+  },
+  {
+    "group": "R4",
+    "scene_idx": 0,
+    "rep": 0,
+    "runtime": true,
+    "segments": 4,
+    "successful_segments": 1,
+    "execution_time": 323.62591195106506,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在禁地遗迹中寻找提升实力的上古秘籍",
+        "conflict": "遗迹机关与同期探索者的争夺",
+        "expected_outcome": "获得残缺秘籍但触发追踪印记"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "运用灵觉感知发现隐匿山洞，破译岩壁上风蚀的阵法铭文",
+            "attributes": {
+              "sensitivity": 8,
+              "knowledge_required": "基础阵法"
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "以本命精血为引解开三重禁制，触发悬浮玉简的防御机制",
+            "attributes": {
+              "risk_level": "high",
+              "resource_cost": "10%灵力"
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "在秘籍传送阵启动瞬间抢夺半卷《九霄劫雷手》，引发空间裂隙",
+            "attributes": {
+              "initiative": 9,
+              "distraction": "同期修士阻拦"
+            }
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "借助幻阵干扰追踪者，将残卷封入随身乾坤袋的隐格",
+            "attributes": {
+              "stealth": 7,
+              "item_dependency": "祖传玉佩"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "古籍残卷获取",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "空间裂隙坐标",
+            "value": [
+              34.6,
+              -12.3
+            ],
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "relationship",
+            "name": "与散修联盟敌意",
+            "value": 45,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须触发传送阵",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "直接与元婴期修士正面冲突",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T18:52:13.051200"
+      }
+    },
+    "scene_text": "林逸盘膝而坐，灵觉如蛛网般向四野蔓延。当感知到三里外岩壁的灵气流动异常时，他指尖轻点山岚雾气，一道风蚀千年的阵纹在青苔下若隐若现。以《玄机诀》推演古篆，竟是需要本命精血为引的三重封灵禁制。\n\n当第三道血符融入石缝时，穹顶突然垂落幽蓝光柱，悬浮玉简爆发出雷火禁制。林逸袖中飞出三枚避尘符，身形在电光火石间掠过七盏悬浮灯台，在传送阵启动的刹那，指尖已扣住半卷《九霄劫雷手》残篇。\n\n空间裂隙撕开血色通道时，三道陌生灵压正从不同方位逼近。林逸咬破舌尖喷出猩红雾气，乾坤袋内《迷魂七步阵》自行展开，将追兵幻化成三尊静立石像。趁此空隙，他掌心金光一闪，已将烫伤掌心的残卷封入乾坤袋隐格，只余焦糊血腥气在风中飘散。",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "古籍残卷获取",
+        "value": true
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 1,
+        "total": 4,
+        "score": 0.25
+      },
+      "constraint": {
+        "passed": true,
+        "score": 1.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 3,
+        "score": 0.3333333333333333
+      },
+      "overall": 0.5277777777777778
+    },
+    "error": null
+  },
+  {
+    "group": "R4",
+    "scene_idx": 1,
+    "rep": 0,
+    "runtime": true,
+    "segments": 4,
+    "successful_segments": 4,
+    "execution_time": 473.9707763195038,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在禁地遗迹中寻找提升修为的上古秘卷",
+        "conflict": "守护秘卷的上古灵兽与机关阻碍其获取",
+        "expected_outcome": "成功通过试炼获得秘卷并触发隐藏任务"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "发现刻有玄奥符文的青铜书匣，触发隐匿阵法",
+            "attributes": {
+              "array_type": "discovery",
+              "danger_level": 3
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "遭遇幻境侵袭，需以本命精血破除灵兽虚影封印",
+            "attributes": {
+              "combat_type": "illusion",
+              "resource_cost": "blood"
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "解读古卷上的《九霄雷诀》引发天地异象",
+            "attributes": {
+              "cultivation_gain": "lightning_affinity",
+              "quest_trigger": true
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "obtained_thunder_script",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "古雷卷轴",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "雷属性感知",
+            "value": "enhanced",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过精神力破解幻境",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "使用暴力手段破坏阵法核心",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T18:59:49.264759"
+      }
+    },
+    "scene_text": "青铜书匣表面浮动的符文骤然亮起青芒，林逸瞳孔微缩——隐匿阵法已悄然启动。他感觉周身陷入粘稠的幻境，耳畔传来师尊临终前的低语：'心有所执，道难圆满。'虚空中浮现万千雷光碎片，每一片都映出他渴望力量的执念。咬破舌尖的疼痛让他清醒，精神力如丝线般抽离幻象，将雷光凝聚成漩涡。阵法核心处的青铜锁扣应声而开，卷轴上跳动的雷霆纹路与他丹田中的灵力共鸣，一道惊雷在掌心炸响时，他知道秘卷已归于己有。\n\n青铜匣骤然震颤，一道青鳞虚影自卷轴漩涡中腾空而起。林逸瞳孔紧缩——这分明是上古灵兽玄鳞的魂魄残影，其周身缠绕的雷霆竟比秘卷更炽烈三分。虚影张口吐出万千幻象，他瞬间坠入雷火炼魂的噩梦：宗门弟子化作焦炭的躯体堆积如山，师尊的血书在雷光中一遍遍浮现'贪念即魔'的箴言。丹田灵力被幻境抽丝剥茧般侵蚀，林逸反手割破掌心，以本命精血为引催动精神力织网。殷红血线与青芒交织成锁链穿透虚影核心，玄鳞发出震耳欲聋的哀鸣，其残存执念在血光中涣散成点点星辉。当最后一缕雷光没入卷轴时，他踉跄跪地，发现衣襟上凝结着三枚血色符咒——竟是破除禁地封印的关键。\n\n卷轴上的古篆骤然流转雷光，林逸以精神力探入《九霄雷诀》的刹那，整座遗迹穹顶裂开蛛网状的符文。苍穹之上黑云翻涌，万道雷霆在虚空中凝成巨手抓向他的神魂。丹田处三枚血符咒突然灼烧作痛，竟是秘卷设下的反噬——唯有以本命精血为引方能承接天雷。他咬破舌尖将血珠抹在卷轴，九重霄鸣的轰鸣声里，三道雷霆竟化作金线没入眉心。当最后一缕雷光归于识海时，整座遗迹的阵纹尽数熄灭，而他衣襟上血符已融为齑粉。\n\n残破的阵纹下浮现出幽蓝漩涡，林逸的精神力如蛛网般向虚空中蔓延。他感知到《九霄雷诀》深处蛰伏着第二层封印——无数破碎的记忆残片正构筑着流动幻境。当脚下石砖化作血色沼泽时，他立即将精神力凝成金线，顺着玄鳞残存的雷光轨迹编织禁制。幻境中的上古战场虚影开始崩塌，万千冤魂嘶吼声中，三枚血符的灰烬突然悬浮重组，化作青铜罗盘没入他眉心。穹顶最后一道紫电消散时，石壁上的《九霄雷诀》真迹已彻底融入卷轴，而林逸的炼气期灵力竟在精神力反哺下隐隐生出凝实之感。\n\n",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "obtained_thunder_script",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "None",
+        "item": "None"
+      },
+      {
+        "type": "plot_flag_set",
+        "flag": "obtained_thunder_script",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "None",
+        "item": "None"
+      },
+      {
+        "type": "plot_flag_set",
+        "flag": "obtained_thunder_script",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "None",
+        "item": "None"
+      },
+      {
+        "type": "plot_flag_set",
+        "flag": "obtained_thunder_script",
+        "value": true
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 3,
+        "total": 3,
+        "score": 1.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 3,
+        "score": 0.3333333333333333
+      },
+      "overall": 0.4444444444444444
+    },
+    "error": null
+  },
+  {
+    "group": "R4",
+    "scene_idx": 2,
+    "rep": 0,
+    "runtime": true,
+    "segments": 4,
+    "successful_segments": 0,
+    "execution_time": 342.6927697658539,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古修士遗迹中获取晋升金丹期的关键灵药",
+        "conflict": "遗迹中设有致命阵法与争夺者埋伏",
+        "expected_outcome": "成功取得千年雪莲但触发隐藏杀局"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "破译石碑上古篆文启动机关",
+            "attributes": {
+              "difficulty": "hard",
+              "time_limit": 120
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "以本命精血为引破解冰魄阵",
+            "attributes": {
+              "cost": "50_hp",
+              "success_chance": 0.65
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "与散修联盟成员争夺灵药发生混战",
+            "attributes": {
+              "combat_style": "chaotic",
+              "stake": "high"
+            }
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "触发地脉暴动引发空间裂隙",
+            "attributes": {
+              "unpredictable": true,
+              "consequence": "cataclysm"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "ancient_seal_broken",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "snow_lotus_obtained",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "cultivation_base",
+            "value": "late_danxia",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "current_hp",
+            "value": 450,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "雪莲必须在地脉暴动前带走",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "使用禁术引发天地异象",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T19:09:36.796276"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "R4",
+    "scene_idx": 3,
+    "rep": 0,
+    "runtime": true,
+    "segments": 4,
+    "successful_segments": 3,
+    "execution_time": 747.0926706790924,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古禁地获取上古修仙秘籍以突破境界",
+        "conflict": "禁地核心区域的守护阵法会吞噬心智不坚者",
+        "expected_outcome": "成功获得《九霄劫雷经》但留下精神创伤"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "林逸破译古碑上的星图阵纹触发禁地机关",
+            "attributes": {
+              "difficulty": "hard",
+              "time_limit": 120
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "在幻境中与本心魔障对峙选择保留七情六欲",
+            "attributes": {
+              "moral_choice": true,
+              "stamina_cost": 15
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "以精血为引激活上古阵眼暂避妖兽群袭",
+            "attributes": {
+              "resource_required": "blood",
+              "duration": 60
+            }
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "参悟半卷残破秘籍时遭遇时空乱流反噬",
+            "attributes": {
+              "knowledge_gain": "elemental_control",
+              "hp_damage": 10
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "obtained_ancient_text",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "player_hp",
+            "value": 85,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "nine_heavens_script",
+            "value": "fragment",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须触发星图阵纹机关",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不得提前遭遇守护妖兽",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T19:17:14.659838"
+      }
+    },
+    "scene_text": "林逸指尖抚过古碑上斑驳的星图纹路，忽见七颗暗淡的青铜星钉在掌心温度下泛起幽光。当他将星钉按二十八宿轨迹嵌入凹槽时，整座石殿突然倾斜成倒悬之态，无数星辉化作锁链缠绕周身。'原来真正的阵眼在体内！'他猛然咬破舌尖，以精血为引催动丹田内那道残缺的河图纹身，霎时听见妖兽嘶吼声从四面八方涌来——却见脚下石砖化作流沙漩涡，将万千凶兽吸入地脉深处。\n\n幻境中浮现幼年林逸抱着病榻母亲痛哭的身影，心魔幻化的黑袍人狞笑：'斩断情丝可得大圆满！'他望着母亲咳出的血渍在月光下凝成玉髓，突然将本欲飞升的灵石砸向地面。碎裂的灵石里滚出七只萤火虫，在掌心拼出师门禁制的纹样——正是这执念让他破开幻阵，石壁间半卷《太素心经》应声而落。\n\n当林逸盘膝参悟秘籍时，忽觉时光开始逆向流动。他看见自己同时经历着百年岁月：七岁采药坠崖、十五被逐出师门、昨夜在酒肆与故人诀别...时空乱流撕扯着他刚凝结的金丹，经脉间奔涌的灵力突然变得滚烫如血。古碑最后一道星纹在此刻彻底亮起，将所有矛盾瞬间压缩成一点璀璨的光斑。",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "obtained_ancient_text",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "None",
+        "item": "None"
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 1,
+        "total": 4,
+        "score": 0.25
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 3,
+        "score": 0.3333333333333333
+      },
+      "overall": 0.19444444444444442
+    },
+    "error": null
+  },
+  {
+    "group": "R4",
+    "scene_idx": 4,
+    "rep": 0,
+    "runtime": true,
+    "segments": 4,
+    "successful_segments": 0,
+    "execution_time": 375.5984425544739,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古遗迹中寻找突破炼气期的机缘",
+        "conflict": "上古试炼机关与守护灵兽的双重阻挠",
+        "expected_outcome": "成功获得《玄冰诀》并触发血脉觉醒"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "触发浮雕石碑上的上古试炼阵法，引发地宫机关启动",
+            "attributes": {
+              "trigger_type": "灵力共鸣",
+              "difficulty": "hard"
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "破解悬浮玉简中的九星幻阵谜题，需在三息内调整星辰方位",
+            "attributes": {
+              "time_limit": 3,
+              "failure_consequence": "毒雾喷发"
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "与化形的上古冰蛟虚影进行生死演武，需同时抵御物理与心魔攻击",
+            "attributes": {
+              "combat_type": "混合",
+              "ai_behavior": "adaptive"
+            }
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "以心头血为引激活石棺中的玄冰本源，完成最后的淬体考验",
+            "attributes": {
+              "pain_threshold": "critical",
+              "reward_scale": "legendary"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "ancient_trial_complete",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "玄冰剑",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "灵识境界",
+            "value": "炼气巅峰",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过心魔劫考验才能获得功法",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "直接破坏机关获取奖励",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T19:31:39.049970"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "RA",
+    "scene_idx": 0,
+    "rep": 0,
+    "runtime": true,
+    "segments": 2,
+    "successful_segments": 0,
+    "execution_time": 388.6591229438782,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在禁地边缘寻找稀有灵草以突破炼气期瓶颈",
+        "conflict": "遭遇守护灵草的三阶妖兽黑风老猿阻挠",
+        "expected_outcome": "成功获取灵草但身受内伤，触发后续复仇剧情"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "循着灵气波动在断魂崖峭壁发现千年夜明珠芝的灵脉反应",
+            "attributes": {
+              "location_change": "断魂崖北纬32°洞穴"
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "遭遇黑风老猿偷袭，被迫施展火符术焚毁三株普通灵药吸引仇恨",
+            "attributes": {
+              "resource_loss": "火符x3",
+              "combat_initiated": true
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "在逃跑过程中触发崖壁机关，获得夜明珠芝却引发经脉灼烧伤",
+            "attributes": {
+              "item_acquired": "千年夜明珠芝",
+              "status_effect": "经脉灼痛"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "night_glow_mushroom_obtained",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "断魂崖禁地状态",
+            "value": "已入侵核心区域",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "林逸当前生命值",
+            "value": 0.6,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "夜明珠芝必须通过战斗获得",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "黑风老猿当场死亡",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T19:39:50.780384"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "RA",
+    "scene_idx": 1,
+    "rep": 0,
+    "runtime": true,
+    "segments": 2,
+    "successful_segments": 0,
+    "execution_time": 401.86500310897827,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古遗迹中寻找突破炼气期的机缘",
+        "conflict": "遗迹中的上古机关与突然苏醒的守护古兽",
+        "expected_outcome": "成功获得残缺的《九霄雷诀》并触发古兽追杀"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "发现刻有雷纹的石碑，触碰引发阵法共鸣",
+            "attributes": {
+              "location": "遗迹中心",
+              "trigger": "阵法激活"
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "破解三重符文谜题时触发暗弩阵，右肩中箭",
+            "attributes": {
+              "hp_change": -15,
+              "inventory_gain": "残缺玉简"
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "解读玉简内容时惊动沉睡的玄冥古兽，引发追击",
+            "attributes": {
+              "realm_change": "战斗领域激活"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "古遗迹探索开始",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "残缺玉简",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "林逸当前血量",
+            "value": 85,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过解谜获得传承",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "直接找到完整功法",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T19:48:11.163906"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "RA",
+    "scene_idx": 2,
+    "rep": 0,
+    "runtime": true,
+    "segments": 2,
+    "successful_segments": 2,
+    "execution_time": 434.1105237007141,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在幽冥秘境深处寻获上古凝煞石以突破炼气期瓶颈",
+        "conflict": "秘境内同时存在三股势力（妖兽群、散修争夺者、秘境坍塌危机）的多重威胁",
+        "expected_outcome": "成功获取凝煞石但身受暗伤，触发后续疗伤伏笔"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "潜入秘境核心时遭遇三首赤蟒袭击，以《玄冰手》冻结其毒牙反制",
+            "attributes": {
+              "risk_level": 7,
+              "cultivation_gain": "0"
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "发现散修联盟布置的九宫封灵阵，用本命灵石破解获取优先探索权",
+            "attributes": {
+              "resource_cost": "1枚下品灵石",
+              "time_consume": "30分钟"
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "在坍塌岩层中触发上古机关，以剑气为引激活凝煞石共鸣",
+            "attributes": {
+              "item_acquired": "残缺凝煞石x1",
+              "injury": "经脉灼伤"
+            }
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "撤离时被秘境怨灵缠绕，消耗半瓶续命丹强行突破空间裂缝",
+            "attributes": {
+              "hp_remaining": 0.6,
+              "stamina_cost": "30%"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "凝煞石获取",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "残缺凝煞石",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "林逸当前血量",
+            "value": 0.6,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须在秘境完全坍塌前离开",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不得使用禁制类底牌法器",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T19:57:06.093639"
+      }
+    },
+    "scene_text": "林逸踏着碎裂的玄晶地砖深入秘境，幽蓝雾霭中忽现三首赤蟒盘踞。当先蛇首喷出腥红毒雾时，他已掐诀催动《玄冰手》，双掌寒芒暴起将袭来的毒牙凝成冰柱。余下两首趁机甩尾抽击，却被林逸借着秘境本源之力折射的月华灵光凌空跃开。刚甩掉妖兽，前方石壁竟浮现出九宫封灵阵的禁制纹路——那是散修联盟的标记。他摸出本命灵石贴在阵眼处，任由灵力顺着青金石纹路游走，将阵法反向推演成指引迷宫。当最后一块阵旗偏转方向，石门轰然开启时，穹顶裂缝中坠下的紫色晶砂让他瞳孔骤缩：悬浮在半空的凝煞石，正散发着令他经脉震颤的上古灵气。\n\n凝煞石悬浮处的岩层突然龟裂，林逸剑指划破掌心，以血为媒催动《太乙剑诀》凝出三道青虹。当剑气刺入岩缝的刹那，整座秘境发出龙吟般的震颤，穹顶垂落的紫晶砂化作流火漩涡。他咬牙将凝煞石嵌入腰间玉珏凹槽，霎时经脉如沸水翻涌——上古机关被激活的瞬间，地底冲出万千怨灵锁链。林逸甩出半瓶续命丹，借着药力在空间裂缝撕开前瞬移三丈，却见身后石柱接连崩塌，幽冥火海中凝煞石已与玉珏共鸣生出青色光桥。当他踏着光桥跃出秘境时，最后一块地砖坠入虚空，而怀中玉珏深处传来经脉突破的酥麻感。\n\n",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "凝煞石获取",
+        "value": true
+      },
+      {
+        "type": "plot_flag_set",
+        "flag": "凝煞石获取",
+        "value": true
+      },
+      {
+        "type": "item_consume",
+        "actor": "林逸",
+        "item": "续命丹",
+        "quantity": 1
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 4,
+        "total": 4,
+        "score": 1.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 3,
+        "score": 0.3333333333333333
+      },
+      "overall": 0.4444444444444444
+    },
+    "error": null
+  },
+  {
+    "group": "RA",
+    "scene_idx": 3,
+    "rep": 0,
+    "runtime": true,
+    "segments": 2,
+    "successful_segments": 0,
+    "execution_time": 385.19860434532166,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古遗迹中寻找突破炼气期的机缘",
+        "conflict": "遗迹中的上古守护兽苏醒阻挠探索者",
+        "expected_outcome": "获得残缺的《九霄雷诀》并触发守护兽追杀"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "发现刻有雷纹的石门暗格，触发机关阵",
+            "attributes": {}
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "破译阵法时遭遇电磁风暴类灵力反噬",
+            "attributes": {}
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "夺取悬浮玉简时惊动沉睡的雷龙虚影",
+            "attributes": {}
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "用新得的雷系法诀击碎封印石碑引发空间震荡",
+            "attributes": {}
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "thunder_trial_active",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "fragmented_scripture",
+            "value": "九霄雷诀(残缺)",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "spirit_energy_level",
+            "value": 42,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "雷龙虚影必须在场景结束时处于追击状态",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "直接获得完整功法或无代价获取宝物",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T20:06:12.146330"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "RA",
+    "scene_idx": 4,
+    "rep": 0,
+    "runtime": true,
+    "segments": 2,
+    "successful_segments": 2,
+    "execution_time": 418.0830338001251,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古遗迹中寻找突破境界的关键秘法",
+        "conflict": "上古封印与守护灵兽阻挠探索者",
+        "expected_outcome": "触发试炼机制并获得传承印记"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "发现刻有九霄云雷纹的青铜门环，触碰引发阵法共鸣",
+            "attributes": {
+              "environment": "远古修仙遗迹前厅",
+              "trigger": "阵法激活"
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "破译悬浮玉简上的星图谜题，消耗三颗本命灵石作为祭品",
+            "attributes": {
+              "intellect_challenge": "需理解上古星象体系",
+              "resource_cost": "灵石x3"
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "与化形的青鳞守护兽展开幻境对决，暴露内心执念",
+            "attributes": {
+              "combat_type": "精神力博弈",
+              "exposure_risk": "真实心性"
+            }
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "踏破浮现的血色迷阵，找到刻有《玄天锻骨经》的黑曜石碑",
+            "attributes": {
+              "danger_level": "高阶法阵",
+              "reward_type": "功法传承"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "ancient_trial_active",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "玄天锻骨经",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过精神力对决获得传承",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "直接暴力破坏封印机制",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T20:14:31.011223"
+      }
+    },
+    "scene_text": "青铜巨门上的九霄云雷纹在林逸指尖触碰的刹那骤然亮起，整条手臂仿佛被雷霆缠绕，古老阵纹顺着血脉游走全身。当他咬破舌尖将血珠抹过门环时，穹顶星图突然凝滞成实体玉简悬浮半空，三十六道星轨竟与他丹田灵力产生共鸣。'以本命灵石为引？'林逸冷笑一声抛出三颗碧色灵石，却见它们在星轨中疯狂旋转，化作实质化的光带缠绕住他的神识——玉简内传出上古大能的意念洪流，将他意识拖入星辰漩涡。\n\n星辰漩涡中浮现出青鳞巨蟒虚影，鳞片间流转着与青铜门同源的云雷纹。林逸神识刚凝聚成剑形便被幻境击碎，无数记忆碎片如刀锋划过心脉——师父断剑时的叹息、幼时 village 被焚毁的焦土、还有那本未曾送出的《青玉诀》抄本。青鳞守护兽的声音在虚空中震荡：「求道者皆困于执念，汝以灵石为饵，却未破我设下的贪嗔痴三关。」血色阵纹突然从虚空中蔓延，将林逸钉在由自身执念凝成的祭坛上。当第七道雷火即将焚毁神魂时，他忽然捏碎掌心血精石，任由三十六道星轨反噬入体，周身经脉在剧痛中重构为玄天古篆形态。黑曜石碑就在这灵脉重塑的刹那浮现，碑文正是与他新成形的经脉完美契合的《玄天锻骨经》。\n\n",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "ancient_trial_active",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "None",
+        "item": "None"
+      },
+      {
+        "type": "plot_flag_set",
+        "flag": "ancient_trial_active",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "None",
+        "item": "None"
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 4,
+        "total": 4,
+        "score": 1.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 2,
+        "score": 0.5
+      },
+      "overall": 0.5
+    },
+    "error": null
+  },
+  {
+    "group": "D",
+    "scene_idx": 0,
+    "rep": 0,
+    "runtime": false,
+    "segments": 1,
+    "successful_segments": 0,
+    "execution_time": 0,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古遗迹中寻找上古功法以突破境界",
+        "conflict": "遗迹中的守护灵兽与致命机关阻碍探索",
+        "expected_outcome": "获得残缺功法但触发灵兽追杀"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "破译石碑上的上古符文阵列，激活传送法阵进入遗迹核心",
+            "attributes": {}
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "用本命精血解开血纹锁，获得《九幽玄骨经》残页",
+            "attributes": {}
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "触发地脉反噬导致经脉逆冲，被玄冥冰魄侵蚀丹田",
+            "attributes": {}
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "击杀幻化成导师模样的守护灵兽，获得兽核中的解毒秘术",
+            "attributes": {}
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "obtained_forbidden_art",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "dan_tian_condition",
+            "value": "corrupted",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "artifact_status",
+            "value": "九幽玄骨经残页",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过血祭方式获取功法",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "直接获得完整无缺的修炼资源",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T20:23:17.259665"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "D",
+    "scene_idx": 1,
+    "rep": 0,
+    "runtime": false,
+    "segments": 1,
+    "successful_segments": 0,
+    "execution_time": 0,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古遗迹中获取上古功法以突破境界",
+        "conflict": "遗迹中的守护傀儡与致命机关阻碍探索",
+        "expected_outcome": "成功获得《九霄雷诀》但触发重大代价"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "林逸通过血祭激活遗迹入口石碑，引发地面坍塌机关",
+            "attributes": {}
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "破解星象迷宫时触发幻境，被迫面对心魔劫考验",
+            "attributes": {}
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "与青铜傀儡对战中故意露出破绽，以自残方式引动傀儡反噬机制",
+            "attributes": {}
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "在获得功法的刹那，古剑器灵强行与其立下生死血契",
+            "attributes": {}
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "obtained_necromancy",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "九霄雷诀残页",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "心脉损伤",
+            "value": -20,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过自残方式突破机关",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不得使用传送类法宝逃离",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T20:26:47.075564"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "D",
+    "scene_idx": 2,
+    "rep": 0,
+    "runtime": false,
+    "segments": 1,
+    "successful_segments": 0,
+    "execution_time": 0,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在禁地遗迹中寻找突破炼气期瓶颈的机缘",
+        "conflict": "古老阵法反噬与潜伏的上古妖兽同时苏醒",
+        "expected_outcome": "获得残缺的《九霄雷诀》并触发血脉共鸣"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "触碰石碑引发阵法启动，空间裂缝中逸出紫色雷霆",
+            "attributes": {}
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "三头青鳞妖兽从裂缝中爬出，瞳孔泛着血光锁定修士",
+            "attributes": {}
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "以《玄冰手》冻结妖兽毒牙时发现经脉被雷霆重塑",
+            "attributes": {}
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "吞服妖兽内丹配合雷纹石碑顿悟，背后浮现雷龙虚影",
+            "attributes": {}
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "雷系传承开启",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "雷纹石碑",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "经脉损伤",
+            "value": -15,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "石碑传承必须与雷系功法相关",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "妖兽袭击导致直接死亡",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T20:30:08.361467"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "D",
+    "scene_idx": 3,
+    "rep": 0,
+    "runtime": false,
+    "segments": 1,
+    "successful_segments": 0,
+    "execution_time": 0,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在荒芜山脉寻找突破炼气期的机缘",
+        "conflict": "洞府机关与突如其来的妖兽领地争夺",
+        "expected_outcome": "获得上古淬体术但触发后续追杀伏笔"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "林逸在灵光闪烁的山壁前发现隐秘符文阵列，指尖触碰引发石门开启",
+            "attributes": {
+              "discovery_chance": 0.7,
+              "stealth": false
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "洞府内突然亮起的禁制光网将林逸弹飞，同时唤醒沉睡的岩浆妖兽",
+            "attributes": {
+              "trap_damage": 15,
+              "alert_radius": 30
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "林逸吞下应急丹药强行突破痛楚，以残缺经脉硬接妖兽火球",
+            "attributes": {
+              "stamina_cost": 20,
+              "critical_injury_risk": true
+            }
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "在妖兽巢穴深处发现刻有《玄冥锻骨经》的冰玉碑，同时地面开始剧烈震动",
+            "attributes": {
+              "cultivation_boost": "炼气→筑基（临时）",
+              "time_limit": 120
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "cave_trap_activated",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "玄冥冰髓",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "经脉灼伤",
+            "value": -30,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须获得至少一种突破性功法",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "直接死亡或遭遇绝对碾压",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T20:33:29.834652"
+      }
+    },
+    "scene_text": "",
+    "events": [],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.0
+    },
+    "error": null
+  },
+  {
+    "group": "D",
+    "scene_idx": 4,
+    "rep": 0,
+    "runtime": false,
+    "segments": 1,
+    "successful_segments": 0,
+    "execution_time": 0,
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在古禁地获得上古修炼秘籍",
+        "conflict": "禁地中的守护灵兽与机关阻挠探索",
+        "expected_outcome": "成功获取秘籍但触发心魔试炼"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "林逸破解青铜门上的星象阵法",
+            "attributes": {
+              "difficulty": "high",
+              "time_cost": 120
+            }
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "遭遇幻境守护兽青鳞蛇突袭",
+            "attributes": {
+              "combat_level": 4,
+              "stamina_consume": 30
+            }
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "用本命灵力激活石碑触发传承仪式",
+            "attributes": {
+              "resource_cost": "spirit_energy",
+              "risk": "corruption"
+            }
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "ancient_tome_obtained",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "上古秘籍·九霄诀",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "hp",
+            "name": "林逸",
+            "value": 68,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过星象解密进入内殿",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不得使用非主角协助",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-05T20:36:45.409126"
+      }
+    },
+    "scene_text": "青铜巨门上的星图流转着幽蓝光芒，林逸指尖轻抚天璇星凹槽，体内灵力顺着十二时辰刻度游走。当北斗第七次虚悬于紫微垣时，整座石门发出龟裂般的脆响。青鳞蛇的嘶鸣从殿内炸开，水雾凝成千条碧色锁链破空而来，林逸反手扣住腰间玉衡佩，寒芒乍现的剑气将幻影斩作碎雪。石碑表面浮现出的古老符文灼烧着他的掌心，本命灵力注入的瞬间，穹顶垂落的星砂化作漩涡，青鳞蛇的真身在光柱中显形又湮灭。传承印记烙入识海的刹那，青铜架上泛黄的秘籍无风自动，羊皮卷轴上的血字在林逸瞳孔里逐一行开。",
+    "events": [
+      {
+        "type": "plot_flag_set",
+        "flag": "ancient_tome_obtained",
+        "value": true
+      },
+      {
+        "type": "item_acquire",
+        "actor": "None",
+        "item": "None"
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 1,
+        "total": 3,
+        "score": 0.3333333333333333
+      },
+      "overall": 0.1111111111111111
+    },
+    "error": null
+  }
+]

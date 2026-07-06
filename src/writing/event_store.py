@@ -9,6 +9,7 @@
 """
 import asyncpg
 import json
+import asyncio
 from datetime import datetime
 from typing import Dict, Optional, List, Tuple
 
@@ -18,6 +19,8 @@ from src.writing.causality.projector import DeltaEngine
 from src.writing.causality.scheduler import ProjectionScheduler
 from src.writing.causality.predicate import Predicate
 from src.writing.causality.upcaster import LATEST_EVENT_SCHEMA_VERSION, upcast_event_envelope
+from src.writing.narrative_projection import NarrativeProjector
+from src.db import get_db_pool
 
 logger = setup_logging("writing.event_store")
 
@@ -58,6 +61,7 @@ class NarrativeEventStore:
         scene_id: int = None,
     ) -> str:
         """内部实现，使用传入的连接"""
+        logger.info(f"[DEBUG] _append_event called for novel {novel_id}, event type {event.type}")
         event_data = event_to_dict(event)
         event_data["event_schema_version"] = LATEST_EVENT_SCHEMA_VERSION
         event_data = upcast_event_envelope(event_data)
@@ -102,6 +106,60 @@ class NarrativeEventStore:
             await scheduler.schedule(novel_id, delta)
         except Exception as e:
             logger.error(f"Projection failed for event {event.event_id}: {e}", exc_info=True)
+
+        import sys
+        sys.stderr.write(f"type(NarrativeProjector) = {type(NarrativeProjector)}\n")
+        sys.stderr.flush()       
+             
+        # ====== Narrative Projection（临时同步调试） ======
+                # ====== 测试：直接插入一条记录 ======
+        import sys
+        sys.stderr.write(">>> DIRECT TEST INSERTION <<<\n")
+        sys.stderr.flush()
+        try:
+            pool = get_db_pool()
+            if pool is None:
+                sys.stderr.write(">>> pool is None!\n")
+            else:
+                async with pool.acquire() as conn:
+                    await conn.execute(
+                        """
+                        INSERT INTO narrative_projection_snapshots
+                        (id, novel_id, chapter, event_id, projection_data)
+                        VALUES ($1, $2, $3, $4, $5)
+                        """,
+                        "test_" + str(event_db_id),
+                        novel_id,
+                        chapter_num or 1,
+                        event_db_id,
+                        '{"test": true}'
+                    )
+                sys.stderr.write(">>> DIRECT INSERT SUCCESS <<<\n")
+        except Exception as e:
+            sys.stderr.write(f">>> DIRECT INSERT FAILED: {e}\n")
+        sys.stderr.flush()
+        # ====== 结束测试 ======
+        try:
+            logger.info(">>> NARRATIVE PROJECTION TRIGGERED (EVENT_STORE) <<<")
+            evt_chapter = chapter_num or 1
+            last_proj = await NarrativeProjector.get_latest(novel_id)
+            event_dict = event.model_dump()
+            event_dict["event_id"] = event_db_id
+
+            # 直接 await，移除 wait_for
+            result = await NarrativeProjector.project(
+                novel_id=novel_id,
+                event=event_dict,
+                chapter=evt_chapter,
+                event_id=event_db_id,
+                last_projection=last_proj.to_dict() if last_proj else None
+            )
+            if result is not None:
+                logger.info(">>> NARRATIVE PROJECTION SYNC SUCCESS <<<")
+            else:
+                logger.warning(">>> NARRATIVE PROJECTION RETURNED NONE <<<")
+        except Exception as e:
+            logger.error(f"Narrative projection failed: {e}", exc_info=True)
 
         return event.event_id
 

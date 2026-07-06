@@ -320,3 +320,55 @@ CREATE INDEX IF NOT EXISTS idx_state_audit_created ON state_audit(created_at);
 
 -- 为 projection_health 添加 last_full_rebuild_at 列（如果不存在）
 ALTER TABLE projection_health ADD COLUMN IF NOT EXISTS last_full_rebuild_at TIMESTAMPTZ;
+
+
+-- 叙事版本表（Phase 6 新增）
+CREATE TABLE IF NOT EXISTS narrative_versions (
+    id BIGSERIAL PRIMARY KEY,
+    novel_id VARCHAR(32) NOT NULL,
+    volume_num INT NOT NULL,
+    chapter_num INT NOT NULL,
+    scene_idx INT NOT NULL,
+    version_type VARCHAR(8) NOT NULL,  -- 'A', 'B', 'C'
+    scene_text TEXT NOT NULL,
+    world_state JSONB,                 -- 场景结束时的世界状态（可选）
+    kpi_scores JSONB,                  -- KPI 预计算分数（可选）
+    generated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(novel_id, volume_num, chapter_num, scene_idx, version_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_narrative_versions_novel ON narrative_versions(novel_id);
+CREATE INDEX IF NOT EXISTS idx_narrative_versions_chapter ON narrative_versions(novel_id, volume_num, chapter_num);
+CREATE INDEX IF NOT EXISTS idx_narrative_versions_type ON narrative_versions(version_type);
+
+
+CREATE TABLE IF NOT EXISTS narrative_projection_snapshots (
+    id VARCHAR(32) PRIMARY KEY,
+    novel_id VARCHAR(32) NOT NULL,
+    chapter INT NOT NULL,
+    event_id BIGINT NOT NULL,
+    projection_data JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_projection_novel_chapter
+    ON narrative_projection_snapshots(novel_id, chapter);
+
+CREATE INDEX IF NOT EXISTS idx_projection_created
+    ON narrative_projection_snapshots(created_at DESC);
+
+
+CREATE TABLE IF NOT EXISTS loop_store (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    novel_id VARCHAR(64) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('active', 'resolved', 'abandoned')),
+    progress FLOAT NOT NULL DEFAULT 0.0 CHECK (progress BETWEEN 0 AND 1),
+    owner_character_id VARCHAR(64),
+    priority INT DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved_at TIMESTAMPTZ
+);
+CREATE INDEX idx_loop_novel_status ON loop_store(novel_id, status);

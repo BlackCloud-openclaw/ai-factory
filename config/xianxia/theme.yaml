@@ -1,5 +1,4 @@
-# 创建 theme.yaml（主题吸引子）
-version: 1
+# 主题配置
 themes:
   - id: revenge
     name: "复仇"
@@ -9,7 +8,10 @@ themes:
     weight: 1.5
   - id: growth
     name: "成长"
-    weight: 1.0conflict_keywords:
+    weight: 1.0
+
+# 冲突关键词列表
+conflict_keywords:
   - "战斗"
   - "争斗"
   - "厮杀"

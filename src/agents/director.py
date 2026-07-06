@@ -18,57 +18,9 @@ from src.writing.director_models import (
 from src.writing.world_state import WorldState
 from src.config import config
 from src.writing.character_intent_memory import CharacterIntentMemory
+from src.prompts.director_prompts import DIRECTOR_ENHANCED_PROMPT as DIRECTOR_SYSTEM_PROMPT
 
 logger = setup_logging("agents.director")
-
-DIRECTOR_SYSTEM_PROMPT = """你是一位叙事导演，负责为小说场景设计读者体验。
-你的输出必须严格遵守以下约束：
-1. **绝不改变角色意图**（CharacterIntent 是只读的）
-2. **绝不修改世界状态**（WorldState 不可变）
-3. **不写 prose**（不输出任何叙述性文字，只输出结构化蓝图）
-4. **不设计悬念**（悬念应转化为 withheld_information + reveal_beat）
-5. **只关注信息释放、注意力引导、情绪节奏**
-
-输出格式为 JSON，包含以下字段：
-{
-    "attention_path": ["主角依次关注的事物1", "事物2", ...],
-    "withheld_information": "延迟到后面才告诉读者的信息",
-    "reveal_beat": "情绪转折瞬间的描述",
-    "scene_pressure": "压力来源与可见性",
-    "silent_action_priority": "哪个动作比对白更重要",
-    "recurring_image": "反复出现的意象",
-    "scene_role": "SETUP|ESCALATION|REVEAL|RELEASE|AFTERMATH|TRANSITION",
-    "knowledge_deltas": [
-        {
-            "holder": "protagonist",
-            "information": "≤15字，核心名词+动词",
-            "operation": "acquire|lose|doubt|confirm",
-            "trigger": "触发动作",
-            "visibility": "reader_visible|hidden",
-            "source": "自身感知",
-            "reliability": 0.9
-        }
-    ],
-    "character_intent": {
-        "actor": "角色名",
-        "conscious_goal": "显性目标",
-        "hidden_need": "深层需求",
-        "fear": "恐惧什么",
-        "misconception": "错误认知（可选）",
-        "immediate_tactic": "具体行动方式",
-        "perceived_relationships": {"目标角色": {"value": 80, "confidence": 0.9}},
-        "beliefs": ["核心信念1", "核心信念2"],
-        "attachments": ["依恋对象1", "依恋对象2"],
-        "self_image": "自我认知描述",
-        "moral_boundaries": ["道德底线1", "道德底线2"]
-    }
-}
-
-**重要：**
-- knowledge_deltas 中的 information 字段必须 ≤15 字，使用"核心名词→结果"格式
-- character_intent 中的 beliefs、attachments、self_image、moral_boundaries 应与角色现有身份一致
-- 如果剧情需要角色改变信念，请在 identity_change_reason 字段说明原因
-"""
 
 
 class DirectorAgent(BaseAgent):
@@ -168,12 +120,22 @@ class DirectorAgent(BaseAgent):
         goal = scene_plan.get("goal", "")
         conflict = scene_plan.get("conflict", "")
         must_events = scene_plan.get("must_events", [])
+        # 从 scene_plan 中提取角色名，用于提示 Director 使用正确的角色名
+        characters = scene_plan.get("characters", [])
+        character_list = ", ".join(characters) if characters else "根据场景推断"
+        
         return f"""根据以下场景骨架，设计读者体验蓝图。
 
 **场景骨架**：
 - 目标: {goal}
 - 冲突: {conflict}
 - 必须事件: {must_events}
+- 参与角色: {character_list}
+
+**重要提醒**：
+- character_intent 中的 actor 必须使用场景中实际存在的角色名（从上面的"参与角色"中选择）
+- 如果场景中有主角，actor 必须是主角的名字
+- 不要虚构不存在的角色名
 
 **当前世界状态摘要**：
 {self._summarize_world(world_state)}
@@ -186,7 +148,7 @@ class DirectorAgent(BaseAgent):
         lines = []
         protagonist = "林逸"
         if protagonist in world_state.characters:
-            char = world_state.characters[protagonist]
+            char = world_state.get_character(protagonist)
             lines.append(f"主角 {protagonist}：{char.full_realm()}，HP={char.hp}，位置={char.location}")
             if char.inventory:
                 lines.append(f"背包：{', '.join(char.inventory[:5])}")
@@ -208,7 +170,7 @@ class DirectorAgent(BaseAgent):
         for char_name in scene_characters:
             if char_name not in world_state.characters:
                 continue
-            char = world_state.characters[char_name]
+            char = world_state.get_character(char_name)
             identity_parts = []
             
             if char.self_image:
@@ -240,8 +202,7 @@ class DirectorAgent(BaseAgent):
 
         async def _do_call(model_name: str, **kwargs) -> str:
             base_url = pool.get_base_url(model_name)
-            # 在 _do_call 函数内
-            timeout = httpx.Timeout(7200.0, connect=60.0)   # 总超时2小时，连接超时60秒
+            timeout = httpx.Timeout(7200.0, connect=60.0)
             client = AsyncOpenAI(api_key="not-needed", base_url=base_url, timeout=timeout)
             resp = await client.chat.completions.create(
                 model=model_name,

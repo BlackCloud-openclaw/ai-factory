@@ -1,5 +1,6 @@
 # src/writing/services/scene_completion.py
 import asyncpg
+from pathlib import Path
 from src.db import get_db_pool
 from src.writing.event_store import NarrativeEventStore
 from src.writing.snapshot import SnapshotManager
@@ -119,8 +120,39 @@ class SceneCompletionService:
                         new_world = delta_pe.apply_to(new_world)
                         events_applied += 1
 
+
                     await ensure_core_predicates(cmd.novel_id, new_world)
 
+                # ========== 保存场景正文到文件（独立于事件） ==========
+                logger.info(f"[SAVE_DEBUG] cmd.parsed_output keys: {list(cmd.parsed_output.keys()) if cmd.parsed_output else 'None'}")
+                scene_text_to_save = None
+                if cmd.parsed_output:
+                    scene_text_to_save = cmd.parsed_output.get("scene_text")
+                    logger.info(f"[SAVE_DEBUG] scene_text from parsed_output length = {len(scene_text_to_save) if scene_text_to_save else 0}")
+
+                if not scene_text_to_save and hasattr(cmd, 'raw_output') and cmd.raw_output:
+                    import re
+                    match = re.search(r'"scene_text"\s*:\s*"((?:[^"\\]|\\.)*)"', cmd.raw_output, re.DOTALL)
+                    if match:
+                        scene_text_to_save = match.group(1).replace('\\"', '"').replace('\\n', '\n')
+                        logger.warning(f"[SAVE_DEBUG] Extracted scene_text from raw_output, length={len(scene_text_to_save)}")
+
+                if scene_text_to_save and len(scene_text_to_save.strip()) >= 10:
+                    await SceneCompletionService._save_scene_to_file(cmd, scene_text_to_save)
+                else:
+                    logger.error(f"[SAVE_DEBUG] Cannot save scene: scene_text missing or too short (len={len(scene_text_to_save) if scene_text_to_save else 0})")
+                    # 可选：保存调试信息
+                    try:
+                        debug_dir = Path(f"data/novels/{cmd.novel_id}/debug")
+                        debug_dir.mkdir(parents=True, exist_ok=True)
+                        debug_file = debug_dir / f"vol_{cmd.volume:03d}_chap_{cmd.chapter:03d}_scene_{cmd.scene_idx:02d}_raw.txt"
+                        with open(debug_file, "w", encoding="utf-8") as f:
+                            f.write(str(cmd.parsed_output) + "\n\n" + str(getattr(cmd, 'raw_output', '')))
+                        logger.info(f"[SAVE_DEBUG] Saved raw output to {debug_file} for debugging")
+                    except Exception as e:
+                        logger.error(f"[SAVE_DEBUG] Failed to save debug output: {e}")
+                # =========================================================
+                    
                 # ========== 相变检测与处理（放在事件应用之后、快照保存之前） ==========
                 # 构建 compressed_state（用于相变检测）
                 if cmd.character_intents or cmd.voice_memory:
@@ -228,3 +260,24 @@ class SceneCompletionService:
             chapter_finished=chapter_finished,
             events_applied=events_applied,
         )
+
+    @staticmethod
+    async def _save_scene_to_file(cmd: SceneCompletionCommand, scene_text: str):
+        """保存场景正文到章节文件"""
+        logger.info(f"_save_scene_to_file called for chapter {cmd.chapter}, scene {cmd.scene_idx}, text length={len(scene_text)}")
+        if not scene_text or len(scene_text.strip()) < 50:
+            logger.warning(f"Scene text too short ({len(scene_text)} chars), skip saving")
+            return
+        try:
+            novel_data_dir = Path(f"data/novels/{cmd.novel_id}")
+            volumes_dir = novel_data_dir / f"vol_{cmd.volume:03d}"
+            volumes_dir.mkdir(parents=True, exist_ok=True)
+            chapter_file = volumes_dir / f"chap_{cmd.chapter:03d}.txt"
+            mode = "a" if chapter_file.exists() else "w"
+            with open(chapter_file, mode, encoding="utf-8") as f:
+                if mode == "a":
+                    f.write("\n\n<!-- scene break -->\n\n")
+                f.write(scene_text.strip())
+            logger.info(f"✅ Saved scene to {chapter_file} (mode={mode}, length={len(scene_text)})")
+        except Exception as e:
+            logger.error(f"Failed to save scene: {e}", exc_info=True)

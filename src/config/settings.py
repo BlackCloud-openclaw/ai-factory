@@ -97,6 +97,13 @@ class Settings(BaseSettings):
     dead_letter_alert_threshold: int = 3
 
     enable_perception_propagation: bool = True   # 是否启用感知传播
+    
+    experiment_enable_versioned_writer: bool = True  #ABC三个版本写作并保存在数据库
+
+    experiment_enable_runtime: bool = True   # 是否启用 Narrative Runtime
+    controlled_writer_enabled: bool = True
+    controlled_writer_max_retries: int = 2
+    controlled_writer_default_segments: int = 3
 
     # 任务模型映射（可被环境变量覆盖为 JSON 字符串，未实现动态加载）
     task_model_map: Dict[str, List[str]] = {

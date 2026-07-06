@@ -8,14 +8,58 @@ from .world_state import WorldState
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from .voiceprint import VoiceprintRegistry
 from .state_projection import extract_hard_constraints, format_constraints_as_xml
-
-
-class ContextCompiler:
-    """上下文编译器"""
+from src.writing.planning_directive import PlanningDirective, PlanningRepresentation
     
+    
+class ContextCompiler:
     def __init__(self, max_tokens: int = 3000):
         self.max_tokens = max_tokens
-    
+        self._planning_directive = None  # 实验用
+
+    def set_planning_directive(self, directive: 'PlanningDirective'):
+        """设置规划指令（实验用）"""
+        self._planning_directive = directive
+
+    def build_planning_directive_prompt(self, directive: 'PlanningDirective') -> str:
+        """根据表示类型生成 Writer 指令"""
+        rep = directive.representation
+        content = directive.content
+        lines = []
+        
+        if rep == PlanningRepresentation.SUMMARY:
+            lines.append(f"【场景概述】{content.get('summary', '')}")
+            lines.append("请基于此概述，以自然流畅的方式展开描写。")
+        
+        elif rep == PlanningRepresentation.BEAT:
+            lines.append("【必须完成的节拍序列】请按以下顺序展开：")
+            for beat in content.get("beats", []):
+                lines.append(f"- {beat}")
+            lines.append("注意：每个节拍都要自然过渡，不要生硬切换。")
+        
+        elif rep == PlanningRepresentation.ACTION:
+            lines.append("【必须体现的动作】请在对话和叙事中融入以下动作：")
+            for action in content.get("actions", []):
+                lines.append(f"- {action}")
+        
+        elif rep == PlanningRepresentation.INTENT:
+            lines.append(f"【写作意图】目的：{content.get('purpose', '')}")
+            if content.get("success_condition"):
+                lines.append(f"成功标志：{content['success_condition']}")
+            if content.get("constraints"):
+                lines.append(f"约束：{', '.join(content['constraints'])}")
+            if content.get("sub_goals"):
+                lines.append(f"子目标：{', '.join(content['sub_goals'])}")
+            lines.append("请让你的每个场景事件都服务于上述意图。")
+        
+        elif rep == PlanningRepresentation.CONSTRAINT:
+            if content.get("must_happen"):
+                lines.append(f"【强制发生】{', '.join(content['must_happen'])}")
+            if content.get("must_not_happen"):
+                lines.append(f"【严格禁止】{', '.join(content['must_not_happen'])}")
+            lines.append("请严格遵守上述边界。")
+        
+        return "\n".join(lines)
+
     def compile(
         self,
         world_state: WorldState,
@@ -55,7 +99,7 @@ class ContextCompiler:
         # 添加角色状态（精简版）
         for name in active_characters:
             if name in world_state.characters:
-                char = world_state.characters[name]
+                char = world_state.get_character(name)
                 context["active_characters"][name] = {
                     "realm": char.full_realm(),
                     "hp": char.hp,
@@ -300,5 +344,11 @@ class ContextCompiler:
             style_constraints = voice_memory.get_style_constraints_prompt()
             if style_constraints:
                 lines.append("\n" + style_constraints)
+
+        # ===== Phase 1 实验：注入 Planning Directive =====
+        if hasattr(self, '_planning_directive') and self._planning_directive:
+            directive_lines = self.build_planning_directive_prompt(self._planning_directive)
+            lines.append("\n" + directive_lines)
+        # ==============================================
 
         return "\n".join(lines)

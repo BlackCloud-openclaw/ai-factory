@@ -171,7 +171,7 @@ def get_progress():
         log(f"查询进度异常: {e}", "WARNING")
         return None, None
 
-def wait_for_task(task_id, timeout=7200, poll_interval=30):
+def wait_for_task(task_id, timeout=88000, poll_interval=30):
     """等待异步任务完成"""
     start_time = time.time()
     while time.time() - start_time < timeout:

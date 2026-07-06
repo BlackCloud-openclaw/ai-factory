@@ -1,0 +1,79 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_constraint_dense_001"
+  
+  intent:
+    goal: "林逸在宗门大比中获胜，获得进入后山修炼的资格"
+    conflict: "对手是筑基四层的赵虎，擅长力量型功法"
+    expected_outcome: "林逸凭借巧劲而非蛮力获胜，并让裁判认可他的战斗智慧"
+  
+  execution:
+    units:
+      - id: "C1"
+        label: "constraint"
+        description: "林逸利用速度优势而非力量对抗赵虎"
+        attributes:
+          strategy: "以巧破力"
+          tactic: "游击战术"
+      - id: "C2"
+        label: "constraint"
+        description: "林逸在比赛前半段避免正面交锋，消耗赵虎体力"
+        attributes:
+          phase: "前半段"
+          objective: "消耗对手"
+      - id: "C3"
+        label: "constraint"
+        description: "林逸在比赛后半段找到赵虎下盘不稳的破绽"
+        attributes:
+          weakness: "下盘不稳"
+          timing: "后半段"
+          action: "扫堂腿"
+      - id: "C4"
+        label: "constraint"
+        description: "林逸在获胜后向裁判行礼，展现宗门风范"
+        attributes:
+          action: "行礼"
+          significance: "宗门礼仪"
+  
+  observables:
+    state_changes:
+      - type: "plot_flag"
+        name: "获得后山资格"
+        value: true
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "赵虎"
+        delta: 5
+    story_events:
+      - type: "combat"
+        description: "林逸与赵虎的比赛持续至少五轮攻防"
+        participants: ["林逸", "赵虎"]
+        importance: "high"
+      - type: "dialogue"
+        description: "赵虎在赛后说了一句不甘心但认可林逸实力的台词"
+        participants: ["赵虎"]
+        importance: "normal"
+    narrative_flags:
+      - name: "victory_style"
+        value: "巧劲"
+      - name: "赵虎认可"
+        value: true
+  
+  constraints:
+    - type: "required"
+      target: "林逸获胜"
+    - type: "forbidden"
+      target: "林逸使用任何宗门禁术"
+    - type: "required"
+      target: "比赛过程中林逸至少被击退一次"
+    - type: "required"
+      target: "林逸在比赛后半段使用扫堂腿"
+    - type: "required"
+      target: "林逸赛后向裁判行礼"
+    - type: "at_least_once"
+      target: "赵虎表现出体力不支的迹象"
+  
+  metadata:
+    chapter: 7
+    scene_index: 1
+    arc: "宗门大比"

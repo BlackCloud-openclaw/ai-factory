@@ -24,6 +24,8 @@ from src.writing.world_state import WorldState
 from src.common.prompt_logger import log_prompt
 from src.writing.history_summarizer import get_chapter_summaries, get_key_events_summary
 from src.writing.voice_memory import VoiceMemory
+from src.writing.narrative_projection import NarrativeProjector
+from src.writing.planning_contract import PlanningContract
 
 logger = setup_logging("agents.writer")
 
@@ -63,50 +65,25 @@ class WritingAgent(BaseAgent):
             cls._grammar = ""
         return None
 
-    def _fix_truncated_json(self, text: str, aggressive: bool = False) -> str:
-        """修复截断的 JSON，自动补全缺失的括号，并尝试移除最后一个不完整的字段"""
+    def _fix_truncated_json(self, text: str) -> str:
         if not text:
             return text
-        
-        # 统计括号
-        brace_count = text.count('{') - text.count('}')
-        bracket_count = text.count('[') - text.count(']')
-        
-        # 如果括号平衡，直接返回
-        if brace_count <= 0 and bracket_count <= 0 and not aggressive:
-            return text
-        
-        # 尝试移除最后一个不完整的字段（aggressive模式）
-        if aggressive and brace_count > 0:
-            # 找到最后一个逗号的位置，删除之后的内容
-            last_comma = text.rfind(',')
-            if last_comma > 0:
-                # 检查最后一个逗号后面是否有完整的字段
-                after_comma = text[last_comma+1:].strip()
-                # 如果后面没有闭合括号，说明字段不完整
-                if after_comma and not (after_comma.endswith('}') or after_comma.endswith(']')):
-                    text = text[:last_comma]
-                    # 重新计算括号
-                    brace_count = text.count('{') - text.count('}')
-                    bracket_count = text.count('[') - text.count(']')
-        
-        # 补全缺失的 }
-        if brace_count > 0:
-            text += '}' * brace_count
-        
-        # 补全缺失的 ]
-        if bracket_count > 0:
-            text += ']' * bracket_count
-        
-        # 额外检查：如果最后一个字符是逗号，移除它
+        # 移除 markdown 代码块标记
+        text = re.sub(r'^```json\s*\n?', '', text)
+        text = re.sub(r'\n?```$', '', text)
+        # 补全缺失的括号
+        brace_diff = text.count('{') - text.count('}')
+        bracket_diff = text.count('[') - text.count(']')
+        if bracket_diff > 0:
+            text += ']' * bracket_diff
+        if brace_diff > 0:
+            text += '}' * brace_diff
         if text.endswith(','):
             text = text[:-1]
-            # 如果移除后末尾是 { 或 [，补全
             if text.endswith('{'):
                 text += '}'
             elif text.endswith('['):
                 text += ']'
-        
         return text
 
     async def run(self, state: AgentState) -> Dict[str, Any]:
@@ -116,6 +93,19 @@ class WritingAgent(BaseAgent):
 
         scene_plan = state.scene_plan or {}
         constraints = state.writing_constraints or {}
+
+        # ========== 新增：提取 Planning Contract ==========
+        planning_contract = None
+        if hasattr(state, 'planning_contract') and state.planning_contract:
+            try:
+                # 验证并解析 Contract
+                contract_data = state.planning_contract
+                planning_contract = PlanningContract(**contract_data)
+                logger.info(f"✅ Loaded Planning Contract for writer: {planning_contract.scene_id}")
+            except Exception as e:
+                logger.warning(f"Failed to parse Planning Contract: {e}, falling back to scene_plan")
+                planning_contract = None
+        # ===================================================
 
         # ========== 读取 Director 输出 ==========
         narrative_blueprint = state.narrative_blueprint or {}
@@ -130,6 +120,15 @@ class WritingAgent(BaseAgent):
         world_state = WorldState.from_dict(state.current_state) if state.current_state else WorldState()
 
         compiler = ContextCompiler(max_tokens=2000)
+
+        # 实验模式：检查 metadata 中是否有 planning_directive
+        if state.metadata and "planning_directive" in state.metadata:
+            from src.writing.planning_directive import PlanningDirective
+            directive_data = state.metadata["planning_directive"]
+            directive = PlanningDirective(**directive_data)
+            compiler.set_planning_directive(directive)
+            logger.info(f"实验模式：注入 {directive.representation} 规划指令")
+
         compiled_context = compiler.compile(
             world_state,
             active_characters=scene_plan.get("characters", []),
@@ -164,6 +163,32 @@ class WritingAgent(BaseAgent):
             key_events_summary=key_events_summary,
             voice_memory=voice_memory,
         )
+        
+        # ========== 新增：如果存在 Contract，用 Contract 信息增强 Prompt ==========
+        if planning_contract:
+            contract_prompt = self._build_contract_prompt(planning_contract)
+            # 将 contract_prompt 插入到 prompt 中（放在约束之前）
+            # 可以选择追加到末尾，或插入到特定位置
+            prompt += "\n\n" + contract_prompt
+        # =====================================================================
+
+        # ====== 新增：注入戏剧结构（来自 Drama Planner） ======
+        drama_structure = state.drama_structure or {}
+        if drama_structure:
+            drama_text = self._format_drama_structure(drama_structure)
+            prompt += f"\n\n【🎭 戏剧结构强制约束 - 必须严格遵循】\n{drama_text}"
+            # ====== 新增：对话引导 ======
+            prompt += "\n\n【🔊 对话要求（强制执行）】\n"
+            prompt += "1. 本场景必须包含至少 **5 轮有效对话**（每轮对话指一方发言及对方的回应）。\n"
+            prompt += "2. 对话总字数应占场景正文总字数的 **30%~50%**，确保充分展现角色间的冲突、压力和决策。\n"
+            prompt += "3. 对话内容应围绕戏剧结构中的**欲望、阻碍、压力、选择、代价**展开，通过语言交锋体现角色的博弈。\n"
+            prompt += "4. 避免纯叙述性描写，优先使用对话来推动情节和揭示信息。\n"
+
+            prompt += "\n\n【🔊 对话模板示例（必须参考）】\n"
+            prompt += "对话不应是寒暄，而应是交锋。例如：\n"
+            prompt += "- 角色 A：「你以为这样就能拦得住我？」\n"
+            prompt += "- 角色 B：「试试看。」（拔剑）\n"
+            prompt += "- 角色 A：「有意思...那我就陪你玩玩。」\n"           
 
         # ========== 2. 添加强制 state_delta 指令 ==========
         if expected_events:
@@ -176,7 +201,6 @@ class WritingAgent(BaseAgent):
         feedback = state.metadata.get("writing_feedback", "")
         if feedback:
             if "知识变化未体现" in feedback:
-                import re
                 missing_infos = re.findall(r'知识变化未体现: ([^(]+)', feedback)
                 if missing_infos:
                     prompt += "\n\n【🔴 重试强制要求】上一次验证失败，缺失以下知识变化：\n"
@@ -230,6 +254,60 @@ class WritingAgent(BaseAgent):
 
         prompt += director_instructions
 
+        # ========== 实验注入：叙事投影 (Loop/Focus) ==========
+        if state.novel_id:
+            latest = await NarrativeProjector.get_latest(state.novel_id)
+            if latest:
+                projection = latest.to_dict()
+                experiment_group = state.metadata.get("experiment_group", "baseline")
+                logger.info(f"📊 实验组: {experiment_group}")  # 添加这行
+
+                if experiment_group == "loop":
+                    loop = projection.get("loop", {})
+                    if loop:
+                        prompt += f"""
+        【叙事循环 (Narrative Loop) - 实验注入】
+        - 当前正在推进的过程：{loop.get('description', '')}
+        - 推动者：{loop.get('initiator', '')}
+        - 紧迫度：{loop.get('urgency', 0.5)}
+        请确保当前场景的推进方向与上述循环保持一致。
+        """
+
+                elif experiment_group == "focus":
+                    focus = projection.get("focus", {})
+                    if focus:
+                        prompt += f"""
+        【叙事聚焦 (Narrative Focus) - 实验注入】
+        - 当前最重要的未完成事项：{focus.get('subject', '')}
+        - 类型：{focus.get('type', '')}
+        - 为什么重要：{focus.get('why_matters', '')}
+        请确保当前场景的行动与上述聚焦事项相关。
+        """
+
+                elif experiment_group == "both":
+                    focus = projection.get("focus", {})
+                    loop = projection.get("loop", {})
+                    if focus or loop:
+                        prompt += f"""
+        【叙事循环 + 聚焦 - 实验注入】
+        循环：{loop.get('description', '')}（紧迫度：{loop.get('urgency', 0.5)}）
+        聚焦：{focus.get('subject', '')}（类型：{focus.get('type', '')}）
+        请确保当前场景的推进方向与上述循环和聚焦保持一致。
+        """
+
+                elif experiment_group == "full":
+                    projection_data = projection
+                    prompt += f"""
+        【完整叙事状态 - 实验注入】
+        - 循环：{projection_data.get('loop', {}).get('description', '')}
+        - 聚焦：{projection_data.get('focus', {}).get('subject', '')}
+        - 注意力：{projection_data.get('attention', {}).get('target', '')}
+        - 核心问题：{projection_data.get('question', {}).get('text', '')}
+        请基于以上叙事状态驱动当前场景的写作。
+        """
+                # baseline: 不注入任何额外信息
+        # ======================================================
+
         # ========== 调用 LLM ==========
         router = get_router()
         primary_model = router.get_model_for_task("writing")
@@ -265,6 +343,21 @@ class WritingAgent(BaseAgent):
                 raw_output = f'{{"scene_text": "[生成失败: {last_error}]", "events": [], "foreshadowing": []}}'
 
         logger.info(f"Raw LLM output: {raw_output[:500]}")
+
+        fixed = self._fix_truncated_json(raw_output)
+        try:
+            data = json.loads(fixed)
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON parse failed: {e}, attempting regex fallback")
+            # 正则直接提取 scene_text
+            match = re.search(r'"scene_text"\s*:\s*"((?:[^"\\]|\\.)*)"', raw_output, re.DOTALL)
+            if match:
+                scene_text = match.group(1).replace('\\"', '"').replace('\\n', '\n')
+                data = {"scene_text": scene_text, "events": [], "foreshadowing": []}
+                logger.info(f"Extracted scene_text via regex (length={len(scene_text)})")
+            else:
+                data = {"scene_text": "[生成失败: JSON解析错误]", "events": [], "foreshadowing": []}
+                logger.error("Failed to extract scene_text even with regex")
 
         # ========== 验证输出 ==========
         must_events = scene_plan.get("must_events", [])
@@ -351,8 +444,7 @@ class WritingAgent(BaseAgent):
 
         # ========== 新增：后处理清洗 ==========
         # 1. 删除 "推进主线剧情（场景X）" 占位符（包括感叹号）
-        scene_text = re.sub(r'推进主线剧情（场景\d+）[！!]?', '', scene_text)
-        # 2. 统一引号为中文双引号（将单引号包裹的对话转为双引号）
+        scene_text = re.sub(r'推进主线剧情\(场景\d+\)[！!]?', '', scene_text)  
         # 简单规则：将 '...' 形式的对话转为 “...” 
         # 注意：不处理缩写或所有格，中文场景下几乎都是对话
         scene_text = re.sub(r"'([^']*)'", r"“\1”", scene_text)
@@ -380,7 +472,7 @@ class WritingAgent(BaseAgent):
         metadata = {
             "model": model_name,
             "temperature": 0.7,
-            "max_tokens": 24576,          # 增加到 24576 避免截断
+            "max_tokens": 32768,          # 增加到 32768 避免截断
         }
         if hasattr(self, '_state') and self._state:
             metadata.update({
@@ -419,7 +511,7 @@ class WritingAgent(BaseAgent):
             model=actual_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=24576,               # 与 metadata 保持一致
+            max_tokens=32768,               # 与 metadata 保持一致
             extra_body=extra_body if extra_body else None,
         )
         content = response.choices[0].message.content or ""
@@ -430,7 +522,7 @@ class WritingAgent(BaseAgent):
         if not (stripped.endswith('}') or stripped.endswith(']')):
             logger.warning(f"Response from {actual_model} appears truncated (ends with '...{stripped[-50:]}')")
             # 尝试修复
-            fixed = self._fix_truncated_json(content, aggressive=True)
+            fixed = self._fix_truncated_json(content)
             if fixed != content:
                 logger.info(f"Successfully fixed truncated JSON (length {len(content)} -> {len(fixed)})")
                 content = fixed
@@ -440,3 +532,94 @@ class WritingAgent(BaseAgent):
         
         logger.info(f"Received response from {actual_model}, length={len(content)}")
         return content
+    
+    # ====== 新增辅助方法 ======
+    def _format_drama_structure(self, ds: Dict[str, Any]) -> str:
+        """将 Drama Planner 的 JSON 转为 LLM 可读的指令"""
+        parts = []
+        
+        if ds.get("scene_goal"):
+            parts.append(f"🟢 核心欲望：{ds['scene_goal']}")
+        
+        obstacle = ds.get("obstacle", {})
+        if obstacle.get("description"):
+            parts.append(f"🔴 阻碍（必须克服）：{obstacle['description']}（类型：{obstacle.get('type', '未知')}）")
+        
+        pressure = ds.get("pressure", {})
+        if pressure.get("description"):
+            parts.append(f"⏳ 压力（紧迫性）：{pressure['description']}（类型：{pressure.get('type', '未知')}）")
+        
+        decision = ds.get("decision", {})
+        if decision.get("options"):
+            parts.append(f"⚖️ 两难选择（必须二选一）：{', '.join(decision['options'])}")
+        if decision.get("chosen"):
+            parts.append(f"👉 最终决定：{decision['chosen']}")
+        
+        cost = ds.get("cost", {})
+        cost_parts = []
+        if cost.get("success"):
+            cost_parts.append(f"成功代价：{cost['success']}")
+        if cost.get("failure"):
+            cost_parts.append(f"失败代价：{cost['failure']}")
+        if cost_parts:
+            parts.append(f"💔 代价：{'；'.join(cost_parts)}")
+        
+        rel_delta = ds.get("relationship_delta", {})
+        if rel_delta.get("target") and rel_delta.get("to"):
+            parts.append(f"🔄 关系变化：与 {rel_delta['target']} 的关系从 {rel_delta.get('from', '当前状态')} 变为 {rel_delta['to']}")
+        
+        if not parts:
+            return "(空)"
+        
+        return "\n".join(parts)
+    
+    def _build_contract_prompt(self, contract: PlanningContract) -> str:
+        """根据 Planning Contract 生成写作指令"""
+        lines = []
+        lines.append("【📋 规划契约（Planning Contract）】")
+        lines.append(f"场景目标：{contract.intent.goal}")
+        lines.append(f"核心冲突：{contract.intent.conflict}")
+        lines.append(f"预期结果：{contract.intent.expected_outcome}")
+        
+        # 执行单元
+        if contract.execution.units:
+            lines.append("\n必须完成的执行单元：")
+            for unit in contract.execution.units:
+                lines.append(f"- {unit.label}: {unit.description}")
+        
+        # 约束
+        if contract.constraints:
+            lines.append("\n硬性约束：")
+            for c in contract.constraints:
+                if c.type == "required":
+                    lines.append(f"  ✅ 必须发生：{c.target}")
+                elif c.type == "forbidden":
+                    lines.append(f"  ❌ 禁止发生：{c.target}")
+                elif c.type == "before":
+                    lines.append(f"  ⏳ {c.target} 必须在 {c.condition} 之前")
+                elif c.type == "after":
+                    lines.append(f"  ⏳ {c.target} 必须在 {c.condition} 之后")
+                elif c.type == "exclusive":
+                    lines.append(f"  🔀 {c.target} 互斥")
+                elif c.type == "at_least_once":
+                    lines.append(f"  🔁 {c.target} 至少发生一次")
+        
+        # 可观测结果（隐含要求）
+        if contract.observables.state_changes:
+            lines.append("\n场景结束后世界状态应发生变化：")
+            for change in contract.observables.state_changes:
+                if change.type == "plot_flag":
+                    lines.append(f"- 剧情标记 {change.name} 应为 {change.value}")
+                elif change.type == "relationship":
+                    lines.append(f"- {change.from_char} 与 {change.to_char} 的关系变化 {change.delta}")
+                elif change.type == "inventory":
+                    lines.append(f"- {change.actor} {change.operation} {change.item}")
+                elif change.type == "realm":
+                    lines.append(f"- {change.actor} 突破至 {change.to_major_realm}{change.to_minor_stage}层")
+                elif change.type == "location":
+                    lines.append(f"- {change.actor} 进入 {change.location}")
+                elif change.type == "hp":
+                    lines.append(f"- {change.actor} HP 变为 {change.new_hp}")
+        
+        lines.append("\n⚠️ 请严格遵循以上契约，尤其是执行单元和硬性约束。")
+        return "\n".join(lines)

@@ -1,0 +1,72 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_intent_dense_001"
+  
+  intent:
+    goal: "让大师兄在对话中暴露他封锁消息的真实原因"
+    conflict: "大师兄对宗门有着近乎盲目的忠诚，但他内心对秘境有恐惧"
+    expected_outcome: "大师兄虽然坚持封锁消息，但林逸成功在对话中埋下了怀疑的种子，并确认大师兄曾独自探索过秘境"
+  
+  execution:
+    units:
+      - id: "I1"
+        label: "intent"
+        description: "让大师兄在对话中暴露出他对宗门命令的质疑或内心矛盾"
+        attributes:
+          target_emotion: "矛盾"
+          trigger: "关于'绝对忠诚'的对话"
+      - id: "I2"
+        label: "intent"
+        description: "让大师兄无意中提及'秘境里的东西不该被看见'，暗示他曾目击过某事"
+        attributes:
+          target_revelation: "大师兄见过秘境内部"
+          trigger: "关于'封印'的讨论"
+      - id: "I3"
+        label: "intent"
+        description: "让林逸观察到大师兄在提及秘境时手指不自觉地抽搐"
+        attributes:
+          observation: "手指抽搐"
+          significance: "恐惧或创伤反应"
+  
+  observables:
+    state_changes:
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "大师兄"
+        delta: -5
+      - type: "plot_flag"
+        name: "大师兄去过秘境"
+        value: true
+    story_events:
+      - type: "dialogue"
+        description: "大师兄至少说出一句对宗门命令的委婉质疑"
+        participants: ["大师兄", "林逸"]
+        importance: "high"
+      - type: "discovery"
+        description: "林逸通过观察大师兄的肢体语言确认他曾进入过秘境"
+        participants: ["林逸"]
+        importance: "critical"
+    narrative_flags:
+      - name: "doubt_planted"
+        value: true
+      - name: "大师兄_trauma_hint"
+        value: true
+      - name: "tension_level"
+        value: "high"
+  
+  constraints:
+    - type: "required"
+      target: "大师兄表现出至少一次犹豫或迟疑"
+    - type: "required"
+      target: "大师兄至少一次提及'不能看'或'不该看'的表述"
+    - type: "required"
+      target: "林逸注意到大师兄的肢体异常"
+    - type: "forbidden"
+      target: "大师兄直接承认任何不满或恐惧"
+    - type: "forbidden"
+      target: "林逸直接询问大师兄是否去过秘境"
+  
+  metadata:
+    chapter: 6
+    scene_index: 3
+    arc: "青云宗秘境"

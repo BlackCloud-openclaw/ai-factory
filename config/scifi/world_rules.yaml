@@ -1,0 +1,11 @@
+rules:
+  - id: "cannot_fly_without_jets"
+    description: "只有拥有喷射背包的士兵才能飞行"
+    severity: "error"
+    applies_to: ["fly_action"]
+  - id: "energy_cell_is_currency"
+    description: "能量块是通用货币"
+    severity: "info"
+  - id: "respect_chain_of_command"
+    description: "不得越级指挥"
+    severity: "warning"

@@ -6,6 +6,7 @@ import ast
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Union, List
 from src.orchestrator.state import AgentState
+from src.domain.identity import get_main_character_name   # 新增导入
 
 # 尝试导入 json_repair，如果不存在则降级
 try:
@@ -193,24 +194,23 @@ User request: {user_request}"""
 class NovelOutlinePromptBuilder(PromptBuilder):
     def build(self, state: AgentState) -> str:
         user_input = state.user_input
-        return f"""You are a professional novel planner. Generate a detailed outline for a novel based on the user's requirements.
-
-Output strict JSON with the following structure:
+        protagonist = get_main_character_name()  # 动态获取
+        return f"""你是一位专业小说策划师。请根据用户需求生成小说详细大纲，输出严格 JSON 格式，结构如下：
 {{
-    "title": "novel title",
-    "world_rules": ["rule1", "rule2"],
+    "title": "小说标题",
+    "world_rules": ["规则1", "规则2"],
     "characters": [
-        {{"name": "林风", "initial_state": {{"realm": "炼气", "level": 1}}}}
+        {{"name": "{protagonist}", "initial_state": {{"realm": "炼气", "level": 1}}}}
     ],
     "volumes": [
         {{
             "volume_num": 1,
-            "title": "volume title",
+            "title": "卷标题",
             "chapters": [
                 {{
                     "chapter_num": 1,
-                    "title": "chapter title",
-                    "must_events": ["event1", "event2"],
+                    "title": "章节标题",
+                    "must_events": ["事件1", "事件2"],
                     "forbidden_events": []
                 }}
             ]
@@ -218,7 +218,7 @@ Output strict JSON with the following structure:
     ]
 }}
 
-User request: {user_input}"""
+用户需求：{user_input}"""
 
     def parse_response(self, response: str) -> Dict[str, Any]:
         return extract_json_from_response(response)

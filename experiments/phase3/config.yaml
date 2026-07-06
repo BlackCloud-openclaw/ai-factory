@@ -1,0 +1,33 @@
+groups:
+  - id: R2
+    runtime: true
+    segments: 2
+    representation: action
+    density: dense
+
+  - id: R3
+    runtime: true
+    segments: 3
+    representation: action
+    density: dense
+
+  - id: R4
+    runtime: true
+    segments: 4
+    representation: action
+    density: dense
+
+  - id: RA
+    runtime: true
+    segments: auto
+    representation: action
+    density: dense
+
+  - id: D
+    runtime: false
+    segments: 1
+    representation: action
+    density: dense
+
+scenes_per_group: 5
+repetitions: 1

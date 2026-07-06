@@ -22,6 +22,7 @@ from .context_compiler import ContextCompiler
 from .event_store import NarrativeEventStore
 from .snapshot import SnapshotManager
 from .retrieval import NarrativeRetriever
+from .controlled_writer import ControlledWriter, ControlledWriteResult
 
 __all__ = [
     "WorldState",
@@ -52,4 +53,6 @@ __all__ = [
     "NarrativeEventStore",
     "SnapshotManager",
     "NarrativeRetriever",
+    "ControlledWriter",
+    "ControlledWriteResult",
 ]

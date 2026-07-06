@@ -1,0 +1,81 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_beat_dense_001"
+  
+  intent:
+    goal: "林逸尝试说服苏清雪合作探索秘境"
+    conflict: "苏清雪对林逸的能力存疑，且有自己的秘密"
+    expected_outcome: "苏清雪勉强同意合作，但保留关键信息"
+  
+  execution:
+    units:
+      - id: "B1"
+        label: "beat"
+        description: "接近：林逸在藏书阁找到苏清雪，苏清雪正在翻阅一本泛黄的古籍"
+        attributes:
+          location: "藏书阁"
+          action: "翻阅古籍"
+      - id: "B2"
+        label: "beat"
+        description: "试探：林逸抛出合作意向，苏清雪冷冷回应'你凭什么'"
+        attributes:
+          dialogue: true
+          mood: "冷淡"
+      - id: "B3"
+        label: "beat"
+        description: "压力：林逸透露自己已找到青铜钥匙碎片，苏清雪面色微变"
+        attributes:
+          revelation: "青铜钥匙碎片"
+          reaction: "面色微变"
+      - id: "B4"
+        label: "beat"
+        description: "僵持：苏清雪说出'秘境是我师叔葬身之地'，揭示她的私人动机"
+        attributes:
+          revelation: "苏清雪师叔丧命秘境"
+          emotion: "悲伤"
+      - id: "B5"
+        label: "beat"
+        description: "妥协：苏清雪提出'信息对等'条件，林逸同意"
+        attributes:
+          condition: "信息对等"
+          outcome: "初步合作"
+  
+  observables:
+    state_changes:
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "苏清雪"
+        delta: 15
+      - type: "plot_flag"
+        name: "cooperation_started"
+        value: true
+    story_events:
+      - type: "dialogue"
+        description: "苏清雪揭示师叔葬身秘境的私人动机"
+        participants: ["苏清雪", "林逸"]
+        importance: "critical"
+      - type: "discovery"
+        description: "林逸了解到苏清雪的真实动机"
+        participants: ["林逸"]
+        importance: "high"
+    narrative_flags:
+      - name: "alliance_formed"
+        value: true
+      - name: "苏清雪_secret_revealed"
+        value: true
+      - name: "tension_level"
+        value: "medium"
+  
+  constraints:
+    - type: "required"
+      target: "苏清雪提出的条件包含'信息对等'要求"
+    - type: "required"
+      target: "林逸接受苏清雪的条件"
+    - type: "before"
+      target: "苏清雪揭示师叔秘密"
+      condition: "在林逸透露钥匙碎片信息之后"
+  
+  metadata:
+    chapter: 4
+    scene_index: 2
+    arc: "青云宗秘境"

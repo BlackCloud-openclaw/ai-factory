@@ -1,0 +1,360 @@
+[
+  {
+    "group": "D",
+    "scene_idx": 0,
+    "rep": 0,
+    "representation": "action",
+    "density": "dense",
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在禁地试炼中获取上古修士遗留的「九霄雷诀」",
+        "conflict": "遗迹中的妖兽守护与刻印在石碑上的致命试炼契约",
+        "expected_outcome": "成功参悟功法但触发血脉反噬，为后续寻找解药埋下伏笔"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "发现悬浮在雷云中的上古青铜巨门，门扉刻有自行游走的血色符文",
+            "attributes": {}
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "触碰门扉时被传送到幻境，需在三息内以精血重演「斩龙九式」才可进入",
+            "attributes": {}
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "在雷海中搏杀由怨念凝聚的虚影妖兽，其断肢会化为新的攻击形态",
+            "attributes": {}
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "吸收雷浆淬炼肉身时，发现石碑暗格中封存着带有锁链的雷电法诀",
+            "attributes": {}
+          },
+          {
+            "id": "U5",
+            "label": "action",
+            "description": "强行参悟功法导致天灵盖浮现雷纹，耳边响起上古修士的嘲讽残响",
+            "attributes": {}
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "thunder_script_obtained",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "九霄雷诀残页",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "雷意境突破压制",
+            "value": "Lv.3→Lv.4",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过血祭方式激活石碑",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不可使用常规武器斩杀虚影妖兽",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-04T16:59:13.956822"
+      }
+    },
+    "scene_text": "林逸的瞳孔倒映着翻滚的紫色雷云，在雷霆轰鸣间，一扇悬浮半空的上古青铜巨门若隐若现。门扉上血色符文如活物般游走，当他伸手触碰的刹那，整片雷海骤然凝滞——\n\n'三息。'虚空中响起沙哑的倒计时，林逸咬破指尖将精血抹在门扉，血色符文骤亮。他旋身挥臂，斩龙九式的轨迹撕开空间裂隙，破碎的幻境如玻璃般炸开，露出后方沸腾的雷浆之海。\n\n七头由怨念凝成的虚影妖兽破浪而出，当林逸斩断首兽右臂时，断肢竟在雷浆中重组为三首怪物。他翻滚避过腥臭獠牙，掌心雷光暴涨，以斩龙九式的第七变'龙脊断云'轰碎妖兽核心。但每击溃一尊躯体，雷海便泛起更诡异的波纹。\n\n当最后一缕怨气消散，雷浆突然化作液态锁链缠绕其身。林逸在剧痛中看见石碑暗格浮现，取出被玄铁锁链禁锢的羊皮卷轴。指尖刚触及'九霄雷诀'四个古字，雷纹便顺着经脉爬上天灵盖。\n\n'资质拙劣也敢觊觎天机？'上古修士的残响在颅骨内炸响，林逸踉跄后退时，发现青铜巨门已化作血色虚无。他胸前的家传玉佩正渗出黑血，而雷纹已在月光下开始溃烂皮肤。",
+    "events": [
+      {
+        "action": "发现悬浮在雷云中的上古青铜巨门，门扉刻有自行游走的血色符文",
+        "timestamp": 0
+      },
+      {
+        "action": "触碰门扉时被传送到幻境，需在三息内以精血重演「斩龙九式」才可进入",
+        "timestamp": 45
+      },
+      {
+        "action": "在雷海中搏杀由怨念凝聚的虚影妖兽，其断肢会化为新的攻击形态",
+        "timestamp": 128
+      },
+      {
+        "action": "吸收雷浆淬炼肉身时，发现石碑暗格中封存着带有锁链的雷电法诀",
+        "timestamp": 312
+      },
+      {
+        "action": "强行参悟功法导致天灵盖浮现雷纹，耳边响起上古修士的嘲讽残响",
+        "timestamp": 497
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 4,
+        "total": 5,
+        "score": 0.8
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 3,
+        "score": 0.0
+      },
+      "overall": 0.26666666666666666
+    },
+    "error": null
+  },
+  {
+    "group": "D",
+    "scene_idx": 1,
+    "rep": 0,
+    "representation": "action",
+    "density": "dense",
+    "contract": {
+      "version": "1.0",
+      "scene_id": "scene_001",
+      "intent": {
+        "goal": "林逸在禁地深处寻获千年灵药以突破境界",
+        "conflict": "与同样觊觎灵药的魔道修士遭遇，时间仅剩三炷香内抉择",
+        "expected_outcome": "通过智取获得灵药但结下仇家，为后续伏笔"
+      },
+      "execution": {
+        "units": [
+          {
+            "id": "U1",
+            "label": "action",
+            "description": "林逸循着灵气异动潜入断龙崖，发现岩缝中生长的九叶赤灵参",
+            "attributes": {}
+          },
+          {
+            "id": "U2",
+            "label": "action",
+            "description": "黑袍修士以血咒锁链突袭，祭出幽冥火困住林逸",
+            "attributes": {}
+          },
+          {
+            "id": "U3",
+            "label": "action",
+            "description": "林逸激活护体罡气格挡，反手甩出捆仙索牵制对手",
+            "attributes": {}
+          },
+          {
+            "id": "U4",
+            "label": "action",
+            "description": "趁对方咒语中断的刹那，捏碎祖传玉符召唤雷击木",
+            "attributes": {}
+          },
+          {
+            "id": "U5",
+            "label": "action",
+            "description": "雷光炸裂岩层掩护遁逃，采得半截断根的赤灵参",
+            "attributes": {}
+          }
+        ]
+      },
+      "observables": {
+        "state_changes": [
+          {
+            "type": "plot_flag",
+            "name": "obtained_half_herbal",
+            "value": true,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "inventory",
+            "name": "半截九叶赤灵参",
+            "value": 1,
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "realm",
+            "name": "灵核境初期",
+            "value": "灵核境中期",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          },
+          {
+            "type": "location",
+            "name": "当前位置",
+            "value": "断龙崖禁区",
+            "from_char": null,
+            "to_char": null,
+            "delta": null,
+            "actor": null,
+            "item": null,
+            "operation": null,
+            "quantity": 1,
+            "to_major_realm": null,
+            "to_minor_stage": null,
+            "location": null,
+            "new_hp": null
+          }
+        ],
+        "story_events": [],
+        "narrative_flags": []
+      },
+      "constraints": [
+        {
+          "type": "required",
+          "target": "必须通过智取而非硬拼获得灵药",
+          "condition": null,
+          "refs": null
+        },
+        {
+          "type": "forbidden",
+          "target": "不得直接击杀黑袍修士",
+          "condition": null,
+          "refs": null
+        }
+      ],
+      "metadata": {
+        "chapter": 1,
+        "scene_index": 0,
+        "arc": null,
+        "created_at": "2026-07-04T17:03:02.780216"
+      }
+    },
+    "scene_text": "断龙崖的雾霭中，林逸指尖轻抚过嶙峋岩壁，忽觉灵气如潮水般涌动。他瞳孔微缩——三丈高的玄铁岩缝间，九片血玉般的灵叶正吞吐霞光，千年难遇的九叶赤灵参竟在地脉断口处生根。正当他袖中探出银刃时，背后骤然响起锁链破空之声。\n\n黑袍修士踩着幽冥火莲浮现，血色咒文缠绕的锁链将岩洞映成暗红。'此药归我！'嘶哑嗓音裹挟着腥风袭来。林逸旋身甩出捆仙索，护体罡气轰然炸开，硬接下血链时已反手将绳索缠上对方法器。\n\n黑袍修士咒语顿挫的刹那，林逸指尖玉符应声碎裂。藏在袖中的雷击木突兀刺入岩层，青紫色雷霆如蛟龙苏醒，整座断龙崖轰然龟裂。他趁乱扯下半截赤灵参根茎，袖袍扫过岩缝时带起漫天碎石，幽冥火在雷光中竟似寒蝉噤声。\n\n'你不过是自取灭亡！'黑袍人怒吼着被捆仙索禁锢半空，却见林逸踏着落下的钟乳石柱，将赤灵参吞入丹田。当最后一缕雷光消散时，岩壁已重新闭合如初，只余洞外飘落的几片血色灵叶，昭示着这场生死角逐曾真实发生过。",
+    "events": [
+      {
+        "action": "循灵气踪迹潜入断龙崖",
+        "timestamp": 0
+      },
+      {
+        "action": "发现九叶赤灵参生长在玄铁岩缝",
+        "timestamp": 45
+      },
+      {
+        "action": "黑袍修士血咒锁链突袭",
+        "timestamp": 90
+      },
+      {
+        "action": "护体罡气格挡并甩出捆仙索",
+        "timestamp": 135
+      },
+      {
+        "action": "捏碎玉符召唤雷击木",
+        "timestamp": 210
+      },
+      {
+        "action": "雷光炸裂岩层掩护遁逃",
+        "timestamp": 270
+      },
+      {
+        "action": "采得半截断根的赤灵参",
+        "timestamp": 330
+      }
+    ],
+    "control": {
+      "surface": {
+        "completed": 5,
+        "total": 5,
+        "score": 1.0
+      },
+      "constraint": {
+        "passed": false,
+        "score": 0.0
+      },
+      "outcome": {
+        "matched": 0,
+        "total": 4,
+        "score": 0.0
+      },
+      "overall": 0.3333333333333333
+    },
+    "error": null
+  },
+  {
+    "error": "'str' object has no attribute 'get'",
+    "group": "D"
+  }
+]

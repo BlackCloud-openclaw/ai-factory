@@ -7,7 +7,7 @@ XianxiaAdapter - 将现有 WorldState 映射到 KernelWorldState
 from typing import Dict, Any, List, Optional
 import uuid
 
-from src.writing.world_state import WorldState, CharacterState, Realm
+from src.writing.world_state import WorldState
 from next.kernel.world import KernelWorldState
 from next.kernel.entity import Entity, EntityType
 from next.kernel.capability import Capability, CapabilityMode
@@ -126,11 +126,23 @@ class XianxiaAdapter:
         )
         kernel.capabilities["world|global_flags"] = world_flags
 
+        # 8. 映射相变列表
+        if hasattr(world, 'phase_transitions') and world.phase_transitions:
+            kernel.phase_transitions = world.phase_transitions.copy()
+        else:
+            kernel.phase_transitions = []
+
+        # 9. 映射吸引子配置
+        if hasattr(world, 'attractor_field') and world.attractor_field:
+            kernel.attractor_field = world.attractor_field.copy()
+        else:
+            kernel.attractor_field = {}
+
         return kernel
 
     @staticmethod
     def get_coverage_report(world: WorldState, kernel: KernelWorldState) -> Dict[str, float]:
-        """计算映射覆盖率"""
+        """计算映射覆盖率（包含全部字段）"""
         total_fields = 0
         mapped_fields = 0
 
@@ -138,6 +150,7 @@ class XianxiaAdapter:
         char_total = 0
         char_mapped = 0
         for name, char in world.characters.items():
+            # 实体存在
             char_total += 1
             if name in kernel.entities:
                 char_mapped += 1
@@ -172,11 +185,40 @@ class XianxiaAdapter:
         char_total += rel_total
         char_mapped += rel_mapped
 
-        coverage = (char_mapped / char_total) if char_total > 0 else 0.0
+        # 全局标记
+        total_fields += 1
+        if "world|global_flags" in kernel.capabilities:
+            mapped_fields += 1
+
+        # 相变列表
+        total_fields += 1
+        if hasattr(world, 'phase_transitions'):
+            # 比较内容（简单检查长度一致）
+            if len(kernel.phase_transitions) == len(world.phase_transitions):
+                mapped_fields += 1
+        else:
+            if not kernel.phase_transitions:
+                mapped_fields += 1
+
+        # 吸引子配置
+        total_fields += 1
+        if hasattr(world, 'attractor_field'):
+            # 比较顶层键
+            if kernel.attractor_field.keys() == world.attractor_field.keys():
+                mapped_fields += 1
+        else:
+            if not kernel.attractor_field:
+                mapped_fields += 1
+
+        # 总覆盖率 = 角色部分 + 额外全局字段
+        total_fields += char_total
+        mapped_fields += char_mapped
+
+        coverage = (mapped_fields / total_fields) if total_fields > 0 else 0.0
 
         return {
-            "total_fields": char_total,
-            "mapped_fields": char_mapped,
+            "total_fields": total_fields,
+            "mapped_fields": mapped_fields,
             "coverage": coverage,
             "character_coverage": char_mapped / char_total if char_total > 0 else 0,
             "relationship_coverage": rel_mapped / rel_total if rel_total > 0 else 0,

@@ -1,0 +1,43 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_intent_sparse_001"
+  
+  intent:
+    goal: "让大师兄在对话中暴露他封锁消息的真实原因"
+    conflict: "大师兄对宗门有着近乎盲目的忠诚"
+    expected_outcome: "大师兄虽然坚持封锁消息，但林逸成功在对话中埋下了怀疑的种子"
+  
+  execution:
+    units:
+      - id: "I1"
+        label: "intent"
+        description: "让大师兄在对话中暴露出他对宗门命令的质疑或内心矛盾"
+        attributes:
+          target_emotion: "矛盾"
+          trigger: "关于'绝对忠诚'的对话"
+  
+  observables:
+    state_changes:
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "大师兄"
+        delta: -5
+    story_events:
+      - type: "dialogue"
+        description: "大师兄至少说出一句对宗门命令的委婉质疑"
+        participants: ["大师兄", "林逸"]
+        importance: "high"
+    narrative_flags:
+      - name: "doubt_planted"
+        value: true
+  
+  constraints:
+    - type: "required"
+      target: "大师兄表现出至少一次犹豫或迟疑"
+    - type: "forbidden"
+      target: "大师兄直接承认任何不满"
+  
+  metadata:
+    chapter: 6
+    scene_index: 3
+    arc: "青云宗秘境"

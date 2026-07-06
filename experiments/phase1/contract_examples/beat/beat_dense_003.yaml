@@ -1,0 +1,95 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_beat_dense_003"
+  
+  intent:
+    goal: "林逸在最终决战前完成最后的准备"
+    conflict: "时间紧迫，且林逸的伤势未痊愈，同时苏清雪提出了一个冒险方案"
+    expected_outcome: "林逸完成装备和策略准备，但留有隐患，且与苏清雪的关系出现张力"
+  
+  execution:
+    units:
+      - id: "B1"
+        label: "beat"
+        description: "检查：林逸在密室中逐一清点法器，发现丹药储备不足"
+        attributes:
+          location: "密室"
+          action: "清点"
+          finding: "丹药不足"
+      - id: "B2"
+        label: "beat"
+        description: "策略：林逸与苏清雪推演敌我战力，苏清雪提出使用'血煞针'的冒险方案"
+        attributes:
+          participants: ["林逸", "苏清雪"]
+          topic: "战术"
+          conflict_point: "血煞针"
+      - id: "B3"
+        label: "beat"
+        description: "犹豫：林逸拒绝使用'血煞针'，因它可能损伤根基"
+        attributes:
+          emotion: "犹豫"
+          reason: "根基损伤"
+      - id: "B4"
+        label: "beat"
+        description: "坚持：苏清雪坚持认为当前处境必须冒险"
+        attributes:
+          emotion: "坚持"
+          argument: "局势紧迫"
+      - id: "B5"
+        label: "beat"
+        description: "决定：林逸保留血煞针作为最后手段，但标记为'禁用'"
+        attributes:
+          outcome: "妥协"
+          decision: "封印备用"
+      - id: "B6"
+        label: "beat"
+        description: "隐患：林逸感觉到旧伤在阴雨天隐隐作痛"
+        attributes:
+          detail: "旧伤复发"
+          significance: "决战隐患"
+  
+  observables:
+    state_changes:
+      - type: "plot_flag"
+        name: "战前准备完成"
+        value: true
+      - type: "plot_flag"
+        name: "血煞针封印"
+        value: true
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "苏清雪"
+        delta: 5
+    story_events:
+      - type: "dialogue"
+        description: "林逸与苏清雪就血煞针产生激烈讨论"
+        participants: ["林逸", "苏清雪"]
+        importance: "high"
+      - type: "discovery"
+        description: "林逸确认旧伤未愈"
+        participants: ["林逸"]
+        importance: "normal"
+    narrative_flags:
+      - name: "readiness_level"
+        value: "85%"
+      - name: "hidden_risk"
+        value: "旧伤"
+      - name: "relationship_tension"
+        value: "战略分歧"
+  
+  constraints:
+    - type: "required"
+      target: "林逸做出封印血煞针的决定"
+    - type: "required"
+      target: "林逸和苏清雪至少讨论三个战术方案"
+    - type: "required"
+      target: "苏清雪坚持使用血煞针至少两次"
+    - type: "required"
+      target: "林逸的旧伤被明确提及"
+    - type: "forbidden"
+      target: "林逸或苏清雪在讨论中彻底让步"
+  
+  metadata:
+    chapter: 9
+    scene_index: 2
+    arc: "背叛与反制"

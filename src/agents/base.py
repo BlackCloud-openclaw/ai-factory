@@ -1,8 +1,11 @@
 # src/agents/base.py
-from typing import Dict, Any
+from __future__ import annotations
+
+from typing import Dict, Any, TYPE_CHECKING
 from abc import ABC, abstractmethod
 
-from src.orchestrator.state import AgentState
+if TYPE_CHECKING:
+    from src.orchestrator.state import AgentState
 
 
 class BaseAgent(ABC):

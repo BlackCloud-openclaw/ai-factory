@@ -1,0 +1,49 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_action_sparse_003"
+  
+  intent:
+    goal: "林逸在秘境深处获取'玄天镜'神器"
+    conflict: "玄天镜被封印在九宫阵法中，需破解机关"
+    expected_outcome: "林逸成功破解九宫阵，获得玄天镜"
+  
+  execution:
+    units:
+      - id: "A1"
+        label: "action"
+        description: "林逸观察九宫阵的光纹流转规律"
+      - id: "A2"
+        label: "action"
+        description: "林逸依次踩中正确的阵法节点"
+      - id: "A3"
+        label: "action"
+        description: "林逸在阵法解除瞬间取出玄天镜"
+  
+  observables:
+    state_changes:
+      - type: "inventory"
+        actor: "林逸"
+        item: "玄天镜"
+        operation: "acquire"
+      - type: "plot_flag"
+        name: "玄天镜获得"
+        value: true
+    story_events:
+      - type: "discovery"
+        description: "林逸破解九宫阵法"
+        participants: ["林逸"]
+        importance: "critical"
+    narrative_flags:
+      - name: "artifact_acquired"
+        value: "玄天镜"
+  
+  constraints:
+    - type: "required"
+      target: "林逸成功获得玄天镜"
+    - type: "forbidden"
+      target: "林逸触发阵法的反击机制"
+  
+  metadata:
+    chapter: 10
+    scene_index: 1
+    arc: "神器出世"

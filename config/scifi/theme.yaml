@@ -1,0 +1,17 @@
+themes:
+  - id: "survival"
+    name: "生存"
+    weight: 1.5
+  - id: "discovery"
+    name: "探索"
+    weight: 1.2
+  - id: "sacrifice"
+    name: "牺牲"
+    weight: 1.0
+
+conflict_keywords:
+  - "战斗"
+  - "遭遇战"
+  - "伏击"
+  - "突袭"
+  - "火力压制"

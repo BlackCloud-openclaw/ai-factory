@@ -9,7 +9,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from openai import AsyncOpenAI
             
-
 from src.config import config
 from src.common.logging import setup_logging
 from src.agents.base import BaseAgent
@@ -20,6 +19,9 @@ from src.prompts.planner_prompts import PROMPT_REGISTRY
 from src.writing.causality.rule_engine import RuleEngine
 from src.common.prompt_logger import log_prompt
 from src.writing.narrative_entropy import EntropyController, EntropyReport, ControlAction
+from src.db import get_db_pool
+from src.writing.loop_store import LoopStore
+from src.writing.planning_contract import create_contract_from_dict
 
 logger = setup_logging("agents.planner")
 
@@ -191,6 +193,35 @@ class PlannerAgent(BaseAgent):
             # ================================================================
         # ===========================================================
 
+        # ========== [新增] 确保有激活的 Loop（生命周期管理） ==========
+        if state.novel_id and task_type == "scene_plan":
+            pool = get_db_pool()
+            if pool:
+                loop_store = LoopStore(pool)
+                active_loop = await loop_store.get_active_loop(state.novel_id)
+                if active_loop is None:
+                    # 从大纲中提取核心冲突作为 Loop 描述
+                    loop_desc = "主角提升实力，探索世界，推动主线剧情"
+                    if state.outline and "volumes" in state.outline:
+                        volumes = state.outline.get("volumes", [])
+                        if volumes and state.current_volume <= len(volumes):
+                            vol = volumes[state.current_volume - 1]
+                            loop_desc = vol.get("core_conflict", loop_desc)
+                    active_loop = await loop_store.create_loop(
+                        state.novel_id,
+                        title=f"主线推进 - 卷{state.current_volume}",
+                        description=loop_desc
+                    )
+                    logger.info(f"✅ Created new active Loop for novel {state.novel_id}: {active_loop.title}")
+                # 将 Loop 信息存入 state.metadata，供 Writer 和 Validator 使用
+                state.metadata["active_loop"] = {
+                    "id": str(active_loop.id),
+                    "title": active_loop.title,
+                    "description": active_loop.description,
+                    "progress": active_loop.progress,
+                }
+        # =============================================================
+
         # ---------- 其他任务类型（code, scene_plan 等）使用原有逻辑 ----------
         builder = PROMPT_REGISTRY.get(task_type)
         if not builder:
@@ -205,6 +236,29 @@ class PlannerAgent(BaseAgent):
 
             if task_type == "scene_plan" and isinstance(result, list):
                 result = {"scenes": result}
+
+            # ========== 新增：生成 Planning Contract ==========
+            if task_type == "scene_plan" and result and "scenes" in result:
+                scenes = result["scenes"]
+                for idx, scene in enumerate(scenes):
+                    try:
+                        # 补全必要字段
+                        if "scene_id" not in scene:
+                            scene["scene_id"] = f"scene_{state.current_volume}_{state.current_chapter}_{idx}"
+                        if "chapter" not in scene:
+                            scene["chapter"] = state.current_chapter
+                        if "scene_index" not in scene:
+                            scene["scene_index"] = idx
+                        
+                        # 转换为 Contract
+                        contract = create_contract_from_dict(scene)
+                        scene["planning_contract"] = contract.model_dump()
+                        
+                        logger.info(f"✅ Generated Planning Contract for scene {scene['scene_id']}")
+                    except Exception as e:
+                        logger.warning(f"Failed to generate Planning Contract for scene {idx}: {e}")
+                        scene["planning_contract"] = None
+            # =====================================================
 
             duration = time.time() - start_time
             logger.info(f"{agent_name} completed, step={step}, status=success, duration={duration:.2f}")

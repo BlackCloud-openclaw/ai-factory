@@ -1,0 +1,72 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_action_dense_002"
+  
+  intent:
+    goal: "林逸首次进入秘境探索"
+    conflict: "秘境内部有残存的阵法机关和未知生物"
+    expected_outcome: "林逸探索到第一层区域，发现前人留下的痕迹"
+  
+  execution:
+    units:
+      - id: "A1"
+        label: "action"
+        description: "林逸沿狭窄通道缓慢前行，用剑尖试探地面是否有陷阱"
+        attributes:
+          environment: "狭窄通道"
+          method: "剑尖探路"
+      - id: "A2"
+        label: "action"
+        description: "林逸在石壁上发现三处剑痕，判断是多年前留下的战斗痕迹"
+        attributes:
+          discovery: "剑痕"
+          count: 3
+          interpretation: "昔日战斗"
+      - id: "A3"
+        label: "action"
+        description: "林逸在通道尽头发现一具枯骨，身旁散落着未完成的记录"
+        attributes:
+          discovery: "枯骨"
+          condition: "多年"
+          artifact: "记录残片"
+      - id: "A4"
+        label: "action"
+        description: "林逸捡起记录残片，发现上面记载了秘境的第二层入口位置"
+        attributes:
+          artifact: "记录残片"
+          content: "第二层入口"
+          significance: "关键线索"
+  
+  observables:
+    state_changes:
+      - type: "plot_flag"
+        name: "秘境第一层已探索"
+        value: true
+      - type: "plot_flag"
+        name: "获得第二层线索"
+        value: true
+      - type: "inventory"
+        actor: "林逸"
+        item: "记录残片"
+        operation: "acquire"
+    story_events:
+      - type: "discovery"
+        description: "林逸发现枯骨和记录残片"
+        participants: ["林逸"]
+        importance: "critical"
+    narrative_flags:
+      - name: "exploration_progress"
+        value: "第一层完成"
+  
+  constraints:
+    - type: "required"
+      target: "林逸发现至少一个前人留下的物品"
+    - type: "required"
+      target: "林逸获得进入第二层的线索"
+    - type: "forbidden"
+      target: "林逸触发任何致命的陷阱"
+  
+  metadata:
+    chapter: 8
+    scene_index: 1
+    arc: "秘境探索"

@@ -1,0 +1,49 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_beat_sparse_002"
+  
+  intent:
+    goal: "林逸与赵虎在比试后爆发冲突"
+    conflict: "赵虎心胸狭隘，认为林逸胜之不武"
+    expected_outcome: "冲突在长老介入前升级为对峙，但未动手"
+  
+  execution:
+    units:
+      - id: "B1"
+        label: "beat"
+        description: "挑衅：赵虎当众质疑林逸获胜手段"
+      - id: "B2"
+        label: "beat"
+        description: "对峙：林逸冷静回应，但语气坚定"
+      - id: "B3"
+        label: "beat"
+        description: "升级：两人气息外放，场地气氛紧张"
+      - id: "B4"
+        label: "beat"
+        description: "介入：长老出现，喝止双方"
+  
+  observables:
+    state_changes:
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "赵虎"
+        delta: -15
+    story_events:
+      - type: "dialogue"
+        description: "赵虎说出至少一句侮辱性台词"
+        participants: ["赵虎"]
+        importance: "normal"
+    narrative_flags:
+      - name: "conflict_escalated"
+        value: true
+  
+  constraints:
+    - type: "required"
+      target: "双方气息外放形成对峙"
+    - type: "forbidden"
+      target: "任何一方先动手"
+  
+  metadata:
+    chapter: 7
+    scene_index: 2
+    arc: "宗门大比"

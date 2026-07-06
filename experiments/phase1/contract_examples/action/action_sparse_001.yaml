@@ -1,0 +1,45 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_action_sparse_001"
+  
+  intent:
+    goal: "林逸调查后山禁地的入口"
+    conflict: "禁地入口被阵法封锁，且时常有巡逻弟子经过"
+    expected_outcome: "林逸确认阵法弱点和巡逻规律，但未触发警报"
+  
+  execution:
+    units:
+      - id: "A1"
+        label: "action"
+        description: "林逸在夜幕掩护下潜行至后山禁地外围"
+      - id: "A2"
+        label: "action"
+        description: "林逸观察阵法光纹，记录其脉动规律"
+      - id: "A3"
+        label: "action"
+        description: "林逸在巡逻间隙潜伏，统计守卫换防间隔"
+  
+  observables:
+    state_changes:
+      - type: "plot_flag"
+        name: "禁地入口定位"
+        value: true
+    story_events:
+      - type: "discovery"
+        description: "林逸发现阵法的脉动间隔从半刻变为一刻"
+        participants: ["林逸"]
+        importance: "high"
+    narrative_flags:
+      - name: "investigation_depth"
+        value: "初步"
+  
+  constraints:
+    - type: "required"
+      target: "林逸完成对阵法脉动的记录"
+    - type: "forbidden"
+      target: "林逸触发任何警报"
+  
+  metadata:
+    chapter: 5
+    scene_index: 1
+    arc: "青云宗秘境"

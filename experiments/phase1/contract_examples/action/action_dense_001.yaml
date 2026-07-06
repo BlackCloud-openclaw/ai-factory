@@ -1,0 +1,75 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_action_dense_001"
+  
+  intent:
+    goal: "林逸调查后山禁地的入口"
+    conflict: "禁地入口被阵法封锁，且时常有巡逻弟子经过"
+    expected_outcome: "林逸确认阵法弱点和巡逻规律，但未触发警报"
+  
+  execution:
+    units:
+      - id: "A1"
+        label: "action"
+        description: "林逸在夜幕掩护下潜行至后山禁地外围，利用低矮灌木作为掩体"
+        attributes:
+          time: "戌时三刻"
+          terrain: "灌木丛"
+          risk: "low"
+      - id: "A2"
+        label: "action"
+        description: "林逸观察阵法光纹，用随身木炭在布帛上拓印纹路"
+        attributes:
+          method: "拓印"
+          material: "木炭"
+          duration: "半刻钟"
+      - id: "A3"
+        label: "action"
+        description: "林逸在巡逻间隙潜伏，统计守卫换防间隔"
+        attributes:
+          duration: "两刻钟"
+          patrol_interval: "半刻钟"
+          guard_count: 3
+      - id: "A4"
+        label: "action"
+        description: "林逸在返回前谨慎清理所有痕迹，确保未留下脚印或残留物"
+        attributes:
+          cleanup: true
+          action: "清除痕迹"
+  
+  observables:
+    state_changes:
+      - type: "plot_flag"
+        name: "禁地入口定位"
+        value: true
+      - type: "plot_flag"
+        name: "阵法弱点半刻脉动"
+        value: true
+      - type: "plot_flag"
+        name: "巡逻换防间隔记录"
+        value: "两刻钟"
+    story_events:
+      - type: "discovery"
+        description: "林逸发现阵法的脉动间隔从半刻变为一刻，意味着阵法有周期性薄弱期"
+        participants: ["林逸"]
+        importance: "critical"
+    narrative_flags:
+      - name: "investigation_depth"
+        value: "深入"
+      - name: "next_action"
+        value: "准备潜入"
+  
+  constraints:
+    - type: "required"
+      target: "林逸完成对阵法脉动的记录"
+    - type: "required"
+      target: "林逸记录至少两个巡逻换防间隔"
+    - type: "forbidden"
+      target: "林逸触发任何警报"
+    - type: "required"
+      target: "林逸清除所有潜入痕迹"
+  
+  metadata:
+    chapter: 5
+    scene_index: 1
+    arc: "青云宗秘境"

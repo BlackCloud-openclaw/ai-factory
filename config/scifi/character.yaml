@@ -1,0 +1,13 @@
+protagonist:
+  default_name: "凯尔"
+  initial_rank: "新兵"
+  initial_hp: 100
+  initial_energy: 100
+
+npcs:
+  - name: "指挥官艾伦"
+    rank: "上校"
+    role: "mentor"
+  - name: "技师琳达"
+    rank: "中士"
+    role: "support"

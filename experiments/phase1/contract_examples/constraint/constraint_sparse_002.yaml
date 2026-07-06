@@ -1,0 +1,48 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_constraint_sparse_002"
+  
+  intent:
+    goal: "林逸和苏清雪在触发警报后逃离秘境"
+    conflict: "秘境守卫已启动，后有追兵"
+    expected_outcome: "两人从备用通道成功逃离，但丢失了部分装备"
+  
+  execution:
+    units:
+      - id: "C1"
+        label: "constraint"
+        description: "林逸和苏清雪分头行动，避免被同时包围"
+      - id: "C2"
+        label: "constraint"
+        description: "两人在备用通道口重新汇合"
+  
+  observables:
+    state_changes:
+      - type: "plot_flag"
+        name: "成功逃离"
+        value: true
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "苏清雪"
+        delta: 10
+    story_events:
+      - type: "combat"
+        description: "林逸至少击退一名追兵"
+        participants: ["林逸"]
+        importance: "normal"
+    narrative_flags:
+      - name: "escape_success"
+        value: true
+  
+  constraints:
+    - type: "required"
+      target: "两人成功在备用通道汇合"
+    - type: "required"
+      target: "林逸至少击退一名追兵"
+    - type: "forbidden"
+      target: "任何一人被捕获"
+  
+  metadata:
+    chapter: 8
+    scene_index: 3
+    arc: "秘境探索"

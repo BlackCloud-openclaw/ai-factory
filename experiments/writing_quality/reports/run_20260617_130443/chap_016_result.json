@@ -1,0 +1,111 @@
+{
+  "chapter": 16,
+  "timestamp": "20260617_130443",
+  "original_length": 1042,
+  "rewritten_length": 918,
+  "length_ratio": 0.8809980806142035,
+  "length_ok": false,
+  "anchors": {
+    "characters": [
+      "林逸"
+    ],
+    "items": [],
+    "realms": []
+  },
+  "validation": {
+    "passed": true,
+    "issues": [],
+    "details": {
+      "characters": {
+        "total": 1,
+        "found": 1,
+        "missing": []
+      },
+      "items": {
+        "total": 0,
+        "found": 0,
+        "missing": []
+      },
+      "realms": {
+        "total": 0,
+        "found": 0,
+        "missing": []
+      }
+    },
+    "character_consistency": 1.0
+  },
+  "orig_wqi": {
+    "total": 40.8,
+    "scores": {
+      "dialogue": 4.2,
+      "sensory": 6.9,
+      "inner": 4.0,
+      "rhythm": 10.0,
+      "voice": 2.0,
+      "repetition": 13.6
+    },
+    "metrics": {
+      "total_chars": 1042,
+      "total_sentences": 47,
+      "dialogue_ratio": 0.04222648752399232,
+      "sensory_density": 0.046065259117082535,
+      "inner_monologue_density": 0.02127659574468085,
+      "avg_sentence_length": 20.829787234042552
+    },
+    "length_ratio": 1.0,
+    "length_ok": true
+  },
+  "new_wqi": {
+    "total": 50.0,
+    "scores": {
+      "dialogue": 8.0,
+      "sensory": 9.2,
+      "inner": 7.2,
+      "rhythm": 2.1,
+      "voice": 10.0,
+      "repetition": 13.6
+    },
+    "metrics": {
+      "total_chars": 918,
+      "total_sentences": 26,
+      "dialogue_ratio": 0.07952069716775599,
+      "sensory_density": 0.06100217864923747,
+      "inner_monologue_density": 0.038461538461538464,
+      "avg_sentence_length": 33.80769230769231
+    },
+    "length_ratio": 0.88,
+    "length_ok": true
+  },
+  "wqi_gain": 9.200000000000003,
+  "metrics_compare": {
+    "original": {
+      "total_chars": 1042,
+      "total_sentences": 47,
+      "dialogue_ratio": 0.0422,
+      "dialogue_blocks": 5,
+      "inner_monologue_density": 0.0213,
+      "inner_monologue_blocks": 1,
+      "sensory_density": 0.048,
+      "sensory_words": 50,
+      "avg_sentence_length": 20.83
+    },
+    "rewritten": {
+      "total_chars": 918,
+      "total_sentences": 26,
+      "dialogue_ratio": 0.0795,
+      "dialogue_blocks": 7,
+      "inner_monologue_density": 0.0385,
+      "inner_monologue_blocks": 1,
+      "sensory_density": 0.0654,
+      "sensory_words": 60,
+      "avg_sentence_length": 33.81
+    },
+    "deltas": {
+      "dialogue_ratio": 0.03729420964376367,
+      "inner_monologue_density": 0.017184942716857613,
+      "sensory_density": 0.01737483221055537,
+      "avg_sentence_length": 12.977905073649755,
+      "total_chars": -124
+    }
+  }
+}

@@ -11,6 +11,7 @@ class XianxiaConfig:
         self.voice = self._load("voice.yaml")
         self.theme = self._load("theme.yaml")
         self.projection = self._load("projection.yaml")
+        self.cognitive_rules = self._load("cognitive_rules.yaml")  # 新增
 
     def _load(self, name: str):
         path = self.base_dir / name

@@ -1,2 +1,90 @@
-protagonist:
-  default_name: "林逸"
+# config/xianxia/character.yaml
+# 角色配置 - 唯一真相源
+# 
+# 设计原则：
+# - id 是系统唯一标识，永不改变
+# - name 是显示名称，可随意更改
+# - tags 用于角色分类和查找（未来扩展用）
+
+characters:
+  - id: protagonist
+    name: 林逸
+    role: 主角
+    tags:
+      - main
+      - cultivator
+      - male
+
+  - id: mentor
+    name: 玄老
+    role: 引导者 / 残魂
+    tags:
+      - mentor
+      - elder
+      - spirit
+
+  - id: heroine
+    name: 苏清月
+    role: 女主角
+    tags:
+      - main
+      - female
+      - cultivator
+
+  - id: second_uncle
+    name: 二叔
+    role: 家族长辈
+    tags:
+      - family
+      - mentor
+
+  - id: sect_elder
+    name: 青云长老
+    role: 宗门长老
+    tags:
+      - elder
+      - authority
+
+  # 反派 / 宿敌（可配置多个）
+  - id: rival
+    name: 萧寒
+    role: 宿敌
+    tags:
+      - antagonist
+      - rival
+
+# 关键道具
+artifacts:
+  - id: jade_pendant
+    name: 神秘玉佩
+    aliases:
+      - 古玉
+      - 玉佩
+      - 灵玉
+      - 残玉
+    significance: 核心剧情道具，主角机缘起点
+    tags:
+      - key_item
+      - plot_device
+      - inheritance
+
+  - id: sword
+    name: 青锋剑
+    aliases:
+      - 长剑
+      - 本命剑
+    significance: 主角本命法宝
+    tags:
+      - weapon
+      - bonded
+
+  - id: cultivation_manual
+    name: 玄天剑诀
+    aliases:
+      - 剑诀
+      - 残页
+      - 玄天残页
+    significance: 主角修炼功法
+    tags:
+      - cultivation
+      - inheritance

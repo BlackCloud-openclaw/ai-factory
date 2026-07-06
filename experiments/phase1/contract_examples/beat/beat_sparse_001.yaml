@@ -1,0 +1,49 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_beat_sparse_001"
+  
+  intent:
+    goal: "林逸尝试说服苏清雪合作探索秘境"
+    conflict: "苏清雪对林逸的能力存疑，且有自己的秘密"
+    expected_outcome: "苏清雪勉强同意合作，但保留关键信息"
+  
+  execution:
+    units:
+      - id: "B1"
+        label: "beat"
+        description: "接近：林逸在藏书阁找到苏清雪"
+      - id: "B2"
+        label: "beat"
+        description: "试探：林逸抛出合作意向，苏清雪冷淡回应"
+      - id: "B3"
+        label: "beat"
+        description: "压力：林逸透露自己已知部分信息，迫使苏清雪正视"
+      - id: "B4"
+        label: "beat"
+        description: "妥协：苏清雪提出条件，双方达成初步共识"
+  
+  observables:
+    state_changes:
+      - type: "relationship"
+        from_char: "林逸"
+        to_char: "苏清雪"
+        delta: 10
+    story_events:
+      - type: "dialogue"
+        description: "苏清雪提出至少一个合作条件"
+        participants: ["苏清雪", "林逸"]
+        importance: "high"
+    narrative_flags:
+      - name: "alliance_formed"
+        value: true
+  
+  constraints:
+    - type: "required"
+      target: "苏清雪提出的条件包含'信息对等'要求"
+    - type: "required"
+      target: "林逸接受苏清雪的条件"
+  
+  metadata:
+    chapter: 4
+    scene_index: 2
+    arc: "青云宗秘境"

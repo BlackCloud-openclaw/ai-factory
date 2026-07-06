@@ -4,8 +4,6 @@ from typing import Any, Dict, Optional
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.base import BaseCheckpointSaver
-
-from src.orchestrator.state import AgentState
 from src.orchestrator.nodes import (
     analyze_node,
     research_node,
@@ -18,18 +16,31 @@ from src.orchestrator.nodes import (
     tool_node_v2,
     writer_node, 
     plan_node,
-)
+)    
+from src.orchestrator.state import AgentState
+
 from src.agents.planner import PlannerAgent
 from src.scheduler.task_scheduler import TaskScheduler
 from src.common.logging import setup_logging
 from src.orchestrator.phase_resolver import WorkflowPhaseResolver
 from src.orchestrator.state_patch import WorkflowPhase
 from src.agents.director import DirectorAgent
+from src.agents.rewrite import RewriteAgent
+from src.agents.drama_planner import DramaPlannerAgent
+from src.config import config
 
 logger = setup_logging("orchestrator.graph")
 
 # 全局 checkpointer（由 main.py 初始化）
 _checkpointer: Optional[BaseCheckpointSaver] = None
+
+async def drama_planner_node(state: AgentState) -> dict:
+    agent = DramaPlannerAgent()
+    return await agent.run(state)
+
+async def rewrite_node(state: AgentState) -> dict:
+    agent = RewriteAgent()
+    return await agent.run(state)
 
 def set_checkpointer(checkpointer: BaseCheckpointSaver) -> None:
     """设置全局 checkpointer（在应用启动时调用）"""
@@ -72,7 +83,10 @@ def after_plan(state: AgentState) -> str:
         return "save_memory"
     
     if task_type == "scene_plan" and state.scene_plan:
-        return "director"
+        # 检查场景计划是否已包含戏剧结构
+        if state.scene_plan_list and state.scene_plan_list[0].get("drama"):
+            return "writer"   # 跳过 drama_planner_node
+        return "drama_planner"
     
     task_plan = getattr(state, 'task_plan', None)
     if not task_plan:
@@ -109,6 +123,8 @@ def route_after_validate(state: AgentState) -> str:
         return "writer"
     if phase == WorkflowPhase.TRANSITIONING:
         return "planning"
+    if phase == WorkflowPhase.PLANNING:
+        return "planning"   # ← 新增    
     return "save_memory"
 
 def create_workflow() -> StateGraph:
@@ -125,7 +141,9 @@ def create_workflow() -> StateGraph:
     workflow.add_node("advance_subtask", advance_subtask_node)
     workflow.add_node("tool_node", tool_node_v2)
     workflow.add_node("writer", writer_node)
-    workflow.add_node("director", director_node)
+    #workflow.add_node("director", director_node)
+    workflow.add_node("rewrite", rewrite_node)   # 使用函数而非 lambda
+    workflow.add_node("drama_planner", drama_planner_node)
 
     workflow.set_entry_point("load_memory")
     workflow.add_edge("load_memory", "analyze")
@@ -152,7 +170,8 @@ def create_workflow() -> StateGraph:
             "save_memory": "save_memory",
             "research": "research",
             "tool_node": "tool_node",
-            "director": "director",
+            "drama_planner": "drama_planner",   # ← 新增
+            "writer": "writer",   # ← 新增
         },
     )
 
@@ -200,8 +219,26 @@ def create_workflow() -> StateGraph:
     workflow.add_edge("save_memory", END)
     workflow.add_edge("advance_subtask", "code")
     workflow.add_edge("tool_node", "planning")
-    workflow.add_edge("director", "writer")
-    workflow.add_edge("writer", "validate")
+    #workflow.add_edge("director", "writer")
+    #workflow.add_edge("writer", "validate")
+    # 修改边：writer → rewrite → validate
+    #workflow.add_edge("writer", "rewrite")
+    #workflow.add_edge("rewrite", "validate")
+    workflow.add_edge("drama_planner", "writer")
+
+    def route_after_writer(state: AgentState) -> str:
+        if config.experiment_enable_versioned_writer:
+            return "validate"
+        return "rewrite"
+
+    workflow.add_conditional_edges(
+        "writer",
+        route_after_writer,
+        {
+            "rewrite": "rewrite",
+            "validate": "validate",
+        }
+    )    
 
     return workflow
 

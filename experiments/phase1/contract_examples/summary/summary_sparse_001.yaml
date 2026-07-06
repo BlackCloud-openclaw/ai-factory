@@ -1,0 +1,40 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_summary_sparse_001"
+  
+  intent:
+    goal: "林逸试图从大师兄口中套出秘境线索"
+    conflict: "大师兄奉命封锁消息，对林逸心存戒备"
+    expected_outcome: "林逸未能获得关键信息，但确认了秘境的存在"
+  
+  execution:
+    units:
+      - id: "U1"
+        label: "intent"
+        description: "林逸用言语试探大师兄"
+        attributes:
+          actor: "林逸"
+          target: "大师兄"
+          method: "闲聊试探"
+  
+  observables:
+    state_changes: []
+    story_events:
+      - type: "dialogue"
+        description: "林逸和大师兄之间至少3轮对话"
+        participants: ["林逸", "大师兄"]
+        importance: "normal"
+    narrative_flags:
+      - name: "tension_level"
+        value: "medium"
+  
+  constraints:
+    - type: "forbidden"
+      target: "大师兄直接告知任何真实信息"
+    - type: "required"
+      target: "场景结束时林逸的疑虑加深"
+  
+  metadata:
+    chapter: 3
+    scene_index: 1
+    arc: "青云宗秘境"

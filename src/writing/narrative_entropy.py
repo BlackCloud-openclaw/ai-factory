@@ -11,6 +11,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 from src.config_loader import get_xianxia_config
+from src.domain.identity import get_main_character_id, get_character_name
 
 
 # ============================================================================
@@ -439,22 +440,33 @@ class NarrativeEntropyCalculator:
         if not hasattr(world_state, 'characters'):
             return 0.0
         
+        # 从配置获取主角名
+        if protagonist_name is None:
+            protagonist_id = get_main_character_id()
+            protagonist_name = get_character_name(protagonist_id)
+
         # 获取主角
         protagonist = None
-        if protagonist_name and protagonist_name in world_state.characters:
-            protagonist = world_state.characters[protagonist_name]
+        if protagonist_name in world_state.characters:
+            protagonist = world_state.get_character(protagonist_name)
+            if protagonist is None:
+                # 尝试用主角 ID
+                protagonist = world_state.get_character(protagonist_id)            
         else:
-            # 自动推断：查找名字含“林逸”或 tag 为 protagonist 的角色
+            # 遍历查找（兼容旧状态）
             for name, char in world_state.characters.items():
-                if "林逸" in name:
+                # 检查角色是否有 id 属性
+                if hasattr(char, 'id') and char.id == protagonist_id:
                     protagonist = char
                     break
-                if hasattr(char, 'tags') and 'protagonist' in char.tags:
+                # fallback：名称匹配
+                if name == protagonist_name:
                     protagonist = char
                     break
-            # 如果还没找到，取第一个角色作为主角
-            if protagonist is None and world_state.characters:
-                protagonist = next(iter(world_state.characters.values()))
+
+        if protagonist is None and world_state.characters:
+            # 如果仍找不到，使用第一个角色作为主角（兜底）
+            protagonist = next(iter(world_state.characters.values()))
         
         if protagonist is None:
             return 0.0

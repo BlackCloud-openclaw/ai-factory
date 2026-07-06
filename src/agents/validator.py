@@ -32,6 +32,7 @@ from src.writing.causality.health import HealthChecker
 from src.common.prompt_logger import log_prompt
 from src.writing.world_state import WorldState
 from src.config_loader import get_xianxia_config
+from src.writing.planning_contract import PlanningContract
 
 
 logger = setup_logging("agents.validator")
@@ -72,6 +73,7 @@ class ValidatorAgent(BaseAgent):
                 "goal": "",
                 "conflict": "",
                 "current_state": state.current_state,   # 新增：用于认知关系检查
+                "final_state": state.current_state or {},  # 初始为 current_state，后续会被覆盖
             }
 
             # ========== 新增：注入 Director 输出（用于职责边界检查）==========
@@ -80,6 +82,8 @@ class ValidatorAgent(BaseAgent):
             constraints["character_intent"] = state.character_intent or {}
             # ========== 新增：注入场景目标（阶段5） ==========
             constraints["scene_objective"] = state.scene_plan.get("scene_objective", "") if state.scene_plan else ""
+            # ========== 新增：注入当前激活的 Loop ==========
+            constraints["active_loop"] = state.metadata.get("active_loop")
             # ================================================================
 
             # 加载当前活跃谓词（用于因果关系校验）
@@ -111,13 +115,26 @@ class ValidatorAgent(BaseAgent):
                 constraints["goal"] = state.scene_plan.get("goal", "")
                 constraints["conflict"] = state.scene_plan.get("conflict", "")
 
+            # ========== 新增：获取 Planning Contract ==========
+            planning_contract = None
+            if hasattr(state, 'planning_contract') and state.planning_contract:
+                try:
+                    contract_data = state.planning_contract
+                    planning_contract = PlanningContract(**contract_data)
+                    logger.info(f"✅ Loaded Planning Contract for validator: {planning_contract.scene_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to parse Planning Contract in validator: {e}")
+                    planning_contract = None
+            # ===================================================
+
             # 调用增强版校验
             result = await self._validate_novel_enhanced(
                 raw,
                 constraints,
                 deviation_detected=getattr(state, 'deviation_detected', False),
                 missing_goal=getattr(state, 'missing_goal_keywords', []),
-                missing_conflict=getattr(state, 'missing_conflict_keywords', [])
+                missing_conflict=getattr(state, 'missing_conflict_keywords', []),
+                planning_contract=planning_contract,  # 新增
             )
 
             duration = time.time() - start_time
@@ -268,23 +285,45 @@ class ValidatorAgent(BaseAgent):
         deviation_detected: bool = False,
         missing_goal: List[str] = None,
         missing_conflict: List[str] = None,
+        planning_contract: Optional[PlanningContract] = None,  # 新增
     ) -> Dict[str, Any]:
         if missing_goal is None:
             missing_goal = []
         if missing_conflict is None:
             missing_conflict = []
 
+        logger.info(f"🔍 active_loop from constraints: {constraints.get('active_loop')}")
+        logger.info(f"Validator: text type={type(text)}, length={len(text) if text else 0}")
+        logger.debug(f"Validator: text first 200 chars={text[:200] if text else 'None'}")
+
         # 1. 解析 JSON
         parsed_data = self._extract_json(text)
-        if not parsed_data:
-            return {
-                "passed": False,
-                "feedback": "无法解析生成的 JSON，请确保输出包含 scene_text 字段",
-                "suggestions": ["检查模型输出格式，应为 valid JSON，不要用 ```json 代码块包裹"],
-                "should_retry": True,
-                "error_details": {"error": "json_parse_failed"},
-                "parsed_output": None,
-            }
+
+        # ========== 新增：JSON 解析失败或缺少 scene_text 时，用正则直接提取 ==========
+        if not parsed_data or not parsed_data.get("scene_text"):
+            # 匹配 "scene_text": "任意内容"（支持转义）
+            match = re.search(r'"scene_text"\s*:\s*"((?:[^"\\]|\\.)*)"', text, re.DOTALL)
+            if match:
+                scene_text_raw = match.group(1)
+                # 还原转义字符
+                scene_text = scene_text_raw.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+                parsed_data = {
+                    "scene_text": scene_text,
+                    "events": [],
+                    "foreshadowing": []
+                }
+                logger.warning("Validator: extracted scene_text via regex fallback (length=%d)", len(scene_text))
+            else:
+                # 仍然失败，返回失败响应
+                return {
+                    "passed": False,
+                    "feedback": "无法解析生成的 JSON，且无法通过正则提取 scene_text",
+                    "suggestions": ["请确保模型输出包含 scene_text 字段"],
+                    "should_retry": True,
+                    "error_details": {"error": "json_parse_failed_no_regex_fallback"},
+                    "parsed_output": {},
+                }
+        # =====================================================================
 
         scene_text = parsed_data.get("scene_text", "")
         if not scene_text or len(scene_text.strip()) < 50:
@@ -296,6 +335,8 @@ class ValidatorAgent(BaseAgent):
                 "error_details": {"error": "scene_text_too_short", "length": len(scene_text)},
                 "parsed_output": parsed_data,
             }
+        
+        control_scores = {}  # ✅ 加在这里
 
         # 读取配置
         must_events_threshold = getattr(config, 'must_events_similarity_threshold', 0.30)
@@ -309,6 +350,7 @@ class ValidatorAgent(BaseAgent):
         character_intent = constraints.get("character_intent", {})
         scene_objective = constraints.get("scene_objective", "")
         current_state_dict = constraints.get("current_state", {})
+        active_loop = constraints.get("active_loop")  # 新增
 
         # 辅助函数：安全的单个 embedding 请求
         async def safe_embedding(text: str, desc: str) -> Optional[List[float]]:
@@ -437,56 +479,63 @@ class ValidatorAgent(BaseAgent):
             try:
                 world = WorldState.from_dict(current_state_dict)
                 actor = character_intent.get("actor")
-                if actor and actor in world.characters:
-                    char = world.characters[actor]
-                    
+                char = world.get_character(actor)
+                if char is not None:
+                    cognitive_rules = get_xianxia_config().cognitive_rules
+
+                    # --- 1. 信念检查 ---
                     if char.beliefs:
-                        belief_violations = {
-                            "不杀无辜": ["杀", "斩杀", "屠杀", "灭口", "处决"],
-                            "不背叛朋友": ["出卖", "背叛", "告密", "陷害"],
-                            "强者为尊": ["屈服", "求饶", "认输"],
-                            "丹药不可靠": ["服用丹药", "吞服丹药", "嗑药"],
-                            "不食言": ["毁约", "失信", "食言"],
-                        }
+                        belief_violations = cognitive_rules.get("belief_violations", {})
                         for belief in char.beliefs:
                             violation_keywords = belief_violations.get(belief, [])
                             if violation_keywords and any(kw in scene_text for kw in violation_keywords):
                                 errors.append(f"认知身份违背: {actor} 的信念「{belief}」被违背")
-                    
+
+                    # --- 2. 自我认知检查 ---
                     if char.self_image:
                         self_image_lower = char.self_image.lower()
-                        if "天弃" in self_image_lower or "弃子" in self_image_lower:
-                            luck_words = ["机缘", "奇遇", "天赐", "传承", "神兵"]
-                            if any(word in scene_text for word in luck_words):
-                                errors.append(f"认知身份可能不一致: {actor} 自我认知为「{char.self_image}」，但获得了不应得的机缘")
-                        
-                        if "复仇" in self_image_lower or "报仇" in self_image_lower:
-                            forgive_words = ["原谅", "宽恕", "放下仇恨", "释怀"]
-                            if any(word in scene_text for word in forgive_words):
-                                errors.append(f"认知身份可能不一致: {actor} 自我认知为「{char.self_image}」，但表现出宽容行为")
-                    
+                        self_image_rules = cognitive_rules.get("self_image_rules", [])
+
+                        for rule in self_image_rules:
+                            match_tags = rule.get("match", [])
+                            if not any(tag in self_image_lower for tag in match_tags):
+                                continue
+
+                            forbidden_keywords = rule.get("forbidden_keywords", [])
+                            if any(kw in scene_text for kw in forbidden_keywords):
+                                errors.append(
+                                    f"认知身份可能不一致: {actor} 自我认知为「{char.self_image}」，"
+                                    f"但不应出现 {', '.join(forbidden_keywords[:3])} 类词汇"
+                                )
+
+                    # --- 3. 依恋检查 ---
                     if char.attachments:
-                        attachment_keywords = [att for att in char.attachments if len(att) >= 2]
-                        for attachment in attachment_keywords:
+                        attachment_rules = cognitive_rules.get("attachment_rules", {})
+                        default_neg = attachment_rules.get("default_negative_keywords", [
+                            "丢弃", "毁掉", "遗弃", "破坏", "砸"
+                        ])
+                        family_neg = attachment_rules.get("family_negative_keywords", [])
+                        artifact_neg = attachment_rules.get("artifact_negative_keywords", [])
+
+                        # 合并负面词
+                        all_negative = list(set(default_neg + family_neg + artifact_neg))
+
+                        for attachment in char.attachments:
                             if attachment in scene_text:
-                                negative_words = ["丢弃", "毁掉", "遗弃", "破坏", "砸"]
                                 idx = scene_text.find(attachment)
                                 if idx != -1:
                                     context = scene_text[max(0, idx-30):min(len(scene_text), idx+30)]
-                                    if any(word in context for word in negative_words):
+                                    if any(word in context for word in all_negative):
                                         errors.append(f"认知身份可能不一致: {actor} 的依恋「{attachment}」被表现出负面行为")
-                    
+
+                    # --- 4. 道德底线检查 ---
                     if char.moral_boundaries:
-                        boundary_violations = {
-                            "不杀无辜": ["杀", "斩杀", "屠杀"],
-                            "不背叛宗门": ["背叛", "出卖", "投敌"],
-                            "不偷盗": ["偷", "盗", "窃取"],
-                            "不欺骗": ["欺骗", "撒谎", "骗"],
-                        }
+                        boundary_violations = cognitive_rules.get("boundary_violations", {})
                         for boundary in char.moral_boundaries:
                             violation_keywords = boundary_violations.get(boundary, [])
                             if violation_keywords and any(kw in scene_text for kw in violation_keywords):
                                 errors.append(f"道德底线突破: {actor} 突破了「{boundary}」底线")
+
             except Exception as e:
                 logger.warning(f"Failed to check cognitive identity: {e}")
 
@@ -579,7 +628,6 @@ class ValidatorAgent(BaseAgent):
         if voice_violations:
             logger.warning(f"Voice violations: {voice_violations}")
 
-
         # ==================== 因果关系校验 ====================
         predicates = constraints.get("predicates", {})
         budget = constraints.get("budget")
@@ -623,6 +671,20 @@ class ValidatorAgent(BaseAgent):
                 "suggestions": causality_suggestions
             }
 
+        # ========== 新增：Loop 推进检查 ==========
+        active_loop = constraints.get("active_loop")
+        loop_advancement_score = 0.0
+        if active_loop:
+            advanced, score, reason = await self._check_loop_advancement(scene_text, active_loop)
+            loop_advancement_score = score
+            logger.info(f"📊 loop_advancement_score assigned: {loop_advancement_score:.3f} (advanced={advanced})")  # 新增            
+            if not advanced:
+                errors.append(f"叙事环路未推进: {reason}")
+                error_details["loop_not_advanced"] = reason
+            else:
+                error_details["loop_advancement_score"] = score
+        # =====================================
+
         # 计算是否需要重试
         has_missing_knowledge = bool(missing_knowledge)
         should_retry = bool(missing_events or not goal_ok or not conflict_ok or not scene_obj_ok or has_missing_knowledge or causality_failed)
@@ -649,7 +711,46 @@ class ValidatorAgent(BaseAgent):
                 "should_retry": should_retry,
                 "error_details": error_details,
                 "parsed_output": parsed_data,
+                "loop_advancement_score": loop_advancement_score,  # 新增
+                "control_scores": control_scores,  # 新增
             }
+
+        # ========== 新增：Planning Contract 验证 ==========
+        if planning_contract:
+            # Surface Control: 检查 Execution Units
+            surface_result = self._validate_contract_units(planning_contract, scene_text)
+            control_scores["surface_control"] = surface_result
+            
+            # Constraint Control: 检查硬约束
+            constraint_result = self._validate_contract_constraints(planning_contract, scene_text)
+            control_scores["constraint_control"] = constraint_result
+            
+            # 在第 640 行附近，调用 _validate_contract_observables 之前添加
+            current_state_dict = constraints.get("current_state", {})
+            # 尝试从 parsed_data 的 events 构建 final_state
+            # 或者从约束中获取
+            final_state = constraints.get("final_state", {})
+            if not final_state:
+                # 使用 current_state 作为 fallback
+                final_state = current_state_dict
+
+            # Outcome Control: 检查 Observables
+            outcome_result = self._validate_contract_observables(
+                planning_contract, 
+                parsed_data.get("events", []), 
+                final_state
+            )
+            control_scores["outcome_control"] = outcome_result
+            
+            # 如果任何控制维度失败，影响验证结果
+            if not constraint_result.get("passed", True):
+                errors.append("违反硬性约束")
+                should_retry = True
+            if outcome_result.get("matched", 0) < outcome_result.get("total", 0):
+                missing_outcomes = outcome_result.get("total", 0) - outcome_result.get("matched", 0)
+                errors.append(f"缺失 {missing_outcomes} 个预期状态变化")
+                should_retry = True
+        # ===================================================
 
         return {
             "passed": True,
@@ -658,6 +759,7 @@ class ValidatorAgent(BaseAgent):
             "should_retry": False,
             "error_details": error_details,
             "parsed_output": parsed_data,
+            "loop_advancement_score": loop_advancement_score,  # 新增
         }
 
     # ---------- 辅助方法 ----------
@@ -736,6 +838,52 @@ class ValidatorAgent(BaseAgent):
         scene_text = parsed.get("scene_text", "")
         if len(scene_text) < 100:
             logger.warning(f"Validation debug: scene_text too short ({len(scene_text)} chars)")
+
+    # ==================== 新增：Loop 推进检查 ====================
+    async def _check_loop_advancement(self, scene_text: str, loop: dict) -> tuple[bool, float, str]:
+        """
+        检查场景是否实质推进了叙事环路
+        返回: (是否推进, 推进分数 0-1, 理由)
+        """
+        if not loop or not loop.get("description"):
+            return True, 0.0, "无激活 Loop，跳过检查"
+
+        try:
+            prompt = f"""
+你是一位叙事分析专家。判断以下场景对指定叙事环路的推进程度。
+
+环路描述：{loop['description']}
+当前进度：{loop.get('progress', 0)*100:.0f}%
+
+场景文本：
+{scene_text[:2000]}
+
+请评估本章对环路的推进程度（0-1），并输出 JSON：
+{{
+    "advanced": true/false,      // 是否有实质推进
+    "score": 0.0-1.0,            // 推进程度（0=无，0.1=轻微，0.5=中等，1.0=重大突破）
+    "reason": "简短理由"
+}}
+"""
+            client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
+            response = await client.chat.completions.create(
+                model="Qwen3-32B-Q5_K_M",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=256,
+                response_format={"type": "json_object"}
+            )
+            result = json.loads(response.choices[0].message.content)
+            advanced = result.get("advanced", False)
+            score = result.get("score", 0.0)
+            reason = result.get("reason", "未提供理由")
+            logger.info(f"🔍 Loop advancement check result: advanced={advanced}, score={score:.3f}, reason={reason[:60]}")            
+
+            #return advanced, min(1.0, max(0.0, score)), reason
+            return advanced, score, reason        
+        except Exception as e:
+            logger.warning(f"Loop advancement check failed (fallback: pass with 0.05): {e}")
+            return True, 0.05, f"检查异常，默认推进 5%: {e}"
 
     # ==================== 原有方法保留（用于代码验证） ====================
     async def _semantic_validate(self, text: str, must_events: List[str]) -> Tuple[bool, str]:
@@ -825,3 +973,184 @@ class ValidatorAgent(BaseAgent):
         outline = constraints.get("outline")
         writing_constraints = constraints.get("writing_constraints", {})
         return await self._validate_novel(text, outline, writing_constraints)
+    
+    def _validate_contract_units(self, contract: PlanningContract, text: str) -> Dict[str, Any]:
+        """验证 Execution Units 是否被完成"""
+        if not contract.execution.units:
+            return {"completed": 0, "total": 0, "details": [], "score": 1.0}
+        
+        completed = 0
+        details = []
+        for unit in contract.execution.units:
+            # 提取关键词
+            keywords = re.findall(r'[\u4e00-\u9fff]{2,4}', unit.description)
+            if not keywords:
+                # 如果没有关键词，使用整个描述的前6个字
+                keywords = [unit.description[:6]]
+            matched = any(kw in text for kw in keywords)
+            if matched:
+                completed += 1
+            details.append({
+                "unit_id": unit.id, 
+                "description": unit.description, 
+                "completed": matched
+            })
+        
+        total = len(contract.execution.units)
+        score = completed / total if total > 0 else 1.0
+        return {
+            "completed": completed, 
+            "total": total, 
+            "score": score,
+            "details": details
+        }
+
+    def _validate_contract_constraints(self, contract: PlanningContract, text: str) -> Dict[str, Any]:
+        """验证硬约束"""
+        if not contract.constraints:
+            return {"passed": True, "details": [], "score": 1.0}
+        
+        results = []
+        all_passed = True
+        for c in contract.constraints:
+            keywords = re.findall(r'[\u4e00-\u9fff]{2,4}', c.target)
+            if not keywords:
+                keywords = [c.target[:6]]
+            
+            if c.type == "required":
+                matched = any(kw in text for kw in keywords) if keywords else False
+                passed = matched
+                if not passed:
+                    all_passed = False
+            elif c.type == "forbidden":
+                matched = any(kw in text for kw in keywords) if keywords else False
+                passed = not matched
+                if not passed:
+                    all_passed = False
+            else:
+                # before/after/exclusive/at_least_once 暂不实现
+                passed = True
+            results.append({
+                "type": c.type, 
+                "target": c.target, 
+                "passed": passed
+            })
+        
+        total = len(contract.constraints)
+        passed_count = sum(1 for r in results if r["passed"])
+        score = passed_count / total if total > 0 else 1.0
+        return {"passed": all_passed, "details": results, "score": score}
+
+    def _validate_contract_observables(
+        self,
+        contract: PlanningContract,
+        events: List[Dict],
+        final_state: Dict
+    ) -> Dict[str, Any]:
+        """验证可观测结果是否发生（支持多种事件格式）"""
+        logger.info(f"Validating observables: {len(contract.observables.state_changes)} expected, {len(events)} actual events")
+
+        if not contract.observables.state_changes:
+            return {"matched": 0, "total": 0, "details": [], "score": 1.0}
+
+        matched = 0
+        details = []
+
+        # 类型映射
+        TYPE_MAP = {
+            "plot_flag_set": "plot_flag",
+            "flag_set": "plot_flag",
+            "relationship_change": "relationship",
+            "item_acquire": "inventory",
+            "item_lose": "inventory",
+            "realm_upgrade": "realm",
+            "location_enter": "location",
+            "hp_changed": "hp",
+        }
+
+        # 字段映射（将 Writer 的字段名映射到 Contract 字段名）
+        FIELD_MAP = {
+            "flag": "name",
+            "from": "from_char",
+            "to": "to_char",
+            "character": "actor",
+            "actor": "actor",
+            "location": "location",
+            "new_hp": "new_hp",
+            "delta": "delta",
+        }
+
+        for change in contract.observables.state_changes:
+            found = False
+
+            for evt in events:
+                evt_type = evt.get("type", "")
+                mapped_type = TYPE_MAP.get(evt_type, evt_type)
+
+                if mapped_type != change.type:
+                    continue
+
+                # 根据类型检查
+                if change.type == "plot_flag":
+                    # 尝试多种可能字段名
+                    flag_name = evt.get("name") or evt.get("flag") or evt.get("flag_name")
+                    if flag_name == change.name and evt.get("value") == change.value:
+                        found = True
+                        break
+
+                elif change.type == "relationship":
+                    from_char = evt.get("from_char") or evt.get("from")
+                    to_char = evt.get("to_char") or evt.get("to")
+                    if from_char == change.from_char and to_char == change.to_char:
+                        evt_delta = evt.get("delta", 0)
+                        if abs(evt_delta - change.delta) <= 5:
+                            found = True
+                            break
+
+                elif change.type == "inventory":
+                    actor = evt.get("actor") or evt.get("character")
+                    item = evt.get("item") or evt.get("item_name")
+                    if actor == change.actor and item == change.item:
+                        op = evt.get("operation") or evt.get("action")
+                        if op in ["acquire", "add", "get"]:
+                            found = True
+                            break
+                        elif op in ["lose", "remove", "drop"]:
+                            found = True
+                            break
+
+                elif change.type == "realm":
+                    actor = evt.get("actor") or evt.get("character")
+                    if actor == change.actor:
+                        if evt.get("to_major_realm") == change.to_major_realm and \
+                        evt.get("to_minor_stage") == change.to_minor_stage:
+                            found = True
+                            break
+
+                elif change.type == "location":
+                    actor = evt.get("actor") or evt.get("character")
+                    if actor == change.actor and evt.get("location") == change.location:
+                        found = True
+                        break
+
+                elif change.type == "hp":
+                    actor = evt.get("actor") or evt.get("character")
+                    if actor == change.actor and evt.get("new_hp") == change.new_hp:
+                        found = True
+                        break
+
+            if found:
+                matched += 1
+                logger.info(f"  ✅ Matched: {change.type} - {change.name if hasattr(change, 'name') else change.model_dump()}")
+            else:
+                logger.info(f"  ❌ Not matched: {change.type}")
+
+            details.append({
+                "change": change.model_dump() if hasattr(change, 'model_dump') else vars(change),
+                "found": found
+            })
+
+        total = len(contract.observables.state_changes)
+        score = matched / total if total > 0 else 1.0
+        logger.info(f"Outcome Control score: {score:.3f} ({matched}/{total})")
+        return {"matched": matched, "total": total, "score": score, "details": details}

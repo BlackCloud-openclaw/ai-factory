@@ -1,0 +1,49 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_constraint_sparse_001"
+  
+  intent:
+    goal: "林逸在宗门大比中获胜，获得进入后山修炼的资格"
+    conflict: "对手是筑基四层的赵虎，擅长力量型功法"
+    expected_outcome: "林逸凭借巧劲而非蛮力获胜"
+  
+  execution:
+    units:
+      - id: "C1"
+        label: "constraint"
+        description: "林逸利用速度优势而非力量对抗赵虎"
+        attributes:
+          strategy: "以巧破力"
+      - id: "C2"
+        label: "constraint"
+        description: "林逸在比赛后半段找到赵虎下盘不稳的破绽"
+        attributes:
+          weakness: "下盘不稳"
+          timing: "后半段"
+  
+  observables:
+    state_changes:
+      - type: "plot_flag"
+        name: "获得后山资格"
+        value: true
+    story_events:
+      - type: "combat"
+        description: "林逸与赵虎的比赛持续至少三轮攻防"
+        participants: ["林逸", "赵虎"]
+        importance: "high"
+    narrative_flags:
+      - name: "victory_style"
+        value: "巧劲"
+  
+  constraints:
+    - type: "required"
+      target: "林逸获胜"
+    - type: "forbidden"
+      target: "林逸使用任何宗门禁术"
+    - type: "required"
+      target: "比赛过程中林逸至少被击退一次"
+  
+  metadata:
+    chapter: 7
+    scene_index: 1
+    arc: "宗门大比"

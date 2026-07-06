@@ -1,0 +1,65 @@
+planning_contract:
+  version: "1.0"
+  scene_id: "scene_summary_dense_001"
+  
+  intent:
+    goal: "林逸试图从大师兄口中套出秘境线索"
+    conflict: "大师兄奉命封锁消息，对林逸心存戒备，且周围有其他弟子监视"
+    expected_outcome: "林逸未能获得关键信息，但确认了秘境的存在，并注意到大师兄对某个方向下意识回避"
+  
+  execution:
+    units:
+      - id: "U1"
+        label: "intent"
+        description: "林逸以请教剑法为由接近大师兄，用闲聊掩饰真实意图"
+        attributes:
+          actor: "林逸"
+          target: "大师兄"
+          method: "迂回试探"
+          initial_topic: "剑法"
+      - id: "U2"
+        label: "intent"
+        description: "大师兄察觉林逸意图，用宗门规矩作为挡箭牌"
+        attributes:
+          actor: "大师兄"
+          target: "林逸"
+          reaction: "防御性回应"
+      - id: "U3"
+        label: "intent"
+        description: "林逸观察到大师兄在提及'后山禁地'时眼神闪烁，确认秘境方向"
+        attributes:
+          actor: "林逸"
+          observation: "大师兄眼神回避"
+          conclusion: "秘境在后山方向"
+  
+  observables:
+    state_changes: []
+    story_events:
+      - type: "dialogue"
+        description: "林逸和大师兄之间至少5轮对话，其中至少一轮涉及'后山'话题"
+        participants: ["林逸", "大师兄"]
+        importance: "high"
+      - type: "discovery"
+        description: "林逸通过观察大师兄的微表情获得线索"
+        participants: ["林逸"]
+        importance: "high"
+    narrative_flags:
+      - name: "tension_level"
+        value: "high"
+      - name: "suspect_confirmed"
+        value: true
+  
+  constraints:
+    - type: "forbidden"
+      target: "大师兄直接告知任何真实信息"
+    - type: "forbidden"
+      target: "林逸主动询问秘境"
+    - type: "required"
+      target: "场景结束时林逸确认秘境在后山方向"
+    - type: "required"
+      target: "大师兄至少出现一次防御性回应"
+  
+  metadata:
+    chapter: 3
+    scene_index: 1
+    arc: "青云宗秘境"

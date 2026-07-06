@@ -17,6 +17,7 @@ class SceneCompletionCommand:
     scene_plan: Optional[Dict[str, Any]] = None
     character_intents: Optional[Dict[str, Any]] = None   # 新增
     voice_memory: Optional[Dict[str, Any]] = None   # 新增
+    raw_output: Optional[str] = None   # 新增
     
 @dataclass
 class SceneCompletionResult:
@@ -68,6 +69,9 @@ class WritingCommand:
     narrative_blueprint: Optional[Dict[str, Any]] = None
     knowledge_deltas: Optional[List[Dict[str, Any]]] = None
     character_intent: Optional[Dict[str, Any]] = None
+    # ====== 新增：戏剧结构 ======
+    drama_structure: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 @dataclass

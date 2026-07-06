@@ -92,6 +92,9 @@ class AgentState(BaseModel):
     narrative_blueprint: Optional[Dict[str, Any]] = None
     knowledge_deltas: Optional[List[Dict[str, Any]]] = None
     character_intent: Optional[Dict[str, Any]] = None
+    
+    # ====== 新增：Drama Planner 输出（取代 Director） ======
+    drama_structure: Optional[Dict[str, Any]] = None
 
     # ===== 工作流阶段（显式状态机）=====
     phase: Optional[WorkflowPhase] = None
@@ -107,6 +110,10 @@ class AgentState(BaseModel):
     # ===== 已废弃字段（保留以免反序列化失败，但不再使用）=====
     skip_remaining: bool = False         # 不再使用
     plan: List[Dict[str, Any]] = []      # 不再使用
+
+    # ====== 新增：Planning Contract ======
+    planning_contract: Optional[Dict[str, Any]] = None  # 当前场景的 Planning Contract
+    planning_contracts: List[Dict[str, Any]] = Field(default_factory=list)  # 所有场景的 Contracts
 
     def should_retry(self) -> bool:
         return self.retry_count < self.max_retries and self.error is not None

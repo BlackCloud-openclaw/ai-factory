@@ -1,0 +1,7 @@
+groups:
+  - id: D
+    representation: action
+    density: dense
+    execution: single
+scenes_per_group: 3
+repetitions: 1

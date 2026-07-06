@@ -3,19 +3,24 @@
 from typing import Dict, Any, List, Optional
 from .world_state import WorldState, Realm
 import logging
+from src.domain.identity import get_main_character_id, get_character_name
+from src.domain.identity import get_character_config
 
 logger = logging.getLogger(__name__)
 
 REALM_ORDER = ["炼气", "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫"]
 
-
 def extract_hard_constraints(
     world_state: WorldState,
-    protagonist: str = "林逸",
+    protagonist: Optional[str] = None,
     max_items: int = 8,
     max_flags: int = 5,
     max_relationships: int = 3,
 ) -> Dict[str, Any]:
+    if protagonist is None:
+        protagonist_id = get_main_character_id()
+        protagonist = get_character_name(protagonist_id)
+
     constraints = {
         "protagonist": protagonist,
         "current_realm": {},
@@ -27,10 +32,11 @@ def extract_hard_constraints(
         "critical_flags": [],
         "critical_relationships": {},
     }
-    
-    # ========== 1. 主角境界（始终注入）==========
-    if protagonist in world_state.characters:
-        char = world_state.characters[protagonist]
+
+    char = world_state.get_character(protagonist)
+
+    if char is not None:
+        # 境界
         current_major = char.realm.value
         current_level = char.realm_level
         constraints["current_realm"] = {
@@ -38,25 +44,60 @@ def extract_hard_constraints(
             "minor_level": current_level,
             "full": char.full_realm(),
         }
-        
-        # 计算允许的下一境界
+
         try:
             current_idx = REALM_ORDER.index(current_major)
             next_major = REALM_ORDER[current_idx + 1] if current_idx + 1 < len(REALM_ORDER) else None
         except ValueError:
             next_major = None
-        
+
         if current_level < 9:
             constraints["allowed_next_realms"].append(f"{current_major}{current_level + 1}层")
         elif current_level == 9 and next_major:
             constraints["allowed_next_realms"].append(f"{next_major}一层")
-        
+
         for r in REALM_ORDER:
             if r != current_major and r != next_major:
                 constraints["forbidden_realms"].append(r)
+
+        # 生命值
+        hp = char.hp
+        if hp <= 30:
+            constraints["hp_status"] = "重伤"
+        elif hp <= 70:
+            constraints["hp_status"] = "轻伤"
+        else:
+            constraints["hp_status"] = "健康"
+
+        # 关键物品
+        config = get_character_config()
+        item_priority = {}
+        for art_id, art in config.artifacts.items():
+            if "key_item" in art.tags:
+                item_priority[art.name] = 100
+            elif "weapon" in art.tags:
+                item_priority[art.name] = 90
+
+        sorted_items = sorted(
+            char.inventory,
+            key=lambda x: item_priority.get(x, 0),
+            reverse=True
+        )
+        constraints["critical_items"] = sorted_items[:max_items]
+
+        # 关键关系
+        sorted_rels = sorted(
+            char.relationships.items(),
+            key=lambda x: abs(x[1]),
+            reverse=True
+        )
+        constraints["critical_relationships"] = dict(sorted_rels[:max_relationships])
+
     else:
-        # 如果主角不存在，记录警告并设置默认值
-        logger.warning(f"Protagonist {protagonist} not found in world_state, using defaults. Available characters: {list(world_state.characters.keys())}")
+        logger.warning(
+            f"主角 {protagonist} 未在 world_state 中找到，使用默认值。"
+            f"可用角色: {list(world_state.characters.keys())}"
+        )
         constraints["current_realm"] = {
             "major": "炼气",
             "minor_level": 1,
@@ -64,55 +105,23 @@ def extract_hard_constraints(
         }
         constraints["allowed_next_realms"] = ["炼气二层"]
         constraints["forbidden_realms"] = ["筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫"]
-    
-    # ========== 2. 生命值 ==========
-    if protagonist in world_state.characters:
-        hp = world_state.characters[protagonist].hp
-        if hp <= 30:
-            constraints["hp_status"] = "重伤"
-        elif hp <= 70:
-            constraints["hp_status"] = "轻伤"
-        else:
-            constraints["hp_status"] = "健康"
-    
-    # ========== 3. 当前位置 ==========
+        constraints["hp_status"] = "健康"
+        constraints["critical_items"] = []
+        constraints["critical_relationships"] = {}
+
+    # 当前位置（独立于主角）
     if world_state.map.current:
         constraints["current_location"] = world_state.map.current
-    
-    # ========== 4. 关键物品（Top-K）==========
-    if protagonist in world_state.characters:
-        inventory = world_state.characters[protagonist].inventory
-        item_priority = {
-            "神秘玉佩": 100, "青锋剑": 90, "千年雷击木": 80,
-            "寒铁矿": 70, "血煞丹": 60, "赤炎虎内丹": 50,
-        }
-        sorted_items = sorted(
-            inventory,
-            key=lambda x: item_priority.get(x, 0),
-            reverse=True
-        )
-        constraints["critical_items"] = sorted_items[:max_items]
-    
-    # ========== 5. 关键剧情标记（Top-K）==========
+
+    # 关键剧情标记（独立于主角）
     important_flags = [
         "玉佩觉醒", "封魔阵异动", "血色禁制触发",
         "师徒决裂", "金丹突破成功", "妖兽内丹现世"
     ]
     active_flags = [f for f in important_flags if world_state.global_flags.get(f)]
     constraints["critical_flags"] = active_flags[:max_flags]
-    
-    # ========== 6. 关键关系（Top-K）==========
-    if protagonist in world_state.characters:
-        char = world_state.characters[protagonist]
-        sorted_rels = sorted(
-            char.relationships.items(),
-            key=lambda x: abs(x[1]),
-            reverse=True
-        )
-        constraints["critical_relationships"] = dict(sorted_rels[:max_relationships])
-    
-    return constraints
 
+    return constraints
 
 def format_constraints_as_xml(constraints: Dict[str, Any]) -> str:
     """格式化为 XML + 优先级 banner"""
