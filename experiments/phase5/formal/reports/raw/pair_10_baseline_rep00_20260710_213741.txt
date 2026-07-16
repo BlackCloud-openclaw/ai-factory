@@ -1,0 +1,27 @@
+Scene: pair_10_baseline_rep00
+Condition: baseline
+Repeat: 0
+EntryLocation: None
+============================================================
+
+晨光未破晓，林逸已推开丹房斑驳的木门。潮湿的药香裹着腐臭扑面而来，他下意识屏息，指尖却触到石壁沁出的凉意。案上血灵芝根部泛着不自然的暗红，像是凝固的血痂。他抽出匕首轻刮表皮，簌簌剥落的碎屑里露出蛛网状黑斑——与三日前灵田异动时土壤渗出的纹路如出一辙。丹炉吞吐的雾气突然滞涩，架子上青玉瓶发出细微震颤。林逸后颈汗毛悄然竖起，袖中符纸已被冷汗浸得发软。
+
+============================================================
+Events: [
+  {
+    "type": "environment_check",
+    "target": "blood_ginseng_root"
+  },
+  {
+    "type": "discovery",
+    "content": "abnormal_black_spots"
+  },
+  {
+    "type": "connection_established",
+    "link": "spiritual_field_disturbance"
+  },
+  {
+    "type": "decision_making",
+    "action": "investigate_further"
+  }
+]

@@ -1,0 +1,36 @@
+Scene: S005
+Condition: isolation_emotion_fixed_world_garden
+Repetition: 0
+Timestamp: 20260707_205617
+============================================================
+
+林逸推开议事堂的门扉时，晨雾正从药园深处漫过来。他低头看了眼青布鞋面沾满的露水，将袖口的墨痕掖进长衫。山道石阶在乳白色雾气里忽隐忽现，像一截截浮在奶汤里的玉。指尖掠过石缝间新发的半夏，凉意顺着掌纹渗进来。
+
+第三十七级台阶有块青苔斑驳的岩石，他惯常在此处驻足。可今日石面竟覆着层滑腻的露珠，指尖残留的触感让他喉头微动。雾气突然流动起来，裹着当归与白芷的香气扑面，却在鼻腔深处泛出一丝铁锈味。林逸将药篓往肩上提了提，竹篾压痕在肩胛骨上烫出两道红印。
+
+山腰处传来归鸟的啼鸣。他仰头望见玄色剪影掠过雾霭，本该盘旋回巢的鸟群突然四散惊飞。几片羽毛飘落在前路，沾着未干的露水。林逸弯腰拾起一片，绒羽下的石阶上，暗红痕迹正缓缓渗开。晨雾重新凝滞成团，将那抹猩红裹得密不透风。
+
+============================================================
+Events: [
+  {
+    "type": "environment_change",
+    "element": "fog_density",
+    "value": "increasing"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "hemlock_scent",
+    "intensity": "strong"
+  },
+  {
+    "type": "character_action",
+    "element": "stone_touch",
+    "response": "unease"
+  },
+  {
+    "type": "anomaly_detection",
+    "element": "blood_trace",
+    "visibility": "partial"
+  }
+]
+Segments: 2, Succeeded: 1

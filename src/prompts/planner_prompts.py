@@ -433,7 +433,71 @@ class ScenePlanPromptBuilder(PromptBuilder):
         if gravity_warning:
             base_prompt += f"\n\n{gravity_warning}\n"
 
-        return base_prompt
+        # ========== v2.1: Scene Specification 生成指令 ==========
+        spec_section = """
+## 🆕 v2.1 场景规格（Scene Specification）
+
+每个场景除 goal/conflict/outcome/must_events 外，必须包含 `scene_spec` 字段：
+
+```json
+{
+    "scene_spec": {
+        "world": {
+            "location": "具体地点名",
+            "time": "清晨|正午|黄昏|子夜|深夜",
+            "atmosphere": "氛围关键词（潮湿/冷冽/宁静/肃杀/温暖/压抑）",
+            "sensory": ["感官细节1", "感官细节2", "感官细节3"]
+        },
+        "reader_emotion": {
+            "begin": "开头情绪",
+            "middle": "中间情绪",
+            "end": "结尾情绪"
+        },
+        "narrative_function": "introduce_mystery|escalate|reveal_truth|release_tension|transition|foreshadow",
+        "pov": "视角角色名"
+    }
+}
+字段说明
+字段	说明	示例
+world.location	场景发生地点	药园、议事堂、密室
+world.time	场景时间	清晨、正午、黄昏、子夜
+world.atmosphere	氛围基调	潮湿、冷冽、宁静、肃杀
+world.sensory	感官细节（2-4个）	["药香", "晨雾", "露水"]
+reader_emotion.begin	开头读者情绪	好奇、警惕、平静
+reader_emotion.middle	中间读者情绪	疑惑、愤怒、震惊
+reader_emotion.end	结尾读者情绪	不安、冷静、沉重
+narrative_function	场景叙事功能	introduce_mystery / escalate / reveal_truth / release_tension / transition
+pov	视角角色	林逸
+场景功能指南
+
+    introduce_mystery：留下谜团，结尾产生悬念，不解释
+
+    escalate：提升冲突，压力增大，局势紧张
+
+    reveal_truth：揭示关键信息，让读者震惊或恍然大悟
+
+    release_tension：缓解紧张，提供喘息空间
+
+    transition：自然过渡，节奏平稳
+
+情绪轨迹指南
+
+    三者必须有变化（begin ≠ middle ≠ end）
+
+    introduce_mystery：好奇 → 疑惑 → 不安
+
+    escalate：警惕 → 愤怒 → 冷静
+
+    reveal_truth：平静 → 震惊 → 沉重
+
+    release_tension：疲惫 → 放松 → 坚定
+
+    transition：平静 → 期待 → 平和
+
+请为每个场景生成完整的 scene_spec。
+"""
+
+        return base_prompt + spec_section
 
     def parse_response(self, response: str) -> Dict[str, Any]:
         data = extract_json_from_response(response)
@@ -443,6 +507,8 @@ class ScenePlanPromptBuilder(PromptBuilder):
             return data
         else:
             return {"scenes": [data] if isinstance(data, dict) else []}
+        
+
         
 # ---------- 注册表 ----------
 PROMPT_REGISTRY = {

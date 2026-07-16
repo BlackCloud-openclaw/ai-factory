@@ -1,0 +1,11 @@
+Scene: S001
+Condition: isolation_emotion_fixed_world_garden
+Repetition: 2
+Timestamp: 20260707_153954
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

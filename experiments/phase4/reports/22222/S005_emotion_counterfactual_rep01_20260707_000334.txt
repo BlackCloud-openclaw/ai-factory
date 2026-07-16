@@ -1,0 +1,63 @@
+Scene: S005
+Condition: emotion_counterfactual
+Repetition: 1
+Timestamp: 20260707_000334
+============================================================
+
+林逸推开议事堂的木门时，最后一缕残阳正沿着山道流淌。他踩着被晒暖的青石台阶往下走，靴底碾碎几片枯叶的脆响被风声稀释。暮色将松针染成琥珀色，裹着草木腥气的晚风掀起他腰间佩剑的穗子，掌心却仍残留着方才拍案时木纹硌进的刺痛。
+
+转过三叠瀑的豁口，山道突然开阔起来。林逸在崖边驻足，看归鸟群像一串墨点坠入远山。风灌满他鸦青色的衣袍，发丝间缠绕着草籽的绒毛，那些未尽的争辩之词在喉间翻滚，却随着一声长唳消散在暮云里。他忽然想起幼时师父说过，山雀总在日沉前收翅，正如智者懂得何时该敛藏锋芒。
+
+青石板上的苔痕在脚底泛着凉意，远处传来守林人熄火的叹息。当第七只孤鸟掠过他肩头时，林逸的呼吸终于与山风同频，指节松开又握紧的动作渐渐停驻。暮色将未说出口的怒火酿成蜜色雾霭，而归巢的羽影正一寸寸缝合天际的裂痕。
+
+============================================================
+Events: [
+  {
+    "type": "environmental_detail",
+    "element": "山道青石台阶"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "枯叶碎裂声"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "neutral",
+    "to": "anger"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "松针琥珀色暮光"
+  },
+  {
+    "type": "character_action",
+    "action": "驻足崖边"
+  },
+  {
+    "type": "symbolic_imaging",
+    "image": "归鸟墨点"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "anger",
+    "to": "expectation"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "草籽缠绕发丝"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "三叠瀑豁口"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "expectation",
+    "to": "peace"
+  },
+  {
+    "type": "symbolic_imaging",
+    "image": "归巢羽影缝合天际"
+  }
+]
+Segments: 2, Succeeded: 1

@@ -1,0 +1,37 @@
+Scene: pair_05_baseline_rep00
+Condition: baseline
+Repeat: 0
+EntryLocation: None
+============================================================
+
+林逸攥紧登山杖的手指节发白，山风卷着青草味撞进鼻腔。他刚想抬脚，鞋尖又踢到半截枯枝——就像三小时前那场争吵里被猛地扯断的绳索。'你永远只顾着赶路！'女友的声音混在归鸟掠过树梢的扑棱声中，尖锐得刺破耳膜。
+
+他踉跄两步扶住岩壁，黄昏的云层正将最后一缕金晖泼向山谷。风突然转了方向，带着松针的凉意抚过后颈，像某种无声的劝解。林逸蹲下身，指尖摩挲着石缝里倔强钻出的蕨类植物，那些被撕碎的记忆碎片在暮色中逐渐模糊成轮廓。
+
+远处传来山雀归巢的啁啾，他直起身时呼吸已平稳如初。登山包肩带压进皮肤的钝痛突然变得清晰可辨，林逸甩了甩酸胀的手腕，将缠绕的绳索重新理成笔直的线条。西沉的太阳把他的影子拉得很长，几乎要触到山道尽头那片暗青色的雾霭。
+
+============================================================
+Events: [
+  {
+    "type": "environmental_detail",
+    "elements": [
+      "mountain_path",
+      "dusk",
+      "wind_sound",
+      "grass_scent",
+      "returning_birds"
+    ]
+  },
+  {
+    "type": "emotional_shift",
+    "sequence": [
+      "anger_at_dispute",
+      "calm_through_nature_observation",
+      "resolve_via_physical_action"
+    ]
+  },
+  {
+    "type": "narrative_function",
+    "role": "transition_with_rhythm_balance"
+  }
+]

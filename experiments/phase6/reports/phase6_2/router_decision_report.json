@@ -1,0 +1,105 @@
+{
+  "oracle_version": "v1.0",
+  "timestamp": "2026-07-13T21:29:03.083973",
+  "pca": 1.0,
+  "validation_results": [
+    {
+      "scene": "scene_reunion",
+      "oracle": "adaptive",
+      "selected": "adaptive",
+      "is_correct": true,
+      "gap": 0.0,
+      "confidence": 0.97625,
+      "margin": 0.19624999999999992,
+      "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.73, Adaptive=0.98, Aggressive=0.78"
+    },
+    {
+      "scene": "scene_ethical",
+      "oracle": "conservative",
+      "selected": "conservative",
+      "is_correct": true,
+      "gap": 0.0,
+      "confidence": 0.728,
+      "margin": 0.045500000000000096,
+      "rationale": "TR=0.71, source=inferred; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.73, Adaptive=0.68, Aggressive=0.32"
+    },
+    {
+      "scene": "scene_social",
+      "oracle": "conservative",
+      "selected": "conservative",
+      "is_correct": true,
+      "gap": 0.0,
+      "confidence": 0.905,
+      "margin": 0.28500000000000003,
+      "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+    }
+  ],
+  "artifact": {
+    "metadata": {
+      "artifact_version": "1.0",
+      "oracle_version": "v1.0",
+      "generated_at": "2026-07-13T21:29:03.083956",
+      "model_name": "Qwen3-32B-Q5_K_M",
+      "scene_id": "scene_ethical"
+    },
+    "scene_analysis": {
+      "tr": 0.86,
+      "prediction_plasticity": 0.12,
+      "source": "measured",
+      "confidence": 0.9,
+      "state_type": "conflict",
+      "features": {},
+      "reason": "来自 TR 测量实验"
+    },
+    "router_decision": {
+      "selected_policy": "conservative",
+      "candidate_scores": [
+        {
+          "policy": "conservative",
+          "score": 0.905,
+          "blocked": false,
+          "reason": null
+        },
+        {
+          "policy": "adaptive",
+          "score": 0.62,
+          "blocked": false,
+          "reason": null
+        },
+        {
+          "policy": "aggressive",
+          "score": 0.095,
+          "blocked": true,
+          "reason": null
+        }
+      ],
+      "policy_config": {
+        "prediction": "disabled",
+        "realization": "enhanced",
+        "policy_type": "conservative"
+      },
+      "confidence": 0.905,
+      "margin": 0.28500000000000003,
+      "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+    },
+    "execution": {
+      "instruction_fidelity": 0.95,
+      "scene_compatibility": 0.85,
+      "execution_fidelity": 0.8075,
+      "retry_count": 0,
+      "retry_success": true,
+      "execution_time": 0.0,
+      "raw_reason": null
+    },
+    "propagation": {
+      "prediction": "A",
+      "prediction_confidence": 0.9,
+      "reasoning": "dominant",
+      "reasoning_evidence": "State 信息主导了推理",
+      "justification": [
+        "truth"
+      ],
+      "construction": "混合型叙事"
+    }
+  }
+}

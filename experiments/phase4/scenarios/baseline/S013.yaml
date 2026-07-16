@@ -1,0 +1,43 @@
+# experiments/phase4/scenarios/baseline/S013.yaml
+scene_id: "S013"
+narrative_function: "reveal_truth"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "潜入禁地，验证猜测"
+  conflict: "禁地中有未解封印"
+  expected_outcome: "确认长辈隐瞒真相"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "黎明潜入禁地"
+    - id: U2
+      label: action
+      description: "发现血迹和铁链"
+    - id: U3
+      label: action
+      description: "确认封印下的真相"
+
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "禁地真相"
+      value: true
+
+interventions:
+  world:
+    location: "禁地"
+    time: "黎明"
+    atmosphere: "肃杀，霜气逼人"
+    sensory: ["血迹", "铁链", "灰烬"]
+  reader_emotion:
+    begin: "忐忑"
+    middle: "惊恐"
+    end: "决然"
+  narrative_function: "reveal_truth"
+  pov: "林逸"

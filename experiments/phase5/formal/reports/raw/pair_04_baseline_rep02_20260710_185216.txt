@@ -1,0 +1,32 @@
+Scene: pair_04_baseline_rep02
+Condition: baseline
+Repeat: 2
+EntryLocation: None
+============================================================
+
+烛火在羊皮纸上投下摇曳的影子，林逸的狼毫尖端悬停在古井拓片的裂纹处。深夜的书房浮动着松墨与陈纸的腥甜，他将拓片与《云罗山志》残卷并置，烛泪滴落在泛黄的禁地图标上，突然凝固成琥珀色的惊叹号。手指沿着符文轨迹滑动时，羊皮纸纤维发出细碎的呻吟，那些被圈禁的符号竟与三个月前失踪的采药人最后踪迹完全重合。窗外掠过的夜枭啼叫让烛焰猛然跳动，他瞥见自己映在铜镜上的瞳孔——正与典籍里标注'凶地'的朱砂印记产生某种共振。研钵里的墨汁突然泛起涟漪，仿佛有看不见的手搅动着禁地边缘的雾气。
+
+============================================================
+Events: [
+  {
+    "type": "environmental_detail",
+    "elements": [
+      "candlelight",
+      "parchment",
+      "ink_smell"
+    ]
+  },
+  {
+    "type": "emotional_shift",
+    "from": "curiosity",
+    "to": "focus"
+  },
+  {
+    "type": "discovery",
+    "clue": "rune_matches_forbidden_mark"
+  },
+  {
+    "type": "atmospheric_tension",
+    "trigger": "unnatural_ink_ripples"
+  }
+]

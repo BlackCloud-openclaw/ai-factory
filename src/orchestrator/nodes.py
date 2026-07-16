@@ -402,8 +402,8 @@ async def writer_node(state: AgentState) -> dict:
                 }
                 logger.info(f"✅ Loaded active_loop from DB: {active_loop.title}")
     
-    # ========== 2. 实验组配置（用于投影注入） ==========
-    state.metadata["experiment_group"] = "loop"  # 可配置
+    # ========== 2. 实验组配置 ==========
+    state.metadata["experiment_group"] = "loop"
     
     logger.info(f"versioned_writer enabled: {config.experiment_enable_versioned_writer}")
     
@@ -417,6 +417,22 @@ async def writer_node(state: AgentState) -> dict:
     
     current_scene_plan = scene_plan_list[current_idx]
     state.scene_plan = current_scene_plan
+    
+    # ========== 🔧 修复：从 scene_plan 提取 Planning Contract ==========
+    planning_contract = current_scene_plan.get("planning_contract")
+    if planning_contract:
+        state.planning_contract = planning_contract
+        scene_id = planning_contract.get('scene_id', 'unknown')
+        logger.info(f"✅ 从 scene_plan 提取 Planning Contract: {scene_id}")
+        
+        # 检查是否包含 scene_spec（v2.1 新增）
+        if planning_contract.get('scene_spec'):
+            logger.info(f"✅ Planning Contract 包含 v2.1 Scene Specification")
+        else:
+            logger.warning("⚠️ Planning Contract 缺少 scene_spec，使用 v2.0 模式")
+    else:
+        logger.warning(f"⚠️ scene_plan 中无 planning_contract (scene_idx={current_idx})")
+    # =====================================================================
     
     # ========== 4. 处理 Drama Structure ==========
     if state.drama_structure is None:
@@ -502,7 +518,7 @@ async def writer_node(state: AgentState) -> dict:
         # 如果 result is None，继续执行下面的 ControlledWriter
     
     # ========== 6. Controlled Writer（默认执行路径） ==========
-    # 检查是否有 Planning Contract
+    # 检查是否有 Planning Contract（优先使用从 scene_plan 提取的）
     if not planning_contract:
         logger.error(f"❌ writer_node: 缺少 planning_contract，无法执行受控写入")
         return StatePatch(

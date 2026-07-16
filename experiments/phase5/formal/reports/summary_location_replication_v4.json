@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-07-12T12:29:27.386869",
+  "total_runs": 24,
+  "master_pairs": [
+    "MP2",
+    "MP3"
+  ],
+  "conditions": [
+    "GapHigh_MatchHigh",
+    "GapHigh_MatchLow",
+    "GapLow_MatchHigh",
+    "GapLow_MatchLow"
+  ],
+  "repeats": 3,
+  "output_dir": "/home/data/projects/ai_factory/experiments/phase5/formal/reports/raw_location_replication_v4",
+  "prompt_version": "v4_forced_first_sentence"
+}

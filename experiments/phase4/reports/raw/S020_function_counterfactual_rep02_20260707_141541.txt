@@ -1,0 +1,11 @@
+Scene: S020
+Condition: function_counterfactual
+Repetition: 2
+Timestamp: 20260707_141541
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

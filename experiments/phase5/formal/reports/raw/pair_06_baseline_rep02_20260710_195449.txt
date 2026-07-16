@@ -1,0 +1,43 @@
+Scene: pair_06_baseline_rep02
+Condition: baseline
+Repeat: 2
+EntryLocation: None
+============================================================
+
+林逸的指尖深深陷进河岸青石缝里，暮色将他紧绷的侧脸镀成青铜。水面漂来几瓣合欢，被桨声搅碎的涟漪裹着药草香，却盖不过他袖口残留的血腥气。他盯着对岸垂钓者的剪影，忽然攥紧拳头——方才那招‘惊鸿引’明明该锁住对手命门。
+
+晚风卷起他浸透汗水的衣摆，石缝间蟋蟀的鸣叫竟与战场箭雨声重叠。林逸闭眼靠向老槐树，树皮粗粝的触感让他想起师父掌心的茧。‘步法虚浮，气机错半拍’，记忆里苍老的声音混着河水汩汩流淌。他摸出碎裂的玉坠，在掌心摩挲出月牙白。
+
+当最后一线霞光沉入水底，林逸忽地弹身而起。湿漉漉的裤脚扫过狗尾草，他扯下三枝野花插在石缝，暗红花瓣在风里抖成战旗。‘明日卯时，重练三百遍’，他对着奔涌的河水吐出浊气，瞳孔里浮动的波光已褪去淤青。
+
+============================================================
+Events: [
+  {
+    "type": "sensory_detail",
+    "element": "water_sound"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "flower_scent"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "evening_breeze"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "discontent"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "contemplation"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "resolve"
+  },
+  {
+    "type": "plot_function",
+    "purpose": "transition"
+  }
+]

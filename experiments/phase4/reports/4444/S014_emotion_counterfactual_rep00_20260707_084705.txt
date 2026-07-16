@@ -1,0 +1,11 @@
+Scene: S014
+Condition: emotion_counterfactual
+Repetition: 0
+Timestamp: 20260707_084705
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

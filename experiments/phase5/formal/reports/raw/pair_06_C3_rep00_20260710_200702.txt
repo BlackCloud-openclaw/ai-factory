@@ -1,0 +1,49 @@
+Scene: pair_06_C3_rep00
+Condition: C3
+Repeat: 0
+EntryLocation: 擂台
+============================================================
+
+林逸的刀刃在石面上划出火星，溅入河面时惊起一串涟漪。他盯着对岸被折断的槐枝，暮色里仍能辨认出自己仓促封挡时留下的裂痕。水声裹着残留的槐花香漫过脚踝，晚风掠过发梢的凉意让他想起三日前那道刺穿耳际的破空声——若非后撤半步，此刻他的喉结上该有道血槽。
+
+刀柄在掌心硌出红印，他数着水流撞击卵石的节奏，将呼吸卡在第三声回响处。河面漂来半片焦黑的枫叶，边缘蜷曲的灼痕与记忆中对手的火焰术式重叠。指尖摩挲着刀刃上歪斜的刻痕，第七道划痕的位置对应着错判的力道，第六道则源于分心时的迟滞。
+
+暮色渐浓时，他折了截枯枝在沙地上勾画。当第十三个呼吸循环与剑势图契合，远处归巢的鸟群突然被惊起。林逸盯着沙地上洇开的墨迹，将碎枝削尖成测量距离的标尺。
+
+============================================================
+Events: [
+  {
+    "type": "environment_rendering",
+    "elements": [
+      "riverbank",
+      "dusk",
+      "water_rustle",
+      "槐花_scent",
+      "evening_breeze"
+    ]
+  },
+  {
+    "type": "emotion_arc",
+    "phases": [
+      "resentment",
+      "contemplation",
+      "resolve"
+    ]
+  },
+  {
+    "type": "narrative_function",
+    "function": "transition"
+  },
+  {
+    "type": "execution_unit",
+    "content": "riverbank_sitting"
+  },
+  {
+    "type": "execution_unit",
+    "content": "combat_review"
+  },
+  {
+    "type": "execution_unit",
+    "content": "improvement_plan"
+  }
+]

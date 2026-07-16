@@ -1,0 +1,46 @@
+# experiments/phase4/scenarios/baseline/S011.yaml
+scene_id: "S011"
+narrative_function: "escalate"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "擂台上与宿敌对垒"
+  conflict: "对方手段阴狠，观众起哄"
+  expected_outcome: "险胜，但受伤"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "登上擂台，面对宿敌"
+    - id: U2
+      label: action
+      description: "对方阴狠，观众起哄"
+    - id: U3
+      label: action
+      description: "险胜，血流不止"
+
+observables:
+  state_changes:
+    - type: hp_changed
+      actor: "林逸"
+      new_hp: 40
+    - type: plot_flag
+      name: "擂台决战"
+      value: true
+
+interventions:
+  world:
+    location: "擂台"
+    time: "正午"
+    atmosphere: "灼热，尘土飞扬"
+    sensory: ["汗味", "叫好", "血迹"]
+  reader_emotion:
+    begin: "冷静"
+    middle: "汹涌"
+    end: "决绝"
+  narrative_function: "escalate"
+  pov: "林逸"

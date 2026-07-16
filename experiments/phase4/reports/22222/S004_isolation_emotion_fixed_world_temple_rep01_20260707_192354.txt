@@ -1,0 +1,11 @@
+Scene: S004
+Condition: isolation_emotion_fixed_world_temple
+Repetition: 1
+Timestamp: 20260707_192354
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

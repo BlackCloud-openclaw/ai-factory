@@ -1,0 +1,33 @@
+Scene: pair_06_C4_rep01
+Condition: C4
+Repeat: 1
+EntryLocation: 擂台
+============================================================
+
+河面浮着最后一抹橘红，林逸的指尖无意识摩挲着裤缝。水声在耳畔涨落，混着岸边夜来香的甜涩气息，他盯着对岸被晚风揉皱的倒影，喉结滚动两下——方才那记回马枪明明能封喉，却因半秒迟疑功亏一篑。
+
+碎浪将赤足浸得微凉，他屈起指节叩击青石三下。暮色里浮起清晰脉络：呼吸节奏该再压低半拍，视线余光需覆盖三十七度夹角，掌心发力要像揉碎毒蛇般精准。河风卷起发梢时，他忽然扯开衣襟两颗纽扣，露出锁骨下方新结痂的抓痕。
+
+对岸芦苇丛簌簌晃动，惊起两只白鹭。林逸将掌心按在水面，任涟漪漫过腕间旧疤。当第七道波纹抵达脚踝时，他摸出怀中皱巴巴的训练笔记，铅笔尖在‘反应速度’栏划出深痕，墨迹被河水染成游动的蝌蚪。
+
+============================================================
+Events: [
+  {
+    "type": "environment_render",
+    "elements": [
+      "river_sound",
+      "scent_of_night_blooming_cereus",
+      "dusk_light"
+    ]
+  },
+  {
+    "type": "emotion_shift",
+    "from": "indignation",
+    "to": "contemplation",
+    "trigger": "reviewing_combat_mistake"
+  },
+  {
+    "type": "decision_making",
+    "content": "formulate_improvement_plan"
+  }
+]

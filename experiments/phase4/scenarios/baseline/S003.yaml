@@ -1,0 +1,46 @@
+# experiments/phase4/scenarios/baseline/S003.yaml
+scene_id: "S003"
+narrative_function: "reveal_truth"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "进入密室，寻找玉佩秘密"
+  conflict: "密室中的禁制与林逸的玉简产生共鸣，引发危机"
+  expected_outcome: "林逸发现玉佩与宗门禁制同源，颠覆原有认知"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "林逸用玉简打开密室石门"
+    - id: U2
+      label: action
+      description: "墙上刻痕与玉佩纹路完全吻合"
+    - id: U3
+      label: action
+      description: "禁制激活，林逸被迫读取一段记忆碎片"
+
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "玉佩与宗门关联"
+      value: true
+    - type: plot_flag
+      name: "禁制记忆读取"
+      value: true
+
+interventions:
+  world:
+    location: "密室"
+    time: "子夜"
+    atmosphere: "死寂，灰尘弥漫"
+    sensory: ["铁锈味", "灰尘", "寒气"]
+  reader_emotion:
+    begin: "平静"
+    middle: "震惊"
+    end: "沉重"
+  narrative_function: "reveal_truth"
+  pov: "林逸"

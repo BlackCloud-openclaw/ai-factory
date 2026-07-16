@@ -1,0 +1,11 @@
+Scene: S010
+Condition: world_counterfactual
+Repetition: 0
+Timestamp: 20260707_044042
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

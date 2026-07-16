@@ -1,0 +1,33 @@
+Scene: pair_07_C4_rep02
+Condition: C4
+Repeat: 2
+EntryLocation: 地牢
+============================================================
+
+林逸的鞋底碾过青苔时发出黏腻的声响，铁锈味混着霉菌气息直冲鼻腔。他摸出半截火柴照亮石壁上新月状的凹痕，滴水声突然密集如鼓点——三张被碾碎的符纸正从裂缝渗出暗红浆液。指尖抚过焦黑边缘时，远处传来石块坠落的闷响，他翻身贴住岩壁，瞳孔在幽蓝苔藓间捕捉到蛛丝般细密的震动波纹。潮湿的冷汗顺着脊梁滑下，他却将最后半截火柴按进掌心，碎屑混着血珠渗入石缝，沿着符纸指示的方位，一串新鲜爪痕正通向更深的黑暗。
+
+============================================================
+Events: [
+  {
+    "type": "sensory_detail",
+    "elements": [
+      "iron_rust",
+      "dripping_water",
+      "mold_smell"
+    ]
+  },
+  {
+    "type": "emotion_shift",
+    "from": "tension",
+    "to": "alertness",
+    "trigger": "crushed_fetish_paper"
+  },
+  {
+    "type": "decision_making",
+    "content": "determine_abysm_direction"
+  },
+  {
+    "type": "action_commitment",
+    "target": "immediate_departure"
+  }
+]

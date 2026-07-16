@@ -1,0 +1,46 @@
+Scene: pair_06_C4_rep02
+Condition: C4
+Repeat: 2
+EntryLocation: 擂台
+============================================================
+
+林逸的指尖深深掐进河岸青石，暮色将他绷紧的下颌染成琥珀色。水波在脚边碎成万千金箔，蝉鸣声里浮动着野樱的香气。他盯着涟漪中自己模糊的倒影，喉结滚动——方才那招'惊鸿闪'的破绽又在眼前炸开，剑锋偏转的刹那，对手腕骨传来的钝痛仍像钉在神经里。
+
+风掠过芦苇时，他忽然垂眸凝视掌心纹路。石缝间渗出的溪水漫过指关节，将燥热的掌心泡得发凉。那些错身而过的剑刃轨迹、被刻意忽略的呼吸间隙，此刻在潺潺水声里逐渐清晰成某种韵律。对岸垂柳将影子投进他瞳孔，枝条轻晃的节奏竟与心跳渐渐重合。
+
+当第七片樱花飘落在浸水的衣摆上，林逸忽然直起脊背。晚风卷起他翻飞的衣角，也将石面上凌乱的剑痕映得愈发深邃。他摸出腰间断刃，在湿润的河滩上划下新的刻度，铁器刮擦碎石的锐响刺破暮色，惊起苇丛中栖息的白鹭。
+
+============================================================
+Events: [
+  {
+    "type": "sensory_detail",
+    "element": "water_sound"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "flower_scent"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "evening_wind"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "beginning",
+    "emotion": "resentment"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "middle",
+    "emotion": "contemplation"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "end",
+    "emotion": "determination"
+  },
+  {
+    "type": "narrative_function",
+    "role": "transition"
+  }
+]

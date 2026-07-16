@@ -1,0 +1,35 @@
+Scene: pair_06_C2_rep01
+Condition: C2
+Repeat: 1
+EntryLocation: 擂台
+============================================================
+
+林逸蹲在河滩青石上，指尖碾碎一片落花。暮色将粼粼波光揉成碎金，水声裹着晚风钻进耳膜，他忽然攥紧拳头——方才那招「惊鸿式」的破绽，分明就藏在第七个呼吸的间隙。对战画面在脑海中倒带回放：对手剑锋转向时，自己的步频已乱，掌心沁出的冷汗浸透衣袖。他俯身舀起半瓢河水，冰凉触感漫过腕骨，迫使自己逐帧拆解招式衔接的毫厘之差。对岸芦苇随风俯仰，某种韵律令眉间褶皱渐次舒展。当最后一线残阳掠过水面，他直起身，将三十七处失误逐一烙在暮色里，如同在流沙上刻下新的剑谱。
+
+============================================================
+Events: [
+  {
+    "type": "environment_render",
+    "elements": [
+      "riverbank",
+      "sunset",
+      "water_rustle",
+      "flower_scent",
+      "evening_breeze"
+    ]
+  },
+  {
+    "type": "emotion_arc",
+    "phases": [
+      "frustration→reflection→resolve"
+    ]
+  },
+  {
+    "type": "plot_progression",
+    "checkpoints": [
+      "post-battle_analysis",
+      "tactical_decomposition",
+      "training_plan_formulation"
+    ]
+  }
+]

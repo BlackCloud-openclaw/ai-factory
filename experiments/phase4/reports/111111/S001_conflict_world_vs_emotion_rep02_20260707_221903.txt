@@ -1,0 +1,11 @@
+Scene: S001
+Condition: conflict_world_vs_emotion
+Repetition: 2
+Timestamp: 20260707_221903
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

@@ -1,0 +1,33 @@
+scene_id: pair_3_B_baseline
+intent:
+  goal: "在山道独行，平复心情并整理思路"
+  conflict: "心中仍有怒气，但需要冷静思考下一步"
+  expected_outcome: "情绪平复，坚定下一步行动方向"
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "沿着山道前行"
+    - id: U2
+      label: action
+      description: "回想争吵内容"
+    - id: U3
+      label: action
+      description: "调整心态，坚定决心"
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "决意已定"
+      value: true
+interventions:
+  world:
+    location: "山道"
+    time: "黄昏"
+    atmosphere: "开阔，风中有草木气息"
+    sensory: ["风声", "青草", "归鸟"]
+  reader_emotion:
+    begin: "愤怒"
+    middle: "平复"
+    end: "坚定"
+  narrative_function: "transition"
+  pov: "林逸"

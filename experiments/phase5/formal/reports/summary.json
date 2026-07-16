@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-07-10T22:06:07.209212",
+  "total_runs": 150,
+  "pairs": 10,
+  "conditions": [
+    "baseline",
+    "C1",
+    "C2",
+    "C3",
+    "C4"
+  ],
+  "repeats": 3
+}

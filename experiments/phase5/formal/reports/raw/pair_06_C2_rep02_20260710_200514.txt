@@ -1,0 +1,63 @@
+Scene: pair_06_C2_rep02
+Condition: C2
+Repeat: 2
+EntryLocation: 擂台
+============================================================
+
+林逸的指尖碾过揉皱的战术笔记，纸团在掌心蜷成深褐色的漩涡。河水在他脚边漫过青石，将暮色染成铁锈红，对岸芦苇丛里飘来苦艾的涩香。他盯着水面倒影中自己僵硬的喉结——那里还残留着被琴声震碎的痛感。
+
+蝉鸣突然撕开凝滞的空气，他猛地攥紧纸团，指甲缝里渗出的汗珠混着墨迹，在石板上洇出扭曲的「败」字。上游漂来的银杏叶擦过脚踝时，记忆突然切回决胜局前夜：琴箱底部那道可疑的裂痕，像毒蛇般在指板下无声游走。
+
+晚风卷起笔记残页掠过水面，他忽然盯着涟漪里某个规律起伏的光点。当第七片银杏叶顺流而下时，林逸摸出钢笔在石板上画下新的和弦走向，笔尖划破暮色的刹那，对岸萤火虫恰如星群坠入他骤然清明的瞳孔。
+
+============================================================
+Events: [
+  {
+    "type": "environmental_detail",
+    "element": "river"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "dusk"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "water_sound"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "flower_scent"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "breeze"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "discontent"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "contemplation"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "resolve"
+  },
+  {
+    "type": "narrative_function",
+    "role": "transition"
+  },
+  {
+    "type": "character_action",
+    "action": "sitting_by_river"
+  },
+  {
+    "type": "character_action",
+    "action": "reviewing_mistakes"
+  },
+  {
+    "type": "character_action",
+    "action": "making_plan"
+  }
+]

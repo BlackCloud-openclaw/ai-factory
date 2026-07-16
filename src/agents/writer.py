@@ -1,5 +1,6 @@
 """
 Writer Agent - 基于状态驱动的章节生成（强制服从 state_delta）
+集成 Phase 6 Runtime Pipeline（简化版）
 """
 import json
 import time
@@ -28,6 +29,15 @@ from src.writing.narrative_projection import NarrativeProjector
 from src.writing.planning_contract import PlanningContract
 
 logger = setup_logging("agents.writer")
+
+# ========== Phase 6: Runtime 模块（简化版） ==========
+try:
+    from src.runtime import validate_draft
+    RUNTIME_AVAILABLE = True
+    logger.info("Runtime module available")
+except ImportError as e:
+    RUNTIME_AVAILABLE = False
+    logger.warning(f"Runtime module not available: {e}")
 
 # 全局声纹注册表
 _voiceprint_registry = None
@@ -94,18 +104,16 @@ class WritingAgent(BaseAgent):
         scene_plan = state.scene_plan or {}
         constraints = state.writing_constraints or {}
 
-        # ========== 新增：提取 Planning Contract ==========
+        # ========== 提取 Planning Contract ==========
         planning_contract = None
         if hasattr(state, 'planning_contract') and state.planning_contract:
             try:
-                # 验证并解析 Contract
                 contract_data = state.planning_contract
                 planning_contract = PlanningContract(**contract_data)
                 logger.info(f"✅ Loaded Planning Contract for writer: {planning_contract.scene_id}")
             except Exception as e:
                 logger.warning(f"Failed to parse Planning Contract: {e}, falling back to scene_plan")
                 planning_contract = None
-        # ===================================================
 
         # ========== 读取 Director 输出 ==========
         narrative_blueprint = state.narrative_blueprint or {}
@@ -145,7 +153,7 @@ class WritingAgent(BaseAgent):
                 state.novel_id, state.current_volume, state.current_chapter
             )
 
-        # ========== 恢复 voice_memory（优先从 compressed_state 加载）==========
+        # ========== 恢复 voice_memory ==========
         voice_memory = None
         if state.voice_memory:
             voice_memory = VoiceMemory(state.novel_id, state.voice_memory)
@@ -163,32 +171,27 @@ class WritingAgent(BaseAgent):
             key_events_summary=key_events_summary,
             voice_memory=voice_memory,
         )
-        
+
         # ========== 新增：如果存在 Contract，用 Contract 信息增强 Prompt ==========
         if planning_contract:
             contract_prompt = self._build_contract_prompt(planning_contract)
-            # 将 contract_prompt 插入到 prompt 中（放在约束之前）
-            # 可以选择追加到末尾，或插入到特定位置
             prompt += "\n\n" + contract_prompt
-        # =====================================================================
 
-        # ====== 新增：注入戏剧结构（来自 Drama Planner） ======
+        # ====== 注入戏剧结构（来自 Drama Planner） ======
         drama_structure = state.drama_structure or {}
         if drama_structure:
             drama_text = self._format_drama_structure(drama_structure)
             prompt += f"\n\n【🎭 戏剧结构强制约束 - 必须严格遵循】\n{drama_text}"
-            # ====== 新增：对话引导 ======
             prompt += "\n\n【🔊 对话要求（强制执行）】\n"
             prompt += "1. 本场景必须包含至少 **5 轮有效对话**（每轮对话指一方发言及对方的回应）。\n"
             prompt += "2. 对话总字数应占场景正文总字数的 **30%~50%**，确保充分展现角色间的冲突、压力和决策。\n"
             prompt += "3. 对话内容应围绕戏剧结构中的**欲望、阻碍、压力、选择、代价**展开，通过语言交锋体现角色的博弈。\n"
             prompt += "4. 避免纯叙述性描写，优先使用对话来推动情节和揭示信息。\n"
-
             prompt += "\n\n【🔊 对话模板示例（必须参考）】\n"
             prompt += "对话不应是寒暄，而应是交锋。例如：\n"
             prompt += "- 角色 A：「你以为这样就能拦得住我？」\n"
             prompt += "- 角色 B：「试试看。」（拔剑）\n"
-            prompt += "- 角色 A：「有意思...那我就陪你玩玩。」\n"           
+            prompt += "- 角色 A：「有意思...那我就陪你玩玩。」\n"
 
         # ========== 2. 添加强制 state_delta 指令 ==========
         if expected_events:
@@ -260,53 +263,51 @@ class WritingAgent(BaseAgent):
             if latest:
                 projection = latest.to_dict()
                 experiment_group = state.metadata.get("experiment_group", "baseline")
-                logger.info(f"📊 实验组: {experiment_group}")  # 添加这行
+                logger.info(f"📊 实验组: {experiment_group}")
 
                 if experiment_group == "loop":
                     loop = projection.get("loop", {})
                     if loop:
                         prompt += f"""
-        【叙事循环 (Narrative Loop) - 实验注入】
-        - 当前正在推进的过程：{loop.get('description', '')}
-        - 推动者：{loop.get('initiator', '')}
-        - 紧迫度：{loop.get('urgency', 0.5)}
-        请确保当前场景的推进方向与上述循环保持一致。
-        """
+    【叙事循环 (Narrative Loop) - 实验注入】
+    - 当前正在推进的过程：{loop.get('description', '')}
+    - 推动者：{loop.get('initiator', '')}
+    - 紧迫度：{loop.get('urgency', 0.5)}
+    请确保当前场景的推进方向与上述循环保持一致。
+    """
 
                 elif experiment_group == "focus":
                     focus = projection.get("focus", {})
                     if focus:
                         prompt += f"""
-        【叙事聚焦 (Narrative Focus) - 实验注入】
-        - 当前最重要的未完成事项：{focus.get('subject', '')}
-        - 类型：{focus.get('type', '')}
-        - 为什么重要：{focus.get('why_matters', '')}
-        请确保当前场景的行动与上述聚焦事项相关。
-        """
+    【叙事聚焦 (Narrative Focus) - 实验注入】
+    - 当前最重要的未完成事项：{focus.get('subject', '')}
+    - 类型：{focus.get('type', '')}
+    - 为什么重要：{focus.get('why_matters', '')}
+    请确保当前场景的行动与上述聚焦事项相关。
+    """
 
                 elif experiment_group == "both":
                     focus = projection.get("focus", {})
                     loop = projection.get("loop", {})
                     if focus or loop:
                         prompt += f"""
-        【叙事循环 + 聚焦 - 实验注入】
-        循环：{loop.get('description', '')}（紧迫度：{loop.get('urgency', 0.5)}）
-        聚焦：{focus.get('subject', '')}（类型：{focus.get('type', '')}）
-        请确保当前场景的推进方向与上述循环和聚焦保持一致。
-        """
+    【叙事循环 + 聚焦 - 实验注入】
+    循环：{loop.get('description', '')}（紧迫度：{loop.get('urgency', 0.5)}）
+    聚焦：{focus.get('subject', '')}（类型：{focus.get('type', '')}）
+    请确保当前场景的推进方向与上述循环和聚焦保持一致。
+    """
 
                 elif experiment_group == "full":
                     projection_data = projection
                     prompt += f"""
-        【完整叙事状态 - 实验注入】
-        - 循环：{projection_data.get('loop', {}).get('description', '')}
-        - 聚焦：{projection_data.get('focus', {}).get('subject', '')}
-        - 注意力：{projection_data.get('attention', {}).get('target', '')}
-        - 核心问题：{projection_data.get('question', {}).get('text', '')}
-        请基于以上叙事状态驱动当前场景的写作。
-        """
-                # baseline: 不注入任何额外信息
-        # ======================================================
+    【完整叙事状态 - 实验注入】
+    - 循环：{projection_data.get('loop', {}).get('description', '')}
+    - 聚焦：{projection_data.get('focus', {}).get('subject', '')}
+    - 注意力：{projection_data.get('attention', {}).get('target', '')}
+    - 核心问题：{projection_data.get('question', {}).get('text', '')}
+    请基于以上叙事状态驱动当前场景的写作。
+    """
 
         # ========== 调用 LLM ==========
         router = get_router()
@@ -335,7 +336,7 @@ class WritingAgent(BaseAgent):
                     self._call_llm,
                     prompt,
                     timeout=getattr(config, 'llm_timeout_writing', 600),
-                    agent="writer"           # 建议补上
+                    agent="writer"
                 )
                 logger.info(f"Fallback model {fallback_model} succeeded")
             except Exception as e2:
@@ -349,7 +350,6 @@ class WritingAgent(BaseAgent):
             data = json.loads(fixed)
         except json.JSONDecodeError as e:
             logger.warning(f"JSON parse failed: {e}, attempting regex fallback")
-            # 正则直接提取 scene_text
             match = re.search(r'"scene_text"\s*:\s*"((?:[^"\\]|\\.)*)"', raw_output, re.DOTALL)
             if match:
                 scene_text = match.group(1).replace('\\"', '"').replace('\\n', '\n')
@@ -373,7 +373,6 @@ class WritingAgent(BaseAgent):
             parsed = validation["parsed_output"] or {}
             scene_text = parsed.get("scene_text", "")
 
-            # 事件格式修复
             events = parsed.get("events", [])
             if events:
                 for evt in events:
@@ -438,21 +437,103 @@ class WritingAgent(BaseAgent):
         duration = time.time() - start_time
         logger.info(f"WritingAgent completed, duration={duration:.2f}")
 
-        # ========== 更新风格指纹（每个场景） ==========
+        # ========== 更新风格指纹 ==========
         if scene_text:
             voice_memory.update_from_chapter(scene_text)
 
-        # ========== 新增：后处理清洗 ==========
-        # 1. 删除 "推进主线剧情（场景X）" 占位符（包括感叹号）
-        scene_text = re.sub(r'推进主线剧情\(场景\d+\)[！!]?', '', scene_text)  
-        # 简单规则：将 '...' 形式的对话转为 “...” 
-        # 注意：不处理缩写或所有格，中文场景下几乎都是对话
+        # ========== 后处理清洗 ==========
+        scene_text = re.sub(r'推进主线剧情\(场景\d+\)[！!]?', '', scene_text)
         scene_text = re.sub(r"'([^']*)'", r"“\1”", scene_text)
-        # 3. 可选：去除多余空行
         scene_text = re.sub(r'\n{3,}', '\n\n', scene_text)
-        # ====================================
 
-        # 然后将清洗后的 scene_text 放回 parsed（或直接使用）
+        # 然后将清洗后的 scene_text 放回 parsed
+        if parsed:
+            parsed["scene_text"] = scene_text
+
+        # ============================================================
+        # ========== Phase 6.5: 消费 ExecutionResult ==========
+        # ============================================================
+# src/agents/writer.py（仅 Phase 6.5 消费部分）
+
+        # ============================================================
+        # ========== Phase 6.5: 消费 ExecutionResult ==========
+        # ============================================================
+        if RUNTIME_AVAILABLE and scene_text and len(scene_text) > 50:
+            try:
+                from src.workflow.revision_workflow import RevisionWorkflow
+
+                # 定义 LLM 适配器
+                async def llm_adapter(prompt: str) -> str:
+                    try:
+                        return await pool.call(primary_model, self._call_llm, prompt, agent="writer")
+                    except Exception as e:
+                        logger.warning(f"Primary model failed in revision: {e}, trying fallback")
+                        return await pool.call(fallback_model, self._call_llm, prompt, agent="writer")
+
+                workflow = RevisionWorkflow(
+                    llm_executor=llm_adapter,
+                    layer_targets=None,
+                    max_rounds=2,
+                    compliance_threshold=0.7,
+                    enable_revision=True,
+                )
+
+                result = await workflow.execute(scene_text)
+
+                # ---- Phase 6.5/6.5.1: 打印 ExecutionResult 摘要 + Layer 详情 ----
+                stages_summary = []
+                for stage in result.get("stages", []):
+                    status = stage.get("status", "unknown")
+                    payload = stage.get("payload", {})
+                    if stage["stage"] == "validation":
+                        stages_summary.append(f"validation={payload.get('compliance', 0):.2f}")
+                        # ---- Phase 6.5.1: 打印 Layer 详情 ----
+                        layers = payload.get("layers", [])
+                        for layer_info in layers:
+                            missing = layer_info.get("missing", [])
+                            observed = layer_info.get("observed", [])
+                            if missing:
+                                logger.info(f"  {layer_info['layer']}: missing {', '.join(missing)} (observed: {', '.join(observed) if observed else 'none'})")
+                            else:
+                                logger.info(f"  {layer_info['layer']}: ✅ (observed: {', '.join(observed) if observed else 'none'})")
+                    elif stage["stage"] == "edit_plan":
+                        stages_summary.append(f"edit_plan={payload.get('action_count', 0)}")
+                    elif stage["stage"] == "patch_render":
+                        stages_summary.append(f"patch_render={payload.get('prompt_length', 0)}")
+                    elif stage["stage"] == "llm":
+                        stages_summary.append(f"llm={status}, finish_reason={payload.get('finish_reason', 'unknown')}")
+                    elif stage["stage"] == "revalidation":
+                        stages_summary.append(f"revalidation={payload.get('final_compliance', 0):.2f}")
+
+                delta = result.get("compliance_delta", 0.0)
+                logger.info(f"ExecutionResult: {', '.join(stages_summary)} | delta={delta:+.2f}")
+
+                # 更新场景文本
+                scene_text = result.get("final_text", scene_text)
+                compliance = result.get("compliance", 1.0)
+
+                # 保存到数据库
+                if hasattr(state, 'novel_id') and state.novel_id:
+                    await self._save_runtime_report(
+                        novel_id=state.novel_id,
+                        volume_num=state.current_volume or 1,
+                        chapter_num=state.current_chapter or 1,
+                        scene_idx=state.current_scene_index or 0,
+                        scene_text=scene_text,
+                        validation_result={
+                            "compliance": compliance,
+                            "delta": result.get("compliance_delta", 0.0),
+                            "stages": result.get("stages", []),
+                        }
+                    )
+
+                if compliance < 0.7:
+                    logger.warning(f"Low compliance ({compliance:.2f}) for {state.novel_id}")
+                else:
+                    logger.info(f"Runtime compliance: {compliance:.2f}")
+
+            except Exception as e:
+                logger.warning(f"Runtime workflow failed: {e}")
 
         return {
             "scene_text": raw_output,
@@ -466,13 +547,13 @@ class WritingAgent(BaseAgent):
             "character_intent": character_intent,
             "voice_memory": voice_memory.to_dict(),
         }
-    
+
     @retry_with_backoff(max_retries=2, base_delay=1.0)
     async def _call_llm(self, model_name: str, prompt: str, **kwargs) -> str:
         metadata = {
             "model": model_name,
             "temperature": 0.7,
-            "max_tokens": 32768,          # 增加到 32768 避免截断
+            "max_tokens": 32768,
         }
         if hasattr(self, '_state') and self._state:
             metadata.update({
@@ -480,8 +561,7 @@ class WritingAgent(BaseAgent):
                 "chapter": getattr(self._state, 'current_chapter', None),
                 "scene": getattr(self._state, 'current_scene_index', None),
             })
-        
-        # 提取约束用于哈希
+
         constraints = None
         if hasattr(self, '_state') and self._state and hasattr(self._state, 'current_state'):
             from src.writing.state_projection import extract_hard_constraints
@@ -489,72 +569,155 @@ class WritingAgent(BaseAgent):
             world = WorldState.from_dict(self._state.current_state) if self._state.current_state else None
             if world:
                 constraints = extract_hard_constraints(world)
-        
+
         log_prompt("writer", prompt, metadata, constraints=constraints)
-        
-        # 调用 LLM
+
         actual_model = model_name
         base_url = kwargs.get('base_url')
         if not base_url:
             pool = get_llm_router_pool()
             base_url = pool.get_base_url(actual_model)
-        
+
         client = AsyncOpenAI(api_key="not-needed", base_url=base_url)
-        
-        # 添加 grammar 约束
+
         extra_body = {}
         grammar_str = self._get_grammar()
         if grammar_str:
             extra_body["grammar"] = grammar_str
-        
+
+        max_tokens = 32768
+        temperature = 0.7
+
+        # ---- LLM Request 观测 ----
+        logger.info(
+            "[LLM] request model=%s temperature=%.2f max_tokens=%d prompt_chars=%d prompt_lines=%d grammar_sent=%s extra_body_keys=%s",
+            actual_model,
+            temperature,
+            max_tokens,
+            len(prompt),
+            prompt.count("\n") + 1,
+            bool(grammar_str),
+            list(extra_body.keys()) if extra_body else [],
+        )
+
         response = await client.chat.completions.create(
             model=actual_model,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=32768,               # 与 metadata 保持一致
+            temperature=temperature,
+            max_tokens=max_tokens,
             extra_body=extra_body if extra_body else None,
         )
-        content = response.choices[0].message.content or ""
-        
-        # ========== JSON 完整性检查与修复 ==========
-        # 首先检查是否完整
+
+        choice = response.choices[0]
+        finish_reason = choice.finish_reason or "unknown"
+        content = choice.message.content or ""
+
+        usage = getattr(response, "usage", None)
+
+        # ---- LLM Response 观测 ----
+        if usage:
+            logger.info(
+                "[LLM] finish_reason=%s output_chars=%d usage(prompt=%s completion=%s total=%s)",
+                finish_reason,
+                len(content),
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                usage.total_tokens,
+            )
+        else:
+            logger.info(
+                "[LLM] finish_reason=%s output_chars=%d usage=unavailable",
+                finish_reason,
+                len(content),
+            )
+
+        logger.debug("[LLM] tail=%r", content[-200:])
+
+        # ---- JSON 完整性检查与修复 ----
         stripped = content.strip()
+        json_repair_attempted = False
+        json_repair_changed = False
+        json_parse_success = False
+
         if not (stripped.endswith('}') or stripped.endswith(']')):
-            logger.warning(f"Response from {actual_model} appears truncated (ends with '...{stripped[-50:]}')")
-            # 尝试修复
+            json_repair_attempted = True
             fixed = self._fix_truncated_json(content)
-            if fixed != content:
-                logger.info(f"Successfully fixed truncated JSON (length {len(content)} -> {len(fixed)})")
+            json_repair_changed = (fixed != content)
+            logger.info(
+                "[LLM] json_repair attempted=%s changed=%s",
+                json_repair_attempted,
+                json_repair_changed,
+            )
+            if json_repair_changed:
+                logger.info("[LLM] json repair changed length %d -> %d", len(content), len(fixed))
                 content = fixed
             else:
-                # 仍然截断，抛出异常触发重试
-                raise ValueError("Response truncated, missing closing brace")
-        
+                logger.error("[LLM] json repair failed, original tail: %r", content[-200:])
+
+        # 验证是否可解析
+        try:
+            import json
+            json.loads(content)
+            json_parse_success = True
+        except json.JSONDecodeError:
+            json_parse_success = False
+
+        logger.info(
+            "[LLM] parse_success=%s final_length=%d",
+            json_parse_success,
+            len(content),
+        )
+
+        # ---- 新增：保存 Prompt + Response（按分类） ----
+        import os
+        from datetime import datetime
+
+        def _save_prompt_response(prompt_text: str, response_text: str, parse_success: bool, model: str):
+            logs_dir = "logs/llm_artifacts"
+            os.makedirs(logs_dir, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+            status = "success" if parse_success else "failed"
+            trace_id = f"{timestamp}_{status}_{model.replace('/', '_')}"
+            
+            prompt_path = os.path.join(logs_dir, f"{trace_id}_prompt.txt")
+            response_path = os.path.join(logs_dir, f"{trace_id}_response.txt")
+            
+            with open(prompt_path, "w", encoding="utf-8") as f:
+                f.write(prompt_text)
+            with open(response_path, "w", encoding="utf-8") as f:
+                f.write(response_text)
+            
+            logger.info(f"[LLM] artifacts saved: {trace_id}_prompt.txt / {trace_id}_response.txt")
+
+        _save_prompt_response(prompt, content, json_parse_success, actual_model)
+
+        # 如果仍然无法解析，抛出异常
+        if not json_parse_success:
+            raise ValueError("Response invalid JSON: missing closing brace or malformed")
+
         logger.info(f"Received response from {actual_model}, length={len(content)}")
-        return content
-    
-    # ====== 新增辅助方法 ======
+        return content 
+
+    # ============================================================
+    # 辅助方法
+    # ============================================================
+
     def _format_drama_structure(self, ds: Dict[str, Any]) -> str:
         """将 Drama Planner 的 JSON 转为 LLM 可读的指令"""
         parts = []
-        
         if ds.get("scene_goal"):
             parts.append(f"🟢 核心欲望：{ds['scene_goal']}")
-        
         obstacle = ds.get("obstacle", {})
         if obstacle.get("description"):
             parts.append(f"🔴 阻碍（必须克服）：{obstacle['description']}（类型：{obstacle.get('type', '未知')}）")
-        
         pressure = ds.get("pressure", {})
         if pressure.get("description"):
             parts.append(f"⏳ 压力（紧迫性）：{pressure['description']}（类型：{pressure.get('type', '未知')}）")
-        
         decision = ds.get("decision", {})
         if decision.get("options"):
             parts.append(f"⚖️ 两难选择（必须二选一）：{', '.join(decision['options'])}")
         if decision.get("chosen"):
             parts.append(f"👉 最终决定：{decision['chosen']}")
-        
         cost = ds.get("cost", {})
         cost_parts = []
         if cost.get("success"):
@@ -563,16 +726,13 @@ class WritingAgent(BaseAgent):
             cost_parts.append(f"失败代价：{cost['failure']}")
         if cost_parts:
             parts.append(f"💔 代价：{'；'.join(cost_parts)}")
-        
         rel_delta = ds.get("relationship_delta", {})
         if rel_delta.get("target") and rel_delta.get("to"):
             parts.append(f"🔄 关系变化：与 {rel_delta['target']} 的关系从 {rel_delta.get('from', '当前状态')} 变为 {rel_delta['to']}")
-        
         if not parts:
             return "(空)"
-        
         return "\n".join(parts)
-    
+
     def _build_contract_prompt(self, contract: PlanningContract) -> str:
         """根据 Planning Contract 生成写作指令"""
         lines = []
@@ -580,14 +740,12 @@ class WritingAgent(BaseAgent):
         lines.append(f"场景目标：{contract.intent.goal}")
         lines.append(f"核心冲突：{contract.intent.conflict}")
         lines.append(f"预期结果：{contract.intent.expected_outcome}")
-        
-        # 执行单元
+
         if contract.execution.units:
             lines.append("\n必须完成的执行单元：")
             for unit in contract.execution.units:
                 lines.append(f"- {unit.label}: {unit.description}")
-        
-        # 约束
+
         if contract.constraints:
             lines.append("\n硬性约束：")
             for c in contract.constraints:
@@ -603,8 +761,7 @@ class WritingAgent(BaseAgent):
                     lines.append(f"  🔀 {c.target} 互斥")
                 elif c.type == "at_least_once":
                     lines.append(f"  🔁 {c.target} 至少发生一次")
-        
-        # 可观测结果（隐含要求）
+
         if contract.observables.state_changes:
             lines.append("\n场景结束后世界状态应发生变化：")
             for change in contract.observables.state_changes:
@@ -620,6 +777,44 @@ class WritingAgent(BaseAgent):
                     lines.append(f"- {change.actor} 进入 {change.location}")
                 elif change.type == "hp":
                     lines.append(f"- {change.actor} HP 变为 {change.new_hp}")
-        
+
         lines.append("\n⚠️ 请严格遵循以上契约，尤其是执行单元和硬性约束。")
         return "\n".join(lines)
+
+    # ============================================================
+    # Phase 6 Runtime 辅助方法
+    # ============================================================
+
+    async def _save_runtime_report(
+        self,
+        novel_id: str,
+        volume_num: int,
+        chapter_num: int,
+        scene_idx: int,
+        scene_text: str,
+        validation_result: dict
+    ) -> None:
+        """将 Runtime 分析结果保存到 narrative_versions 表"""
+        from src.db.pool import get_db_pool
+        import json
+
+        pool = get_db_pool()
+        if not pool:
+            logger.warning("Database pool not available, skipping Runtime report save")
+            return
+
+        async with pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO narrative_versions
+                (novel_id, volume_num, chapter_num, scene_idx, version_type,
+                 scene_text, kpi_scores, generated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                ON CONFLICT (novel_id, volume_num, chapter_num, scene_idx, version_type)
+                DO UPDATE SET
+                    scene_text = EXCLUDED.scene_text,
+                    kpi_scores = EXCLUDED.kpi_scores,
+                    generated_at = NOW()
+            """, novel_id, volume_num, chapter_num, scene_idx, "A",
+                scene_text, json.dumps(validation_result))
+
+            logger.debug(f"Saved Runtime report to narrative_versions for {novel_id}")

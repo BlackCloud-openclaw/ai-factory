@@ -1,14 +1,16 @@
 """
 Controlled Writer - 产品化增量执行服务
 
-将 Phase 2/3 验证有效的增量执行能力封装为稳定的服务。
+稳定性优化 v2：强制 JSON 输出，Pydantic 验证，针对性重试，降级兜底。
 """
 
 import logging
 import re
 import json
+import time
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
+from pydantic import BaseModel, Field, ValidationError
 from openai import AsyncOpenAI
 import httpx
 
@@ -18,9 +20,15 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 
+class WriterOutput(BaseModel):
+    """LLM 输出结构验证"""
+    scene_text: str = Field(..., min_length=50, description="场景正文，至少50字")
+    events: List[Dict] = Field(default_factory=list, description="状态变化事件列表")
+    foreshadowing: List[str] = Field(default_factory=list, description="伏笔列表")
+
+
 @dataclass
 class ControlledWriteResult:
-    """受控写入结果"""
     text: str
     events: List[Dict]
     segments_used: int
@@ -30,15 +38,6 @@ class ControlledWriteResult:
 
 
 class ControlledWriter:
-    """
-    受控写入器 - 产品级增量执行引擎
-    
-    设计原则：
-    1. 稳定 > 速度：优先保证输出，再考虑效率
-    2. 降级兜底：任何失败都回退到单次执行
-    3. 状态隔离：每次执行独立，不污染全局
-    """
-    
     def __init__(
         self,
         api_base: Optional[str] = None,
@@ -50,24 +49,26 @@ class ControlledWriter:
         self.model = model or getattr(settings, 'llm_writing_model', 'Qwen3-32B-Q5_K_M')
         self.max_retries_per_segment = max_retries_per_segment
         self.enable_fallback = enable_fallback
-    
+
     def _determine_segments(self, units: List[ExecutionUnit]) -> int:
-        """根据执行单元数量决定分段数"""
+        """
+        分段策略：减少分段数，让每段篇幅更长
+        - 1-4 个单元 → 1 段（整场景）
+        - 5-8 个单元 → 2 段
+        - 9+ 个单元 → 3 段
+        """
         total = len(units)
-        if total <= 2:
+        if total <= 4:
             return 1
-        elif total <= 4:
+        elif total <= 8:
             return 2
-        elif total <= 6:
-            return 3
         else:
-            return 4
-    
+            return 3
+
     def _split_units(self, units: List[ExecutionUnit], segments: int) -> List[List[ExecutionUnit]]:
-        """将执行单元分配到各段"""
         if segments == 1:
             return [units]
-        
+
         total = len(units)
         base = total // segments
         remainder = total % segments
@@ -82,7 +83,7 @@ class ControlledWriter:
         if idx < total:
             result[-1].extend(units[idx:])
         return result
-    
+
     def _build_segment_prompt(
         self,
         contract: PlanningContract,
@@ -94,28 +95,81 @@ class ControlledWriter:
         current_state: Dict,
         is_retry: bool = False,
         is_fallback: bool = False,
+        error_hint: str = "",
     ) -> str:
-        """构建段 Prompt"""
         lines = []
-        
+
         if is_fallback:
-            lines.append("⚠️ 降级模式：一次性生成完整场景。")
+            lines.append("⚠️ 降级模式：一次性生成完整场景，约 800-1200 字。")
             lines.append("")
         else:
-            lines.append(f"请写一段场景正文（约 200-300 字）。这是第 {segment_idx + 1}/{total_segments} 段。")
+            lines.append(f"请写一段场景正文（约 400-600 字）。这是第 {segment_idx + 1}/{total_segments} 段。")
             lines.append("")
-        
+
         lines.append("【场景总目标】")
         lines.append(f"目标：{contract.intent.goal}")
         lines.append(f"冲突：{contract.intent.conflict}")
         lines.append("")
-        
+
+        # ========== v2.1: 注入 Scene Specification 强制渲染指令（优先级最高） ==========
+        if contract.scene_spec:
+            spec = contract.scene_spec
+            
+            lines.append("=" * 60)
+            lines.append("🎯 [v2.1 最高优先级] 场景渲染规格 - 必须严格遵循")
+            lines.append("=" * 60)
+            lines.append("")
+            lines.append("⚠️ 以下规格的优先级高于下方的【本段任务】")
+            lines.append("⚠️ 如果执行单元与规格冲突，优先满足规格")
+            lines.append("")
+            
+            # 1. 世界事实（强制渲染）
+            lines.append("【🌍 世界事实（必须在正文中直接渲染，不可省略）】")
+            lines.append(f"  地点：{spec.world.get('location', '未指定')}")
+            lines.append(f"  时间：{spec.world.get('time', '未指定')}")
+            lines.append(f"  氛围：{spec.world.get('atmosphere', '未指定')}")
+            if spec.world.get('sensory'):
+                lines.append(f"  感官细节：{', '.join(spec.world['sensory'])}")
+            lines.append("")
+            
+            # 2. 情绪轨迹（强制引导）
+            lines.append("【❤️ 读者情绪轨迹（必须让读者经历以下三段式变化）】")
+            lines.append(f"  开头 → 读者应感到：{spec.reader_emotion.get('begin', '未指定')}")
+            lines.append(f"  中间 → 读者应感到：{spec.reader_emotion.get('middle', '未指定')}")
+            lines.append(f"  结尾 → 读者应感到：{spec.reader_emotion.get('end', '未指定')}")
+            lines.append("")
+            
+            # 3. 叙事功能（结构约束）
+            lines.append("【📖 叙事功能】")
+            lines.append(f"  场景功能：{spec.narrative_function}")
+            lines.append(f"  功能含义：{self._get_function_meaning(spec.narrative_function)}")
+            lines.append("")
+            
+            # 4. 视角锚定（强制）
+            lines.append("【👁️ 视角约束】")
+            lines.append(f"  全程从「{spec.pov}」的视角叙述")
+            lines.append("  不要出现其他角色的内心独白")
+            lines.append("")
+            
+            # 5. 渲染规则
+            lines.append("【⚠️ 渲染规则（必须遵守）】")
+            lines.append("1. 必须在正文中直接描写上述【世界事实】中的所有元素")
+            lines.append("2. 必须让读者经历【情绪轨迹】中的三段式变化")
+            lines.append("3. 场景结构必须符合【叙事功能】的指导")
+            lines.append("4. 只从【视角约束】指定的角色视角描述事件")
+            lines.append("5. 不要解释或说明这些规格，直接用叙事文本呈现")
+            lines.append("6. 不要使用「推进主线剧情」等占位符，直接用具体情节推进")
+            lines.append("")
+            lines.append("=" * 60)
+            lines.append("")
+
+        # 继续原有内容
         if not is_fallback and previous_text:
             lines.append("【上一段结尾】")
             lines.append(previous_text[-300:])
             lines.append("请自然衔接。")
             lines.append("")
-        
+
         if previous_events:
             lines.append("【已完成事件】")
             for evt in previous_events[-5:]:
@@ -126,7 +180,7 @@ class ControlledWriter:
                 elif evt.get("type") == "location_enter":
                     lines.append(f"  📍 {evt.get('actor')} 进入 {evt.get('location')}")
             lines.append("")
-        
+
         if current_state:
             lines.append("【当前状态】")
             chars = current_state.get("characters", {})
@@ -136,12 +190,20 @@ class ControlledWriter:
                 level = info.get("level", 1)
                 lines.append(f"  {name}: {realm}{level}层, HP={hp}")
             lines.append("")
-        
+
         lines.append("【本段任务】")
         for unit in segment_units:
             lines.append(f"- {unit.description}")
         lines.append("")
-        
+
+        lines.append("【写作要求】")
+        lines.append("1. 每个执行单元需要展开 100-150 字的细节描写")
+        lines.append("2. 包含场景氛围、角色情绪、对话和动作的交织")
+        lines.append("3. 不要只罗列事件，要用情节自然地展现")
+        lines.append("4. 确保段落之间节奏连贯，有适当的铺垫和余韵")
+        lines.append("5. 如果上一段结尾有未完成的对话或动作，优先承接")
+        lines.append("")
+
         if contract.constraints:
             lines.append("【约束】")
             for c in contract.constraints:
@@ -150,25 +212,30 @@ class ControlledWriter:
                 elif c.type == "forbidden":
                     lines.append(f"  ❌ 禁止：{c.target}")
             lines.append("")
-        
+
         if is_retry:
-            lines.append("⚠️ 重试：请修正上一轮的错误。")
+            lines.append("⚠️ 重试：请修正上一轮的错误，确保完成所有执行单元。")
             lines.append("")
-        
+
         if is_fallback:
-            lines.append("【要求】一次性生成 500-800 字完整场景。")
+            lines.append("【要求】一次性生成 800-1200 字完整场景。")
             lines.append("")
-        
+
+        if error_hint:
+            lines.append(error_hint)
+            lines.append("")
+
         lines.append("【格式】")
         lines.append('{"scene_text": "...", "events": [...]}')
         lines.append("只输出 JSON。")
-        
+
         return "\n".join(lines)
-    
+  
     def _verify_segment(self, text: str, units: List[ExecutionUnit]) -> bool:
-        """验证段是否完成"""
         if not units:
             return True
+        if len(text.strip()) < 200:
+            return False
         for unit in units:
             keywords = re.findall(r'[\u4e00-\u9fff]{2,4}', unit.description)
             if not keywords:
@@ -176,13 +243,29 @@ class ControlledWriter:
             if not any(kw in text for kw in keywords):
                 return False
         return True
-    
+
+    def _parse_and_validate(self, text: str) -> Optional[WriterOutput]:
+        """解析 JSON 并验证结构"""
+        if not text:
+            return None
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if not match:
+            return None
+        try:
+            data = json.loads(match.group())
+            if not data.get("scene_text") or len(data["scene_text"].strip()) < 50:
+                logger.warning("scene_text 缺失或过短")
+                return None
+            return WriterOutput(**data)
+        except (json.JSONDecodeError, ValidationError) as e:
+            logger.warning(f"JSON 解析或验证失败: {e}")
+            return None
+
     def _apply_events(self, events: List[Dict], state: Dict) -> Dict:
-        """应用事件更新状态"""
         state = state.copy()
         if not state:
             state = {"characters": {"林逸": {"hp": 100, "realm": "炼气", "level": 1, "inventory": []}}, "global_flags": {}}
-        
+
         for evt in events:
             evt_type = evt.get("type", "")
             if evt_type == "plot_flag_set":
@@ -230,9 +313,9 @@ class ControlledWriter:
                         state["characters"][actor] = {}
                     state["characters"][actor]["hp"] = new_hp
         return state
-    
-    async def _call_llm(self, prompt: str, max_tokens: int = 2048) -> str:
-        """调用 LLM"""
+
+    async def _call_llm(self, prompt: str, max_tokens: int = 4096) -> str:
+        """调用 LLM，强制 JSON 输出"""
         client = AsyncOpenAI(
             api_key="not-needed",
             base_url=self.api_base,
@@ -243,21 +326,10 @@ class ControlledWriter:
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
             max_tokens=max_tokens,
+            response_format={"type": "json_object"}
         )
         return response.choices[0].message.content or ""
-    
-    def _parse_json(self, text: str) -> Dict:
-        """解析 JSON 响应"""
-        if not text:
-            return {}
-        match = re.search(r'\{.*\}', text, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group())
-            except:
-                pass
-        return {}
-    
+
     async def _execute_segment(
         self,
         contract: PlanningContract,
@@ -268,9 +340,15 @@ class ControlledWriter:
         previous_events: List[Dict],
         current_state: Dict,
     ) -> Tuple[str, List[Dict], bool]:
-        """执行单个段（含重试）"""
         for attempt in range(self.max_retries_per_segment + 1):
             is_retry = attempt > 0
+            error_hint = ""
+            
+            if attempt == 1:
+                error_hint = "\n\n⚠️ 格式错误：请只输出有效的 JSON，确保包含 scene_text（至少200字）和 events 数组。"
+            elif attempt == 2:
+                error_hint = "\n\n⚠️ 输出不完整：请生成完整的 JSON，scene_text 长度至少 300 字，并包含所有必要的执行单元。"
+
             prompt = self._build_segment_prompt(
                 contract=contract,
                 segment_units=units,
@@ -280,75 +358,69 @@ class ControlledWriter:
                 previous_events=previous_events,
                 current_state=current_state,
                 is_retry=is_retry,
+                error_hint=error_hint,
+            )
+
+            try:
+                max_tokens = 4096 if attempt > 1 else 2048
+                response = await self._call_llm(prompt, max_tokens=max_tokens)
+                validated = self._parse_and_validate(response)
+
+                if validated:
+                    text = validated.scene_text
+                    events = validated.events
+                    if self._verify_segment(text, units):
+                        logger.info(f"  ✅ 段 {idx+1} 成功 (尝试 {attempt+1}, 字数 {len(text)})")
+                        return text, events, True
+                    else:
+                        logger.warning(f"  ⚠️ 段 {idx+1} 验证失败 (尝试 {attempt+1})")
+                else:
+                    logger.warning(f"  ⚠️ 段 {idx+1} 解析失败 (尝试 {attempt+1})")
+
+            except Exception as e:
+                logger.warning(f"  ⚠️ 段 {idx+1} 异常 (尝试 {attempt+1}): {e}")
+
+        # 降级
+        if self.enable_fallback:
+            logger.warning(f"  🔄 段 {idx+1} 降级到单次生成")
+            fallback_prompt = self._build_segment_prompt(
+                contract=contract,
+                segment_units=contract.execution.units,
+                segment_idx=0,
+                total_segments=1,
+                previous_text="",
+                previous_events=[],
+                current_state={},
+                is_retry=False,
+                is_fallback=True,
+                error_hint="\n\n⚠️ 降级模式：请一次性生成完整场景，长度至少 500 字。"
             )
             try:
-                response = await self._call_llm(prompt, max_tokens=2048)
-                data = self._parse_json(response)
-                text = data.get("scene_text", "")
-                events = data.get("events", [])
-                if not text or len(text.strip()) < 20:
-                    raise ValueError("生成文本过短")
-                if self._verify_segment(text, units):
-                    logger.info(f"  ✅ 段 {idx+1} 成功 (尝试 {attempt+1})")
-                    return text, events, True
-                else:
-                    raise ValueError("验证失败")
+                fb_response = await self._call_llm(fallback_prompt, max_tokens=4096)
+                validated = self._parse_and_validate(fb_response)
+                if validated and len(validated.scene_text.strip()) > 300:
+                    logger.info(f"  ✅ 降级成功 (字数 {len(validated.scene_text)})")
+                    return validated.scene_text, validated.events, True
             except Exception as e:
-                logger.warning(f"  ⚠️ 段 {idx+1} 失败 (尝试 {attempt+1}): {e}")
-                if attempt == self.max_retries_per_segment:
-                    if self.enable_fallback:
-                        logger.info(f"  🔄 段 {idx+1} 降级到单次生成")
-                        fallback_prompt = self._build_segment_prompt(
-                            contract=contract,
-                            segment_units=contract.execution.units,
-                            idx=0,
-                            total=1,
-                            previous_text="",
-                            previous_events=[],
-                            current_state={},
-                            is_retry=False,
-                            is_fallback=True,
-                        )
-                        try:
-                            fb_response = await self._call_llm(fallback_prompt, max_tokens=4096)
-                            fb_data = self._parse_json(fb_response)
-                            fb_text = fb_data.get("scene_text", "")
-                            fb_events = fb_data.get("events", [])
-                            if fb_text and len(fb_text.strip()) > 50:
-                                logger.info(f"  ✅ 降级成功")
-                                return fb_text, fb_events, True
-                        except Exception as fb_e:
-                            logger.error(f"  ❌ 降级失败: {fb_e}")
+                logger.error(f"  ❌ 降级失败: {e}")
+
         return "", [], False
-    
+
     async def execute(self, contract: PlanningContract) -> ControlledWriteResult:
-        """
-        执行受控写入
-        
-        Args:
-            contract: Planning Contract
-            
-        Returns:
-            ControlledWriteResult
-        """
-        import time
         start = time.time()
-        
-        # 1. 决定分段
+
         units = contract.execution.units
         segments = self._determine_segments(units)
         segment_units = self._split_units(units, segments)
-        
+
         logger.info(f"📝 ControlledWriter: {len(units)} 单元 → {segments} 段")
-        
-        # 2. 状态
+
         text = ""
         events = []
         state = {}
         succeeded = 0
         fallback = False
-        
-        # 3. 逐段执行
+
         for idx, seg_units in enumerate(segment_units):
             seg_text, seg_events, ok = await self._execute_segment(
                 contract=contract,
@@ -366,17 +438,14 @@ class ControlledWriter:
                 succeeded += 1
             else:
                 logger.warning(f"  ❌ 段 {idx+1} 失败")
-                # 检查是否使用了降级（降级会生成完整文本，直接结束）
-                if seg_text and len(seg_text.strip()) > 100:
-                    # 降级成功，已经生成了完整场景
+                if seg_text and len(seg_text.strip()) > 300:
                     text = seg_text
                     events = seg_events
                     state = self._apply_events(seg_events, state)
                     fallback = True
                     succeeded = 1
                 break
-        
-        # 4. 如果没有任何成功，返回空
+
         if not text.strip():
             logger.error("❌ ControlledWriter 完全失败")
             return ControlledWriteResult(
@@ -387,11 +456,10 @@ class ControlledWriter:
                 fallback_used=fallback,
                 execution_time=time.time() - start,
             )
-        
-        # 5. 如果部分成功但使用了降级，正常返回
+
         logger.info(f"✅ ControlledWriter 完成: {succeeded}/{segments} 段成功" + 
                    (f" (降级)" if fallback else ""))
-        
+
         return ControlledWriteResult(
             text=text.strip(),
             events=events,
@@ -400,3 +468,14 @@ class ControlledWriter:
             fallback_used=fallback,
             execution_time=time.time() - start,
         )
+            
+    def _get_function_meaning(self, function: str) -> str:
+        meanings = {
+            "introduce_mystery": "留下谜团，不给出答案，结尾产生悬念或疑问",
+            "escalate": "提升冲突，压力增大，局势紧张",
+            "reveal_truth": "揭示关键信息，让读者感到震惊或恍然大悟",
+            "release_tension": "缓解紧张情绪，提供情感喘息空间",
+            "transition": "自然过渡，平稳衔接前后情节",
+            "foreshadow": "埋下伏笔，暗示未来事件，不要明说",
+        }
+        return meanings.get(function, "推进场景叙事")

@@ -1,0 +1,54 @@
+Scene: pair_06_C3_rep01
+Condition: C3
+Repeat: 1
+EntryLocation: 擂台
+============================================================
+
+暮色漫过河面时，林逸仍蜷坐在青石上。指尖残留的灼痛提醒着他三小时前那场败北——若非最后半招走偏，胜负尚未可知。河水的絮语本该安抚焦躁，可他攥紧拳头的动作却碾碎了这份宁静。
+
+晚风卷着野薄荷的清凉掠过耳际，他忽然垂眸凝视掌纹。涟漪般的水声里，记忆开始抽丝剥茧：对手剑锋转向的刹那，自己右膝微滞的半拍，呼吸与剑势错位的毫厘……这些曾被怒火灼瞎的细节，此刻在暮色中纤毫毕现。
+
+对岸芦苇忽然簌簌摇晃，惊起的白鹭掠过水面。林逸的瞳孔随着水波漾开，枯坐的脊背缓缓挺直。他摸出残破的笔记本，在「第七式」旁划下血痕般的着重线，笔尖沙沙应和着流水，将零散的顿悟串成新的剑谱。
+
+============================================================
+Events: [
+  {
+    "type": "sensory_detail",
+    "element": "water_sound"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "flower_scent"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "evening_breeze"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "start",
+    "emotion": "resentment"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "middle",
+    "emotion": "contemplation"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "end",
+    "emotion": "determination"
+  },
+  {
+    "type": "execution_unit",
+    "content": "riverbank_sitting"
+  },
+  {
+    "type": "execution_unit",
+    "content": "review_battle_mistakes"
+  },
+  {
+    "type": "execution_unit",
+    "content": "plan_improvement"
+  }
+]

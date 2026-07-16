@@ -1,0 +1,55 @@
+Scene: S005
+Condition: emotion_counterfactual
+Repetition: 0
+Timestamp: 20260706_235600
+============================================================
+
+林逸的布靴碾过青石台阶最后一道裂痕，议事堂的飞檐在暮色里收拢如敛翅的鹰。他攥着袖中半卷残简，指节被硌得发白。山道两侧的野薄荷在晚风里翻涌，凉意混着腐叶气息钻进衣领，他忽然停步，看自己投在石板上的影子被斜阳拉得细长——像柄将断未断的剑。
+
+碎叶在足边打着旋儿，他听见胸腔里奔涌的潮声。三日前那场争论中碎裂的瓷盏，此刻正以更细密的裂纹爬满心口。远处传来鹧鸪的啼叫，一声叠着一声，惊起道旁老槐树上扑棱棱的翅影。他仰头望着那些归鸟掠过紫灰色天际，尾羽拖曳的光痕突然让他想起幼时母亲簪在鬓边的凤钗。
+
+山风渐劲，卷起他衣袂却吹不散眉间郁结。转过第七道弯时，整座山谷的暮色忽然倾泻而下。归巢的鸟群正穿过云隙，金红余晖在羽翼间流转成碎金。他驻足处，一株野山茶的落瓣飘落在石缝里未干的露水中。当最后一线天光被地平线吞没时，他松开紧握的拳头，掌心蜿蜒的裂痕里还沾着朱砂墨的残渍。
+
+============================================================
+Events: [
+  {
+    "type": "environmental_detail",
+    "element": "山道青石台阶"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "野薄荷与腐叶气息"
+  },
+  {
+    "type": "emotional_shift",
+    "from": null,
+    "to": "anger"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "晚风穿林声"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "鹧鸪啼叫"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "anger",
+    "to": "expectation"
+  },
+  {
+    "type": "visual_moment",
+    "element": "归鸟掠过天际"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "山茶花瓣落露水"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "expectation",
+    "to": "peace"
+  }
+]
+Segments: 2, Succeeded: 1

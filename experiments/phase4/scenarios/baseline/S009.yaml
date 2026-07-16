@@ -1,0 +1,43 @@
+# experiments/phase4/scenarios/baseline/S009.yaml
+scene_id: "S009"
+narrative_function: "release_tension"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "河边独坐，放松精神"
+  conflict: "内心沉重，难以排解"
+  expected_outcome: "水流声让他慢慢平静"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "河边独坐，看水流"
+    - id: U2
+      label: action
+      description: "闻花香，吹晚风"
+    - id: U3
+      label: action
+      description: "内心释然"
+
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "心境舒缓"
+      value: true
+
+interventions:
+  world:
+    location: "河边"
+    time: "黄昏"
+    atmosphere: "宁静，水声潺潺"
+    sensory: ["水声", "花香", "晚风"]
+  reader_emotion:
+    begin: "忧虑"
+    middle: "舒缓"
+    end: "释然"
+  narrative_function: "release_tension"
+  pov: "林逸"

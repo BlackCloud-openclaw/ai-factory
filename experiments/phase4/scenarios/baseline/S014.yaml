@@ -1,0 +1,43 @@
+# experiments/phase4/scenarios/baseline/S014.yaml
+scene_id: "S014"
+narrative_function: "release_tension"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "帮厨，感受人间烟火"
+  conflict: "手忙脚乱，切菜切到手"
+  expected_outcome: "一餐热饭暖了心"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "清晨帮厨生火"
+    - id: U2
+      label: action
+      description: "手忙脚乱切菜"
+    - id: U3
+      label: action
+      description: "吃上热饭，心暖"
+
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "人间烟火"
+      value: true
+
+interventions:
+  world:
+    location: "厨房"
+    time: "清晨"
+    atmosphere: "温暖，烟火气重"
+    sensory: ["饭香", "柴火", "蒸汽"]
+  reader_emotion:
+    begin: "饥饿"
+    middle: "满足"
+    end: "温馨"
+  narrative_function: "release_tension"
+  pov: "林逸"

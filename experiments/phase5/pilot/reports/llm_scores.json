@@ -1,0 +1,128 @@
+[
+  {
+    "scene_id": "pair_1_baseline_baseline",
+    "condition": "baseline",
+    "repeat": 0,
+    "spatial_score": 5,
+    "brief_reason": "场景A明确提到林逸朝通向静室的密道走去，场景B直接描写他在静室处理伤口并研究卷轴，空间转换通过'密道-静室'的建筑结构自然衔接，环境细节（石壁/烛火）与位置保持一致。"
+  },
+  {
+    "scene_id": "pair_1_baseline_baseline",
+    "condition": "baseline",
+    "repeat": 1,
+    "spatial_score": 5,
+    "brief_reason": "场景B明确承接场景A中'通向静室的密道'这一空间线索，通过石壁、药箱、卷轴等细节延续了炼丹房到静室的空间转换。林逸拖着伤势进入密道后直接出现在静室内，环境描写与动作连贯，无位置跳跃"
+  },
+  {
+    "scene_id": "pair_1_baseline_baseline",
+    "condition": "baseline",
+    "repeat": 2,
+    "spatial_score": 5,
+    "brief_reason": "场景B明确承接场景A中提到的'通向静室的密道'，石室环境与炼丹房形成合理空间转换。卷轴、受伤部位等细节保持连贯性，位置过渡自然。"
+  },
+  {
+    "scene_id": "pair_1_intervention_intervention",
+    "condition": "intervention",
+    "repeat": 0,
+    "spatial_score": 5,
+    "brief_reason": "场景A明确提到林逸朝通向静室的密道移动，场景B直接承接其进入密道后的静室环境，位置转换自然且细节连贯。"
+  },
+  {
+    "scene_id": "pair_1_intervention_intervention",
+    "condition": "intervention",
+    "repeat": 1,
+    "spatial_score": 5,
+    "brief_reason": "场景B明确承接场景A的'通向静室的密道'，通过'沿密道返回静室'和'推开静室木门'形成连贯空间转换。炼丹房→密道→静室的路径清晰，伤口、卷轴等细节保持连续性。"
+  },
+  {
+    "scene_id": "pair_1_intervention_intervention",
+    "condition": "intervention",
+    "repeat": 2,
+    "spatial_score": 5,
+    "brief_reason": "场景B明确承接场景A中'通向静室的密道'这一空间线索，通过石壁、青苔等细节延续了地下空间的环境特征，并自然过渡到静室内部描写。"
+  },
+  {
+    "scene_id": "pair_2_baseline_baseline",
+    "condition": "baseline",
+    "repeat": 0,
+    "spatial_score": 1,
+    "brief_reason": "场景B内容缺失，无法判断与场景A的位置关联性"
+  },
+  {
+    "scene_id": "pair_2_baseline_baseline",
+    "condition": "baseline",
+    "repeat": 1,
+    "spatial_score": 2,
+    "brief_reason": "场景B未明确交代从藏书阁侧梯到檀木案研究拓片的移动路径。场景A中林逸携带拓片离开第三层，但场景B直接跳转至未知空间（檀木案/铜漏等物品暗示非原场景），仅通过'拓片'作为物理连接，缺乏环境转换的具体描述。"
+  },
+  {
+    "scene_id": "pair_2_baseline_baseline",
+    "condition": "baseline",
+    "repeat": 2,
+    "spatial_score": 1,
+    "brief_reason": "场景B缺失内容导致位置信息完全断裂，场景A结尾明确走向侧梯但后续无任何空间衔接描述"
+  },
+  {
+    "scene_id": "pair_2_intervention_intervention",
+    "condition": "intervention",
+    "repeat": 0,
+    "spatial_score": 4,
+    "brief_reason": "场景B明确承接藏书阁侧梯下到二楼的路径，但未说明从二楼到卧房的具体空间关系。环境细节（檀香、烛泪）延续了场景A的氛围，位置转换合理但缺乏中间过渡描述。"
+  },
+  {
+    "scene_id": "pair_2_intervention_intervention",
+    "condition": "intervention",
+    "repeat": 1,
+    "spatial_score": 4,
+    "brief_reason": "场景B明确承接藏书阁西侧木梯（呼应场景A的侧梯），但未说明从藏书阁到卧房的空间关系。位置转换合理但缺乏路径细节，过渡稍显突兀。"
+  },
+  {
+    "scene_id": "pair_2_intervention_intervention",
+    "condition": "intervention",
+    "repeat": 2,
+    "spatial_score": 5,
+    "brief_reason": "场景B明确延续藏书阁西侧木梯的方位描述，从第三层侧梯下行至卧房形成空间连贯性。通过楼梯、卧房门、案头书籍等细节保持位置一致性，过渡自然。"
+  },
+  {
+    "scene_id": "pair_3_baseline_baseline",
+    "condition": "baseline",
+    "repeat": 0,
+    "spatial_score": 5,
+    "brief_reason": "场景B明确承接场景A中林逸沿石阶走向山道的动作，通过登山靴碾碎碎石、暮色环境描写等细节延续空间位置。从议事堂到山道的过渡自然，且保留了晚风、青草气息等连贯元素。"
+  },
+  {
+    "scene_id": "pair_3_baseline_baseline",
+    "condition": "baseline",
+    "repeat": 1,
+    "spatial_score": 3,
+    "brief_reason": "解析失败，使用默认值"
+  },
+  {
+    "scene_id": "pair_3_baseline_baseline",
+    "condition": "baseline",
+    "repeat": 2,
+    "spatial_score": 5,
+    "brief_reason": "场景B延续了场景A中'沿着石阶朝山道走去'的空间线索，通过碎石、斜坡草叶、暮色铁灰色石阶等细节保持空间连续性，并用三道弯的地形变化自然衔接视野开阔的山谷场景。"
+  },
+  {
+    "scene_id": "pair_3_intervention_intervention",
+    "condition": "intervention",
+    "repeat": 0,
+    "spatial_score": 5,
+    "brief_reason": "解析失败，使用默认值"
+  },
+  {
+    "scene_id": "pair_3_intervention_intervention",
+    "condition": "intervention",
+    "repeat": 1,
+    "spatial_score": 5,
+    "brief_reason": "场景A结尾明确提到林逸沿石阶走向山道，若场景B延续此空间线索（如描写山道环境或继续行进），则位置承接自然。"
+  },
+  {
+    "scene_id": "pair_3_intervention_intervention",
+    "condition": "intervention",
+    "repeat": 2,
+    "spatial_score": 5,
+    "brief_reason": "场景B明确承接议事堂出口到山道的空间位置，通过石阶、山风、松枝等环境细节延续场景A的方位感，并用光影变化和归鸟动态维持空间连贯性。"
+  }
+]

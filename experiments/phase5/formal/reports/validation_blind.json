@@ -1,0 +1,23 @@
+[
+  {
+    "pair": 1,
+    "baseline_selected": false,
+    "c2_selected": true,
+    "choice": "B2",
+    "raw": "好的，我现在需要分析用户提供的三个场景，并判断B1和B2哪一个更"
+  },
+  {
+    "pair": 2,
+    "baseline_selected": false,
+    "c2_selected": true,
+    "choice": "B2",
+    "raw": "好的，我现在需要分析用户提供的三个场景，并判断B1和B2哪一个更"
+  },
+  {
+    "pair": 3,
+    "baseline_selected": false,
+    "c2_selected": true,
+    "choice": "B2",
+    "raw": "好的，我现在需要仔细分析用户提供的三个场景，判断场景B1和B2"
+  }
+]

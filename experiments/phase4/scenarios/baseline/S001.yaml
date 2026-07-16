@@ -1,0 +1,46 @@
+# experiments/phase4/scenarios/baseline/S001.yaml
+scene_id: "S001"
+narrative_function: "introduce_mystery"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "探查药园异动"
+  conflict: "药香中混有一丝腐臭，灵草有枯萎迹象"
+  expected_outcome: "发现药园地下有异常灵气波动"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "林逸走进药园，闻到异常气味"
+    - id: U2
+      label: action
+      description: "发现几株灵草根部发黑"
+    - id: U3
+      label: action
+      description: "循着气味找到一处地缝"
+
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "药园异动"
+      value: true
+    - type: location
+      actor: "林逸"
+      location: "药园地缝"
+
+interventions:
+  world:
+    location: "药园"
+    time: "清晨"
+    atmosphere: "潮湿，雾气低垂"
+    sensory: ["药香", "晨雾", "露水"]
+  reader_emotion:
+    begin: "好奇"
+    middle: "疑惑"
+    end: "不安"
+  narrative_function: "introduce_mystery"
+  pov: "林逸"

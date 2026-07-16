@@ -1,0 +1,43 @@
+# experiments/phase4/scenarios/baseline/S004.yaml
+scene_id: "S004"
+narrative_function: "release_tension"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "林逸回到石屋，整理思绪"
+  conflict: "身心俱疲，但责任未了"
+  expected_outcome: "稍作休整，重拾决心"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "林逸推开石屋门，点燃烛火"
+    - id: U2
+      label: action
+      description: "泡茶静坐，听到窗外虫鸣"
+    - id: U3
+      label: action
+      description: "闭目调息，重拾决心"
+
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "rested"
+      value: true
+
+interventions:
+  world:
+    location: "石屋"
+    time: "夜晚"
+    atmosphere: "温暖，烛火摇曳"
+    sensory: ["烛火", "茶香", "虫鸣"]
+  reader_emotion:
+    begin: "疲惫"
+    middle: "放松"
+    end: "坚定"
+  narrative_function: "release_tension"
+  pov: "林逸"

@@ -1,0 +1,45 @@
+Scene: pair_06_C1_rep02
+Condition: C1
+Repeat: 2
+EntryLocation: 擂台
+============================================================
+
+林逸的拳头抵在膝盖上，指节因用力而发白。河水在他脚下漫过卵石，哗啦声混着暮色渗入耳膜，他盯着水面倒影里自己僵硬的喉结——那里还残留着被剑气灼烧的刺痛感。晚风送来野薄荷的清凉，他却觉得后颈滚烫，呼吸节奏仍像未结束的搏杀。
+
+对岸芦苇丛簌簌摇晃，将他的视线拽向记忆里那道偏转的剑锋。三息前的攻防在脑内循环播放，衣摆被风掀起时，腰间断裂的丝绦仍在渗血。他伸手触碰水面，涟漪搅碎了倒影中的眉眼，像搅碎了一团黏稠的不甘。
+
+当第七道波纹归于平静，林逸突然前倾身体，指尖在湿润的河滩上划出弧线。碎石粒沿着他勾勒的剑势滑动，在余晖里泛着细碎的金光。远处传来夜鹭掠过水面的声响，他直起腰时，衣襟上的血痕正被晚风洇成深褐色的图腾。
+
+============================================================
+Events: [
+  {
+    "type": "environment_render",
+    "elements": [
+      "riverbank",
+      "dusk",
+      "water_sound",
+      "flower_scent",
+      "evening_wind"
+    ]
+  },
+  {
+    "type": "emotion_arc",
+    "stages": [
+      "resentment",
+      "contemplation",
+      "resolve"
+    ]
+  },
+  {
+    "type": "narrative_function",
+    "function": "transition"
+  },
+  {
+    "type": "character_action",
+    "action": "sitting_alone"
+  },
+  {
+    "type": "plot_progression",
+    "content": "combat_review_and_plan_formulation"
+  }
+]

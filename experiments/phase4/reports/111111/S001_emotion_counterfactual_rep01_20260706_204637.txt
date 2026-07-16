@@ -1,0 +1,11 @@
+Scene: S001
+Condition: emotion_counterfactual
+Repetition: 1
+Timestamp: 20260706_204637
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

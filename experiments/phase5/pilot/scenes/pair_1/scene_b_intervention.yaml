@@ -1,0 +1,37 @@
+scene_id: pair_1_B_intervention
+entry_location: "炼丹房"
+intent:
+  goal: "从炼丹房返回静室，处理伤口并整理卷轴信息"
+  conflict: "肩伤疼痛影响行动，且卷轴信息与已知线索存在矛盾"
+  expected_outcome: "完成初步包扎，发现卷轴中的异常标记"
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "离开炼丹房，沿密道返回静室"
+    - id: U2
+      label: action
+      description: "检查肩伤并找药"
+    - id: U3
+      label: action
+      description: "展开卷轴查看内容"
+    - id: U4
+      label: action
+      description: "发现卷轴中的异常标记"
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "卷轴异常标记"
+      value: true
+interventions:
+  world:
+    location: "静室"
+    time: "深夜"
+    atmosphere: "安静，烛火微弱"
+    sensory: ["烛火", "血腥味", "石壁凉意"]
+  reader_emotion:
+    begin: "疲惫"
+    middle: "警觉"
+    end: "平静"
+  narrative_function: "transition"
+  pov: "林逸"

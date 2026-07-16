@@ -1,0 +1,46 @@
+# experiments/phase4/scenarios/baseline/S016.yaml
+scene_id: "S016"
+narrative_function: "escalate"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "幽谷遇妖，绝境求生"
+  conflict: "妖兽强大，退路被封"
+  expected_outcome: "借助地形勉强脱身"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "幽谷遇妖"
+    - id: U2
+      label: action
+      description: "绝境求生，躲避嘶吼"
+    - id: U3
+      label: action
+      description: "借地形脱身"
+
+observables:
+  state_changes:
+    - type: hp_changed
+      actor: "林逸"
+      new_hp: 50
+    - type: plot_flag
+      name: "幽谷脱险"
+      value: true
+
+interventions:
+  world:
+    location: "幽谷"
+    time: "子夜"
+    atmosphere: "腥臭，妖气弥漫"
+    sensory: ["嘶吼", "腥风", "血迹"]
+  reader_emotion:
+    begin: "慌张"
+    middle: "求生"
+    end: "侥幸"
+  narrative_function: "escalate"
+  pov: "林逸"

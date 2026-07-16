@@ -1,0 +1,46 @@
+# experiments/phase4/scenarios/baseline/S019.yaml
+scene_id: "S019"
+narrative_function: "release_tension"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "山顶独处，眺望远方"
+  conflict: "情绪低落，难以自拔"
+  expected_outcome: "云海日出让他重燃希望"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "凌晨登上山顶"
+    - id: U2
+      label: action
+      description: "眺望云海"
+    - id: U3
+      label: action
+      description: "日出重燃希望"
+
+observables:
+  state_changes:
+    - type: location
+      actor: "林逸"
+      location: "山顶"
+    - type: plot_flag
+      name: "云海日出"
+      value: true
+
+interventions:
+  world:
+    location: "山顶"
+    time: "凌晨"
+    atmosphere: "凛冽，云海翻涌"
+    sensory: ["云海", "风声", "寒露"]
+  reader_emotion:
+    begin: "绝望"
+    middle: "开阔"
+    end: "希望"
+  narrative_function: "release_tension"
+  pov: "林逸"

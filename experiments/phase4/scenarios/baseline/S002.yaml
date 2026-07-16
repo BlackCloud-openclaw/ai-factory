@@ -1,0 +1,47 @@
+# experiments/phase4/scenarios/baseline/S002.yaml
+scene_id: "S002"
+narrative_function: "escalate"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "在议事堂与管事对质"
+  conflict: "管事否认灵田异常，试图将责任推给林逸"
+  expected_outcome: "林逸被激怒，但也发现了管事的破绽"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "林逸拍案而起，指着管事的鼻子"
+    - id: U2
+      label: action
+      description: "管事冷笑，搬出宗门规矩压制林逸"
+    - id: U3
+      label: action
+      description: "林逸强行压下怒火，发现管事袖口有异样纹路"
+
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "管事可疑"
+      value: true
+    - type: relationship_change
+      from_char: "林逸"
+      to_char: "管事"
+      delta: -20
+
+interventions:
+  world:
+    location: "议事堂"
+    time: "午后"
+    atmosphere: "沉闷，光线斜射"
+    sensory: ["木料气味", "石砖寒意", "茶渍痕迹"]
+  reader_emotion:
+    begin: "警惕"
+    middle: "愤怒"
+    end: "冷静"
+  narrative_function: "escalate"
+  pov: "林逸"

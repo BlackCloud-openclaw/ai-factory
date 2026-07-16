@@ -1,0 +1,493 @@
+{
+  "timestamp": "2026-07-14T21:31:20.829507",
+  "mode": "mock",
+  "total_scenes": 14,
+  "improved_scenes": 9,
+  "draft_changed_scenes": 9,
+  "avg_compliance_v1": 0.6785714285714286,
+  "avg_compliance_v2": 1.0,
+  "avg_improvement": 0.3214285714285714,
+  "llm_calls": 9,
+  "elapsed_seconds": 0.003614664077758789,
+  "results": [
+    {
+      "scene_id": "reunion_low",
+      "tr": 0.33,
+      "policy": "adaptive",
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 0.5,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": false,
+        "justification": false,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": true,
+      "actions_count": 1,
+      "draft_changed": true,
+      "draft_v1_length": 374,
+      "draft_v2_length": 403,
+      "patterns_v1": 7,
+      "patterns_v2": 10,
+      "sentences_v1": 19,
+      "sentences_v2": 21,
+      "hash_v1": "2ef2d39436193f81",
+      "hash_v2": "12299def34890003"
+    },
+    {
+      "scene_id": "well_discovery",
+      "tr": 0.4,
+      "policy": "adaptive",
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 1.0,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": false,
+      "actions_count": 0,
+      "draft_changed": false,
+      "draft_v1_length": 196,
+      "draft_v2_length": 196,
+      "reason": "no_actions_needed"
+    },
+    {
+      "scene_id": "temple_reunion",
+      "tr": 0.38,
+      "policy": "adaptive",
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 0.5,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": false,
+        "justification": false,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": true,
+      "actions_count": 1,
+      "draft_changed": true,
+      "draft_v1_length": 282,
+      "draft_v2_length": 311,
+      "patterns_v1": 3,
+      "patterns_v2": 6,
+      "sentences_v1": 12,
+      "sentences_v2": 14,
+      "hash_v1": "558401c5dcc99ea0",
+      "hash_v2": "cf132ec35818291c"
+    },
+    {
+      "scene_id": "ethical_dilemma",
+      "tr": 0.71,
+      "policy": "conservative",
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 1.0,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": false,
+      "actions_count": 0,
+      "draft_changed": false,
+      "draft_v1_length": 419,
+      "draft_v2_length": 419,
+      "reason": "no_actions_needed"
+    },
+    {
+      "scene_id": "secret_letter",
+      "tr": 0.55,
+      "policy": "adaptive",
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 0.5,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": false,
+        "justification": false,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": true,
+      "actions_count": 1,
+      "draft_changed": true,
+      "draft_v1_length": 457,
+      "draft_v2_length": 486,
+      "patterns_v1": 10,
+      "patterns_v2": 13,
+      "sentences_v1": 18,
+      "sentences_v2": 20,
+      "hash_v1": "d1b29170335b81fe",
+      "hash_v2": "adace19d42267fcb"
+    },
+    {
+      "scene_id": "old_man",
+      "tr": 0.6,
+      "policy": "adaptive",
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 0.5,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": false,
+        "justification": false,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": true,
+      "actions_count": 1,
+      "draft_changed": true,
+      "draft_v1_length": 438,
+      "draft_v2_length": 467,
+      "patterns_v1": 9,
+      "patterns_v2": 12,
+      "sentences_v1": 24,
+      "sentences_v2": 26,
+      "hash_v1": "8c8ac15f92b23afc",
+      "hash_v2": "f16b96af000591f8"
+    },
+    {
+      "scene_id": "library_mystery",
+      "tr": 0.5,
+      "policy": "adaptive",
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 1.0,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": false,
+      "actions_count": 0,
+      "draft_changed": false,
+      "draft_v1_length": 416,
+      "draft_v2_length": 416,
+      "reason": "no_actions_needed"
+    },
+    {
+      "scene_id": "field_anomaly",
+      "tr": 0.48,
+      "policy": "adaptive",
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 0.5,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": false,
+        "justification": false,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": true,
+      "actions_count": 1,
+      "draft_changed": true,
+      "draft_v1_length": 421,
+      "draft_v2_length": 450,
+      "patterns_v1": 10,
+      "patterns_v2": 13,
+      "sentences_v1": 17,
+      "sentences_v2": 19,
+      "hash_v1": "049f60024da3e06d",
+      "hash_v2": "4469eed0828916d2"
+    },
+    {
+      "scene_id": "social_conflict",
+      "tr": 0.86,
+      "policy": "conservative",
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 1.0,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": false,
+      "actions_count": 0,
+      "draft_changed": false,
+      "draft_v1_length": 353,
+      "draft_v2_length": 353,
+      "reason": "no_actions_needed"
+    },
+    {
+      "scene_id": "battle_aftermath",
+      "tr": 0.85,
+      "policy": "conservative",
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 0.5,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": false,
+        "justification": false,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": true,
+      "actions_count": 1,
+      "draft_changed": true,
+      "draft_v1_length": 483,
+      "draft_v2_length": 512,
+      "patterns_v1": 8,
+      "patterns_v2": 11,
+      "sentences_v1": 22,
+      "sentences_v2": 24,
+      "hash_v1": "36fd4554a9296612",
+      "hash_v2": "f6ef3782c2952792"
+    },
+    {
+      "scene_id": "night_raid",
+      "tr": 0.82,
+      "policy": "conservative",
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 0.5,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": false,
+        "justification": false,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": true,
+      "actions_count": 1,
+      "draft_changed": true,
+      "draft_v1_length": 489,
+      "draft_v2_length": 519,
+      "patterns_v1": 11,
+      "patterns_v2": 14,
+      "sentences_v1": 20,
+      "sentences_v2": 22,
+      "hash_v1": "f04c347bab46f602",
+      "hash_v2": "ecc26394bf39424e"
+    },
+    {
+      "scene_id": "market_rumor",
+      "tr": 0.78,
+      "policy": "conservative",
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 0.5,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": false,
+        "justification": false,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": true,
+      "actions_count": 1,
+      "draft_changed": true,
+      "draft_v1_length": 349,
+      "draft_v2_length": 378,
+      "patterns_v1": 11,
+      "patterns_v2": 14,
+      "sentences_v1": 13,
+      "sentences_v2": 15,
+      "hash_v1": "66bc65625c0636ff",
+      "hash_v2": "5dff336833f23a9c"
+    },
+    {
+      "scene_id": "meditation_interrupt",
+      "tr": 0.8,
+      "policy": "conservative",
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 1.0,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": false,
+      "actions_count": 0,
+      "draft_changed": false,
+      "draft_v1_length": 291,
+      "draft_v2_length": 291,
+      "reason": "no_actions_needed"
+    },
+    {
+      "scene_id": "emergency_summon",
+      "tr": 0.9,
+      "policy": "conservative",
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "compliance_v1": 0.5,
+      "compliance_v2": 1.0,
+      "layer_compliance_v1": {
+        "prediction": true,
+        "reasoning": false,
+        "justification": false,
+        "construction": true
+      },
+      "layer_compliance_v2": {
+        "prediction": true,
+        "reasoning": true,
+        "justification": true,
+        "construction": true
+      },
+      "improved": true,
+      "actions_count": 1,
+      "draft_changed": true,
+      "draft_v1_length": 403,
+      "draft_v2_length": 433,
+      "patterns_v1": 8,
+      "patterns_v2": 11,
+      "sentences_v1": 17,
+      "sentences_v2": 19,
+      "hash_v1": "dc162d886e3bf688",
+      "hash_v2": "164cec68728bf5af"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+Scene: S012
+Condition: world_counterfactual
+Repetition: 2
+Timestamp: 20260707_070134
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

@@ -1,0 +1,11 @@
+Scene: S014
+Condition: function_counterfactual
+Repetition: 1
+Timestamp: 20260707_091245
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

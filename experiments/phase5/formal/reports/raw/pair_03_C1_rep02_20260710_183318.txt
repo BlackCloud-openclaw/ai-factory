@@ -1,0 +1,33 @@
+Scene: pair_03_C1_rep02
+Condition: C1
+Repeat: 2
+EntryLocation: 藏书阁
+============================================================
+
+烛泪在青瓷盏中凝成琥珀色，林逸将拓片覆于檀木案时，纸角与松烟墨面摩擦出细碎声响。他蘸取朱砂的手指悬停半空，窗棂外漏进的月光正被云翳蚕食，摇曳烛火在拓片纹路里投下蛛网状阴影。
+
+砚台边摊开的三页笔记被夜风掀起，羊皮纸脆响中，他逐行比对那些篆体铭文。当第七个符号与拓片重合时，铜烛台突然震颤，坠落的火星在‘玄武’二字上烫出焦痕。林逸蹙眉抚过拓片背面，指腹触到半枚凹陷的菱形印记——这本该是完整九宫格的位置。
+
+他抓起镇纸压住飘动的纸页，烛光突然暗得只剩火芯发亮。那枚残缺的标记在幽明中泛着诡异红晕，像是被刻意刮去的血色指纹。
+
+============================================================
+Events: [
+  {
+    "type": "environment_setup",
+    "elements": [
+      "bedroom",
+      "night",
+      "candlelight",
+      "ink_scent",
+      "paper_crackle"
+    ]
+  },
+  {
+    "type": "clue_analysis",
+    "details": "comparing rubbings with existing notes"
+  },
+  {
+    "type": "discovery",
+    "evidence": "suspicious菱形imprint on rubbing"
+  }
+]

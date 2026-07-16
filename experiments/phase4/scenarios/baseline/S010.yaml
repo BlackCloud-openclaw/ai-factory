@@ -1,0 +1,46 @@
+# experiments/phase4/scenarios/baseline/S010.yaml
+scene_id: "S010"
+narrative_function: "transition"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "穿过集市，前往任务地点"
+  conflict: "市井纷扰，难以专注"
+  expected_outcome: "无意间听到关键情报"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "穿过嘈杂集市"
+    - id: U2
+      label: action
+      description: "听到神秘吆喝"
+    - id: U3
+      label: action
+      description: "获得情报线索"
+
+observables:
+  state_changes:
+    - type: location
+      actor: "林逸"
+      location: "集市"
+    - type: plot_flag
+      name: "市集情报"
+      value: true
+
+interventions:
+  world:
+    location: "集市"
+    time: "正午"
+    atmosphere: "嘈杂，人声鼎沸"
+    sensory: ["吆喝", "烟火", "汗味"]
+  reader_emotion:
+    begin: "烦躁"
+    middle: "好奇"
+    end: "期待"
+  narrative_function: "transition"
+  pov: "林逸"

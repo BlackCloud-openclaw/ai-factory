@@ -1,0 +1,31 @@
+Scene: pair_07_C4_rep01
+Condition: C4
+Repeat: 1
+EntryLocation: 地牢
+============================================================
+
+林逸的呼吸在潮湿的空气中凝成白雾，铁锈味混着霉菌气息钻进鼻腔。他摸出半湿的符纸，火折子微光下，墨迹晕染的方位图正渗出暗红——三日前被斩断的傀儡师血迹，此刻竟在纸上蜿蜒成箭头。水滴突然砸在后颈，他猛地转身，石壁裂缝里渗出的猩红液体正顺着青苔流淌。'不是血...是朱砂封印？'他抹去脖子上的粘液，指尖触到岩壁凸起，凹陷的蛇形纹路在掌心发烫。远处传来锁链拖动声，霉味突然变得浓烈，他将符纸塞进腰间，朝着东南角塌陷的砖墙奔去——那里有半截被苔藓覆盖的青铜门环，正泛着与符纸相同的暗红色调。
+
+============================================================
+Events: [
+  {
+    "type": "sensory_detail",
+    "elements": [
+      "iron_rust_smell",
+      "dripping_water",
+      "mold_odor"
+    ]
+  },
+  {
+    "type": "clue_analysis",
+    "object": "blood_sealed_fengshui_chart"
+  },
+  {
+    "type": "direction_confirmation",
+    "method": "brass_door_latch_symbol"
+  },
+  {
+    "type": "immediate_decision",
+    "trigger": "chain_rattling_sound"
+  }
+]

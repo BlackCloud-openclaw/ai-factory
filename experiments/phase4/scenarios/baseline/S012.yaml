@@ -1,0 +1,46 @@
+# experiments/phase4/scenarios/baseline/S012.yaml
+scene_id: "S012"
+narrative_function: "introduce_mystery"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "查阅古籍，寻找线索"
+  conflict: "关键页码被撕去"
+  expected_outcome: "发现有人先一步取走关键卷宗"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "深夜潜入藏书阁"
+    - id: U2
+      label: action
+      description: "找到古籍，关键页被撕"
+    - id: U3
+      label: action
+      description: "发现借阅记录异常"
+
+observables:
+  state_changes:
+    - type: location
+      actor: "林逸"
+      location: "藏书阁"
+    - type: plot_flag
+      name: "古籍被毁"
+      value: true
+
+interventions:
+  world:
+    location: "藏书阁"
+    time: "深夜"
+    atmosphere: "寂静，墨香幽远"
+    sensory: ["墨香", "尘埃", "翻页声"]
+  reader_emotion:
+    begin: "向往"
+    middle: "困惑"
+    end: "忌惮"
+  narrative_function: "introduce_mystery"
+  pov: "林逸"

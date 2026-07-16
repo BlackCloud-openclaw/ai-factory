@@ -1,0 +1,37 @@
+scene_id: pair_2_B_intervention
+entry_location: "藏书阁"
+intent:
+  goal: "从藏书阁返回卧室，仔细研究星图拓片"
+  conflict: "拓片内容晦涩难懂，且部分标记与已知信息矛盾"
+  expected_outcome: "初步解读拓片信息，发现可疑之处"
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "离开藏书阁，沿侧梯返回卧室"
+    - id: U2
+      label: action
+      description: "在烛光下展开拓片"
+    - id: U3
+      label: action
+      description: "比对已知线索"
+    - id: U4
+      label: action
+      description: "发现拓片上的可疑标记"
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "拓片可疑标记"
+      value: true
+interventions:
+  world:
+    location: "林逸卧室"
+    time: "深夜"
+    atmosphere: "昏沉，烛光摇曳"
+    sensory: ["烛火", "墨香", "纸张脆响"]
+  reader_emotion:
+    begin: "好奇"
+    middle: "专注"
+    end: "怀疑"
+  narrative_function: "transition"
+  pov: "林逸"

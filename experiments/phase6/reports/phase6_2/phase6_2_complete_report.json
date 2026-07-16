@@ -1,0 +1,1076 @@
+{
+  "oracle_version": "v1.0",
+  "timestamp": "2026-07-13T21:54:22.067227",
+  "pca": 1.0,
+  "avg_outcome": 0.5536666666666666,
+  "validation_results": [
+    {
+      "scene": "reunion",
+      "tr": 0.33,
+      "oracle": "adaptive",
+      "selected": "adaptive",
+      "is_correct": true,
+      "confidence": 0.9525,
+      "margin": 0.1925
+    },
+    {
+      "scene": "ethical",
+      "tr": 0.71,
+      "oracle": "conservative",
+      "selected": "conservative",
+      "is_correct": true,
+      "confidence": 0.81,
+      "margin": 0.0475000000000001
+    },
+    {
+      "scene": "social",
+      "tr": 0.86,
+      "oracle": "conservative",
+      "selected": "conservative",
+      "is_correct": true,
+      "confidence": 0.905,
+      "margin": 0.28500000000000003
+    }
+  ],
+  "outcome_scores": [
+    {
+      "scene": "reunion",
+      "avg_outcome": 0.715,
+      "samples": 5
+    },
+    {
+      "scene": "ethical",
+      "avg_outcome": 0.47300000000000003,
+      "samples": 5
+    },
+    {
+      "scene": "social",
+      "avg_outcome": 0.47300000000000003,
+      "samples": 5
+    }
+  ],
+  "artifacts": [
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:39:56.350021",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "reunion"
+      },
+      "scene_analysis": {
+        "tr": 0.33,
+        "prediction_plasticity": 0.6699999999999999,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "adaptive",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.715,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.9525,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.76,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "assist",
+          "realization": "enhanced",
+          "policy_type": "adaptive"
+        },
+        "confidence": 0.9525,
+        "margin": 0.1925,
+        "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.71, Adaptive=0.95, Aggressive=0.76"
+      },
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (密信, 信中) 成为推理依据",
+        "justification": [
+          "other"
+        ],
+        "construction": "回避型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:39:56.350092",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "reunion"
+      },
+      "scene_analysis": {
+        "tr": 0.33,
+        "prediction_plasticity": 0.6699999999999999,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "adaptive",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.715,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.9525,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.76,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "assist",
+          "realization": "enhanced",
+          "policy_type": "adaptive"
+        },
+        "confidence": 0.9525,
+        "margin": 0.1925,
+        "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.71, Adaptive=0.95, Aggressive=0.76"
+      },
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "B",
+        "prediction_confidence": 0.5,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (密信, 信中) 成为推理依据",
+        "justification": [
+          "truth"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:39:56.350124",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "reunion"
+      },
+      "scene_analysis": {
+        "tr": 0.33,
+        "prediction_plasticity": 0.6699999999999999,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "adaptive",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.715,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.9525,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.76,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "assist",
+          "realization": "enhanced",
+          "policy_type": "adaptive"
+        },
+        "confidence": 0.9525,
+        "margin": 0.1925,
+        "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.71, Adaptive=0.95, Aggressive=0.76"
+      },
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (密信) 成为推理依据",
+        "justification": [
+          "other"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:39:56.350148",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "reunion"
+      },
+      "scene_analysis": {
+        "tr": 0.33,
+        "prediction_plasticity": 0.6699999999999999,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "adaptive",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.715,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.9525,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.76,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "assist",
+          "realization": "enhanced",
+          "policy_type": "adaptive"
+        },
+        "confidence": 0.9525,
+        "margin": 0.1925,
+        "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.71, Adaptive=0.95, Aggressive=0.76"
+      },
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (密信) 成为推理依据",
+        "justification": [
+          "other"
+        ],
+        "construction": "对抗型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:39:56.350187",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "reunion"
+      },
+      "scene_analysis": {
+        "tr": 0.33,
+        "prediction_plasticity": 0.6699999999999999,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "adaptive",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.715,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.9525,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.76,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "assist",
+          "realization": "enhanced",
+          "policy_type": "adaptive"
+        },
+        "confidence": 0.9525,
+        "margin": 0.1925,
+        "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.71, Adaptive=0.95, Aggressive=0.76"
+      },
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (密信) 成为推理依据",
+        "justification": [
+          "other"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:47:13.186822",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "ethical"
+      },
+      "scene_analysis": {
+        "tr": 0.71,
+        "prediction_plasticity": 0.29000000000000004,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.81,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.7625,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.33249999999999996,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.81,
+        "margin": 0.0475000000000001,
+        "rationale": "TR=0.71, source=measured; TR 来自实验测量值（置信度高）; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.81, Adaptive=0.76, Aggressive=0.33"
+      },
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "other"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:47:13.186875",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "ethical"
+      },
+      "scene_analysis": {
+        "tr": 0.71,
+        "prediction_plasticity": 0.29000000000000004,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.81,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.7625,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.33249999999999996,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.81,
+        "margin": 0.0475000000000001,
+        "rationale": "TR=0.71, source=measured; TR 来自实验测量值（置信度高）; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.81, Adaptive=0.76, Aggressive=0.33"
+      },
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (调查) 成为推理依据",
+        "justification": [
+          "truth",
+          "time"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:47:13.186913",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "ethical"
+      },
+      "scene_analysis": {
+        "tr": 0.71,
+        "prediction_plasticity": 0.29000000000000004,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.81,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.7625,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.33249999999999996,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.81,
+        "margin": 0.0475000000000001,
+        "rationale": "TR=0.71, source=measured; TR 来自实验测量值（置信度高）; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.81, Adaptive=0.76, Aggressive=0.33"
+      },
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "time"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:47:13.186938",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "ethical"
+      },
+      "scene_analysis": {
+        "tr": 0.71,
+        "prediction_plasticity": 0.29000000000000004,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.81,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.7625,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.33249999999999996,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.81,
+        "margin": 0.0475000000000001,
+        "rationale": "TR=0.71, source=measured; TR 来自实验测量值（置信度高）; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.81, Adaptive=0.76, Aggressive=0.33"
+      },
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "other"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:47:13.186958",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "ethical"
+      },
+      "scene_analysis": {
+        "tr": 0.71,
+        "prediction_plasticity": 0.29000000000000004,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.81,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.7625,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.33249999999999996,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.81,
+        "margin": 0.0475000000000001,
+        "rationale": "TR=0.71, source=measured; TR 来自实验测量值（置信度高）; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.81, Adaptive=0.76, Aggressive=0.33"
+      },
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "time"
+        ],
+        "construction": "对抗型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:54:22.066878",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "social"
+      },
+      "scene_analysis": {
+        "tr": 0.86,
+        "prediction_plasticity": 0.14,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.905,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.62,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.095,
+            "blocked": true,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.905,
+        "margin": 0.28500000000000003,
+        "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+      },
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "B",
+        "prediction_confidence": 0.5,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (管事的) 成为推理依据",
+        "justification": [
+          "time"
+        ],
+        "construction": "对抗型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:54:22.066938",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "social"
+      },
+      "scene_analysis": {
+        "tr": 0.86,
+        "prediction_plasticity": 0.14,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.905,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.62,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.095,
+            "blocked": true,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.905,
+        "margin": 0.28500000000000003,
+        "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+      },
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "truth",
+          "time"
+        ],
+        "construction": "对抗型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:54:22.066964",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "social"
+      },
+      "scene_analysis": {
+        "tr": 0.86,
+        "prediction_plasticity": 0.14,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.905,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.62,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.095,
+            "blocked": true,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.905,
+        "margin": 0.28500000000000003,
+        "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+      },
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "time"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:54:22.066986",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "social"
+      },
+      "scene_analysis": {
+        "tr": 0.86,
+        "prediction_plasticity": 0.14,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.905,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.62,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.095,
+            "blocked": true,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.905,
+        "margin": 0.28500000000000003,
+        "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+      },
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "other"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.0",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-13T21:54:22.067009",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "social"
+      },
+      "scene_analysis": {
+        "tr": 0.86,
+        "prediction_plasticity": 0.14,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.905,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.62,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.095,
+            "blocked": true,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.905,
+        "margin": 0.28500000000000003,
+        "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+      },
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "B",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "time"
+        ],
+        "construction": "对抗型叙事"
+      }
+    }
+  ]
+}

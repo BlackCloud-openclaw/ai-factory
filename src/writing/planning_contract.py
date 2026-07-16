@@ -283,6 +283,45 @@ class ContractMetadata(BaseModel):
 
 
 # ============================================================================
+# v2.1: Scene Specification
+# ============================================================================
+
+class SceneSpecification(BaseModel):
+    """
+    v2.1 场景规格 - 控制读者体验
+    
+    这是 Empirical Control Model 的工程化产物。
+    四个维度（World, Reader Emotion, Narrative Function, POV）全部通过实验验证有效。
+    """
+    world: Dict[str, Any] = Field(
+        ...,
+        description="世界事实：location（地点）, time（时间）, atmosphere（氛围）, sensory（感官细节列表）"
+    )
+    reader_emotion: Dict[str, str] = Field(
+        ...,
+        description="读者情绪轨迹：begin（开头）, middle（中间）, end（结尾），三者必须不同"
+    )
+    narrative_function: str = Field(
+        ...,
+        description="叙事功能：introduce_mystery | escalate | reveal_truth | release_tension | transition | foreshadow"
+    )
+    pov: str = Field(
+        ...,
+        description="视角角色名，如'林逸'、'二叔'"
+    )
+
+    def get_function_meaning(self) -> str:
+        meanings = {
+            "introduce_mystery": "留下谜团，不给出答案，结尾产生悬念",
+            "escalate": "提升冲突，压力增大，局势紧张",
+            "reveal_truth": "揭示关键信息，让读者震惊",
+            "release_tension": "缓解紧张，提供喘息空间",
+            "transition": "自然过渡，节奏平稳",
+            "foreshadow": "埋下伏笔，暗示未来事件",
+        }
+        return meanings.get(self.narrative_function, "推进叙事")
+
+# ============================================================================
 # Planning Contract - 核心契约
 # ============================================================================
 
@@ -308,17 +347,16 @@ class PlanningContract(BaseModel):
     observables: Observables = Field(default_factory=Observables, description="可观测事项")
     constraints: List[Constraint] = Field(default_factory=list, description="结构化约束")
     metadata: ContractMetadata = Field(..., description="领域元数据")
+    scene_spec: Optional[SceneSpecification] = Field(
+        default=None,
+        description="v2.1 场景规格（控制读者体验）"
+    )
 
     def model_dump(self, **kwargs) -> Dict[str, Any]:
         """序列化时自动包含 version"""
         data = super().model_dump(**kwargs)
         data["version"] = self.version
         return data
-
-
-# ============================================================================
-# Contract Upcaster - 版本迁移
-# ============================================================================
 
 class ContractUpcaster:
     """
@@ -327,23 +365,27 @@ class ContractUpcaster:
     确保旧版本 Contract 可以平滑升级到最新版本。
     """
     
+# src/writing/planning_contract.py
+
+class ContractUpcaster:
+    """Contract 版本迁移器。"""
+    
     @staticmethod
     def upcast(data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        将任意版本的 Contract 数据迁移到最新版本。
-        
-        Args:
-            data: 原始 Contract 数据（dict）
-            
-        Returns:
-            迁移后的数据（最新版本）
-        """
         version = data.get("version", "0.9")
         
         if version == "0.9":
             data = ContractUpcaster._upcast_v0_9_to_v1_0(data)
         
-        # 确保版本号正确
+        # ========== v2.1: 保留 scene_spec ==========
+        if "scene_spec" in data and data["scene_spec"] is not None:
+            # 确保 scene_spec 在结果中
+            if "scene_spec" not in data:
+                data["scene_spec"] = None
+            # 如果 scene_spec 是字典，保留它
+            if isinstance(data["scene_spec"], dict):
+                data["scene_spec"] = data["scene_spec"]
+        
         data["version"] = CONTRACT_VERSION
         return data
     
@@ -459,6 +501,12 @@ class ContractUpcaster:
 # 工厂方法 - 从旧格式创建 Contract
 # ============================================================================
 
+# src/writing/planning_contract.py (文件末尾)
+
+# ============================================================================
+# 工厂方法 - 从旧格式创建 Contract
+# ============================================================================
+
 def create_contract_from_dict(data: Dict[str, Any]) -> PlanningContract:
     """
     从字典创建 Planning Contract（自动处理版本迁移）。
@@ -469,13 +517,30 @@ def create_contract_from_dict(data: Dict[str, Any]) -> PlanningContract:
     Returns:
         PlanningContract v1.0
     """
+    import logging
+    logger = logging.getLogger("writing.planning_contract")
+    
+    # 1. 先执行版本迁移
     upcasted = ContractUpcaster.upcast(data)
-    return PlanningContract(**upcasted)
-
-
-# ============================================================================
-# 兼容性：保留旧字段名作为别名（逐步废弃）
-# ============================================================================
-
-# 注意：以下别名仅为迁移期间使用，最终将移除
-# PlanningContract 不再包含 project 或 representation 字段
+    
+    # 2. 修复：显式保留 scene_spec（v2.1 新增字段）
+    scene_spec = data.get("scene_spec")
+    if scene_spec is not None:
+        # scene_spec 可能已经在 upcasted 中，也可能没有
+        # 直接覆盖确保存在
+        upcasted["scene_spec"] = scene_spec
+        logger.info(f"✅ create_contract_from_dict: 保留 scene_spec (function={scene_spec.get('narrative_function', 'unknown')})")
+    else:
+        # 如果 upcasted 中有 scene_spec 但原始数据没有，保留 upcasted 的
+        # 实际上 upcast 不会生成 scene_spec，所以这不会发生
+        pass
+    
+    # 3. 构建 Contract
+    try:
+        contract = PlanningContract(**upcasted)
+        if contract.scene_spec:
+            logger.info(f"✅ PlanningContract 包含 scene_spec: {contract.scene_spec.narrative_function}")
+        return contract
+    except Exception as e:
+        logger.error(f"❌ PlanningContract 构建失败: {e}")
+        raise

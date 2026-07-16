@@ -1,0 +1,35 @@
+Scene: pair_10_C2_rep02
+Condition: C2
+Repeat: 2
+EntryLocation: 药园
+============================================================
+
+晨光透过丹房棂窗，在青石药台上割出细长阴影。林逸指尖抚过血灵芝锯齿状的叶缘，药香裹着腐臭钻入鼻腔，像被毒蛇缠住咽喉。他屈膝查看根部切口，半透明的汁液正渗出诡异黑斑，与三日前灵田异动时土壤留下的痕迹如出一辙。石壁凉意顺着脊背攀爬，他后退半步，靴底碾碎几粒干枯的夜交藤，腐臭骤然浓烈。丹房深处传来陶罐碰撞的闷响，他握紧腰间药杵，发现所有盛放灵药的瓷瓶都在朝向灵田的方向微微震颤。
+
+============================================================
+Events: [
+  {
+    "type": "sensory_detail",
+    "elements": [
+      "药香",
+      "腐臭味",
+      "石壁凉意"
+    ]
+  },
+  {
+    "type": "emotional_arc",
+    "phases": [
+      "curiosity_about_blood_ginseng",
+      "alertness_to_black_spots",
+      "unease_from_aura_vibration"
+    ]
+  },
+  {
+    "type": "plot_progression",
+    "points": [
+      "inspect_root",
+      "discover_correlation",
+      "decide_to_investigate"
+    ]
+  }
+]

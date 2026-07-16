@@ -1,0 +1,37 @@
+Scene: pair_06_C4_rep00
+Condition: C4
+Repeat: 0
+EntryLocation: 擂台
+============================================================
+
+林逸的指尖碾过石缝里的青苔，河面浮光在暮色中碎成点点金砂。他数着第三十七片涟漪消散时，掌心还残留着竹剑刺空的灼烧感。对战录像在脑内循环播放，对手袖口掠过的弧线总在第0.3秒出现偏差——就像此刻河湾处突然打旋的水流，看似随意实则暗藏涡流。
+
+晚风裹挟着野薄荷的清凉漫过肩头，他仰头望着最后一线霞光在芦苇丛中明灭。战术笔记本被水汽洇开的墨迹提醒着他，连续七天在同一时刻出现的预判失误，像河底盘踞的暗礁。
+
+当萤火虫从菖蒲丛中升起时，林逸将石子掷向对岸。溅起的水花在暮色里划出新月弧线，浸透汗水的笔记本上，红色记号笔正在第八页勾勒出全新的轨迹。
+
+============================================================
+Events: [
+  {
+    "type": "environmental_detail",
+    "elements": [
+      "riverbank",
+      "sunset",
+      "water_ripples",
+      "herb_scent",
+      "evening_breeze"
+    ]
+  },
+  {
+    "type": "emotional_shift",
+    "sequence": [
+      "frustration_from_training_failure",
+      "contemplative_analysis",
+      "resolute_planning"
+    ]
+  },
+  {
+    "type": "narrative_function",
+    "role": "transition_with_reflection"
+  }
+]

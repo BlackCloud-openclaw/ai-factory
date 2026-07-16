@@ -1,0 +1,1184 @@
+{
+  "oracle_version": "v1.0",
+  "compiler_version": "2.0",
+  "renderer_version": "1.0",
+  "timestamp": "2026-07-14T14:02:49.161346",
+  "pca": 1.0,
+  "avg_outcome": 0.6226666666666666,
+  "validation_results": [
+    {
+      "scene": "reunion",
+      "tr": 0.33,
+      "oracle": "adaptive",
+      "selected": "adaptive",
+      "is_correct": true,
+      "confidence": 0.9525,
+      "margin": 0.1925
+    },
+    {
+      "scene": "ethical",
+      "tr": 0.71,
+      "oracle": "conservative",
+      "selected": "conservative",
+      "is_correct": true,
+      "confidence": 0.81,
+      "margin": 0.0475000000000001
+    },
+    {
+      "scene": "social",
+      "tr": 0.86,
+      "oracle": "conservative",
+      "selected": "conservative",
+      "is_correct": true,
+      "confidence": 0.905,
+      "margin": 0.28500000000000003
+    }
+  ],
+  "outcome_scores": [
+    {
+      "scene": "reunion",
+      "avg_outcome": 0.6499999999999999,
+      "samples": 5
+    },
+    {
+      "scene": "ethical",
+      "avg_outcome": 0.633,
+      "samples": 5
+    },
+    {
+      "scene": "social",
+      "avg_outcome": 0.585,
+      "samples": 5
+    }
+  ],
+  "artifacts": [
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T13:47:05.012880",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "reunion"
+      },
+      "scene_analysis": {
+        "tr": 0.33,
+        "prediction_plasticity": 0.6699999999999999,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "adaptive",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.715,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.9525,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.76,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "assist",
+          "realization": "enhanced",
+          "policy_type": "adaptive"
+        },
+        "confidence": 0.9525,
+        "margin": 0.1925,
+        "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.71, Adaptive=0.95, Aggressive=0.76"
+      },
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸抬起头，看见一个熟悉的身影站在不远处。那人背对着月光，轮廓模糊，但他绝不会认错——那是十年前消失的师兄。两人之间隔着十几步，谁也没有先开口。夜风从两人之间穿过，吹动衣角。\n\n【状态信息】\n林逸想起师兄失踪前曾留给他一封密信，信中暗示自己要去调查宗门内部的一个秘密。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 可辅助事件选择，但不强制改变。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何...",
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (密信, 秘密) 成为推理依据",
+        "justification": [
+          "truth"
+        ],
+        "construction": "对抗型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T13:47:05.012941",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "reunion"
+      },
+      "scene_analysis": {
+        "tr": 0.33,
+        "prediction_plasticity": 0.6699999999999999,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "adaptive",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.715,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.9525,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.76,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "assist",
+          "realization": "enhanced",
+          "policy_type": "adaptive"
+        },
+        "confidence": 0.9525,
+        "margin": 0.1925,
+        "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.71, Adaptive=0.95, Aggressive=0.76"
+      },
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸抬起头，看见一个熟悉的身影站在不远处。那人背对着月光，轮廓模糊，但他绝不会认错——那是十年前消失的师兄。两人之间隔着十几步，谁也没有先开口。夜风从两人之间穿过，吹动衣角。\n\n【状态信息】\n林逸想起师兄失踪前曾留给他一封密信，信中暗示自己要去调查宗门内部的一个秘密。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 可辅助事件选择，但不强制改变。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何...",
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "B",
+        "prediction_confidence": 0.5,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "other"
+        ],
+        "construction": "社交型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T13:47:05.013046",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "reunion"
+      },
+      "scene_analysis": {
+        "tr": 0.33,
+        "prediction_plasticity": 0.6699999999999999,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "adaptive",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.715,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.9525,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.76,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "assist",
+          "realization": "enhanced",
+          "policy_type": "adaptive"
+        },
+        "confidence": 0.9525,
+        "margin": 0.1925,
+        "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.71, Adaptive=0.95, Aggressive=0.76"
+      },
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸抬起头，看见一个熟悉的身影站在不远处。那人背对着月光，轮廓模糊，但他绝不会认错——那是十年前消失的师兄。两人之间隔着十几步，谁也没有先开口。夜风从两人之间穿过，吹动衣角。\n\n【状态信息】\n林逸想起师兄失踪前曾留给他一封密信，信中暗示自己要去调查宗门内部的一个秘密。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 可辅助事件选择，但不强制改变。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何...",
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "B",
+        "prediction_confidence": 0.5,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (密信) 成为推理依据",
+        "justification": [
+          "truth"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T13:47:05.013077",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "reunion"
+      },
+      "scene_analysis": {
+        "tr": 0.33,
+        "prediction_plasticity": 0.6699999999999999,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "adaptive",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.715,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.9525,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.76,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "assist",
+          "realization": "enhanced",
+          "policy_type": "adaptive"
+        },
+        "confidence": 0.9525,
+        "margin": 0.1925,
+        "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.71, Adaptive=0.95, Aggressive=0.76"
+      },
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸抬起头，看见一个熟悉的身影站在不远处。那人背对着月光，轮廓模糊，但他绝不会认错——那是十年前消失的师兄。两人之间隔着十几步，谁也没有先开口。夜风从两人之间穿过，吹动衣角。\n\n【状态信息】\n林逸想起师兄失踪前曾留给他一封密信，信中暗示自己要去调查宗门内部的一个秘密。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 可辅助事件选择，但不强制改变。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何...",
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (密信) 成为推理依据",
+        "justification": [
+          "truth"
+        ],
+        "construction": "对抗型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T13:47:05.013095",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "reunion"
+      },
+      "scene_analysis": {
+        "tr": 0.33,
+        "prediction_plasticity": 0.6699999999999999,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "adaptive",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.715,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.9525,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.76,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "assist",
+          "realization": "enhanced",
+          "policy_type": "adaptive"
+        },
+        "confidence": 0.9525,
+        "margin": 0.1925,
+        "rationale": "TR=0.33, source=measured; TR 来自实验测量值（置信度高）; TR 低（<0.40），Prediction 空间充足，选择自适应策略; 策略分数: Conservative=0.71, Adaptive=0.95, Aggressive=0.76"
+      },
+      "layer_targets": {
+        "prediction": "assist",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸抬起头，看见一个熟悉的身影站在不远处。那人背对着月光，轮廓模糊，但他绝不会认错——那是十年前消失的师兄。两人之间隔着十几步，谁也没有先开口。夜风从两人之间穿过，吹动衣角。\n\n【状态信息】\n林逸想起师兄失踪前曾留给他一封密信，信中暗示自己要去调查宗门内部的一个秘密。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 可辅助事件选择，但不强制改变。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何...",
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (密信) 成为推理依据",
+        "justification": [
+          "other"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T13:54:49.849982",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "ethical"
+      },
+      "scene_analysis": {
+        "tr": 0.71,
+        "prediction_plasticity": 0.29000000000000004,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.81,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.7625,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.33249999999999996,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.81,
+        "margin": 0.0475000000000001,
+        "rationale": "TR=0.71, source=measured; TR 来自实验测量值（置信度高）; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.81, Adaptive=0.76, Aggressive=0.33"
+      },
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸站在岔路口，左边的路通向宗门，右边的路通向禁地。师父交代的任务是三天内返回宗门复命，但禁地方向隐约传来异样的灵力波动。他停下脚步，望着两条路。\n\n【状态信息】\n禁地方向的灵力波动与林逸一直在追查的某个秘密高度相关。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 不得改变已选定的事件。事件走向已经锁定。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何解释或元评论\n5. 只输出续写的正文，不...",
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (密信) 成为推理依据",
+        "justification": [
+          "time"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T13:54:49.850030",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "ethical"
+      },
+      "scene_analysis": {
+        "tr": 0.71,
+        "prediction_plasticity": 0.29000000000000004,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.81,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.7625,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.33249999999999996,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.81,
+        "margin": 0.0475000000000001,
+        "rationale": "TR=0.71, source=measured; TR 来自实验测量值（置信度高）; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.81, Adaptive=0.76, Aggressive=0.33"
+      },
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸站在岔路口，左边的路通向宗门，右边的路通向禁地。师父交代的任务是三天内返回宗门复命，但禁地方向隐约传来异样的灵力波动。他停下脚步，望着两条路。\n\n【状态信息】\n禁地方向的灵力波动与林逸一直在追查的某个秘密高度相关。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 不得改变已选定的事件。事件走向已经锁定。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何解释或元评论\n5. 只输出续写的正文，不...",
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "time"
+        ],
+        "construction": "对抗型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T13:54:49.850068",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "ethical"
+      },
+      "scene_analysis": {
+        "tr": 0.71,
+        "prediction_plasticity": 0.29000000000000004,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.81,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.7625,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.33249999999999996,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.81,
+        "margin": 0.0475000000000001,
+        "rationale": "TR=0.71, source=measured; TR 来自实验测量值（置信度高）; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.81, Adaptive=0.76, Aggressive=0.33"
+      },
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸站在岔路口，左边的路通向宗门，右边的路通向禁地。师父交代的任务是三天内返回宗门复命，但禁地方向隐约传来异样的灵力波动。他停下脚步，望着两条路。\n\n【状态信息】\n禁地方向的灵力波动与林逸一直在追查的某个秘密高度相关。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 不得改变已选定的事件。事件走向已经锁定。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何解释或元评论\n5. 只输出续写的正文，不...",
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "truth",
+          "time"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T13:54:49.850103",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "ethical"
+      },
+      "scene_analysis": {
+        "tr": 0.71,
+        "prediction_plasticity": 0.29000000000000004,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.81,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.7625,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.33249999999999996,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.81,
+        "margin": 0.0475000000000001,
+        "rationale": "TR=0.71, source=measured; TR 来自实验测量值（置信度高）; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.81, Adaptive=0.76, Aggressive=0.33"
+      },
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸站在岔路口，左边的路通向宗门，右边的路通向禁地。师父交代的任务是三天内返回宗门复命，但禁地方向隐约传来异样的灵力波动。他停下脚步，望着两条路。\n\n【状态信息】\n禁地方向的灵力波动与林逸一直在追查的某个秘密高度相关。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 不得改变已选定的事件。事件走向已经锁定。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何解释或元评论\n5. 只输出续写的正文，不...",
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (秘密) 成为推理依据",
+        "justification": [
+          "duty",
+          "truth",
+          "time"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T13:54:49.850134",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "ethical"
+      },
+      "scene_analysis": {
+        "tr": 0.71,
+        "prediction_plasticity": 0.29000000000000004,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.81,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.7625,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.33249999999999996,
+            "blocked": false,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.81,
+        "margin": 0.0475000000000001,
+        "rationale": "TR=0.71, source=measured; TR 来自实验测量值（置信度高）; TR 中等（0.65-0.85），Prediction 有一定空间，保守策略更安全; 策略分数: Conservative=0.81, Adaptive=0.76, Aggressive=0.33"
+      },
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸站在岔路口，左边的路通向宗门，右边的路通向禁地。师父交代的任务是三天内返回宗门复命，但禁地方向隐约传来异样的灵力波动。他停下脚步，望着两条路。\n\n【状态信息】\n禁地方向的灵力波动与林逸一直在追查的某个秘密高度相关。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 不得改变已选定的事件。事件走向已经锁定。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何解释或元评论\n5. 只输出续写的正文，不...",
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (秘密) 成为推理依据",
+        "justification": [
+          "truth"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T14:02:49.161106",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "social"
+      },
+      "scene_analysis": {
+        "tr": 0.86,
+        "prediction_plasticity": 0.14,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.905,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.62,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.095,
+            "blocked": true,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.905,
+        "margin": 0.28500000000000003,
+        "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+      },
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸转身踏出议事堂门槛，晚风裹着青草气扑面而来。身后传来管事的茶杯碎裂声，他没有回头，沿着石阶朝外走去。脚步在青石板上发出清脆的回响，石阶尽头分出三条路。\n\n【状态信息】\n林逸知道管事的背后另有主使，而这个人很可能就在宗门高层之中。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 不得改变已选定的事件。事件走向已经锁定。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何解释或元评论\n5. 只输出...",
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "B",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "time"
+        ],
+        "construction": "混合型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T14:02:49.161143",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "social"
+      },
+      "scene_analysis": {
+        "tr": 0.86,
+        "prediction_plasticity": 0.14,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.905,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.62,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.095,
+            "blocked": true,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.905,
+        "margin": 0.28500000000000003,
+        "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+      },
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸转身踏出议事堂门槛，晚风裹着青草气扑面而来。身后传来管事的茶杯碎裂声，他没有回头，沿着石阶朝外走去。脚步在青石板上发出清脆的回响，石阶尽头分出三条路。\n\n【状态信息】\n林逸知道管事的背后另有主使，而这个人很可能就在宗门高层之中。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 不得改变已选定的事件。事件走向已经锁定。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何解释或元评论\n5. 只输出...",
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "B",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (高层) 成为推理依据",
+        "justification": [
+          "time"
+        ],
+        "construction": "对抗型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T14:02:49.161164",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "social"
+      },
+      "scene_analysis": {
+        "tr": 0.86,
+        "prediction_plasticity": 0.14,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.905,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.62,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.095,
+            "blocked": true,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.905,
+        "margin": 0.28500000000000003,
+        "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+      },
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸转身踏出议事堂门槛，晚风裹着青草气扑面而来。身后传来管事的茶杯碎裂声，他没有回头，沿着石阶朝外走去。脚步在青石板上发出清脆的回响，石阶尽头分出三条路。\n\n【状态信息】\n林逸知道管事的背后另有主使，而这个人很可能就在宗门高层之中。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 不得改变已选定的事件。事件走向已经锁定。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何解释或元评论\n5. 只输出...",
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (管事的) 成为推理依据",
+        "justification": [
+          "other"
+        ],
+        "construction": "对抗型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T14:02:49.161177",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "social"
+      },
+      "scene_analysis": {
+        "tr": 0.86,
+        "prediction_plasticity": 0.14,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.905,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.62,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.095,
+            "blocked": true,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.905,
+        "margin": 0.28500000000000003,
+        "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+      },
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸转身踏出议事堂门槛，晚风裹着青草气扑面而来。身后传来管事的茶杯碎裂声，他没有回头，沿着石阶朝外走去。脚步在青石板上发出清脆的回响，石阶尽头分出三条路。\n\n【状态信息】\n林逸知道管事的背后另有主使，而这个人很可能就在宗门高层之中。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 不得改变已选定的事件。事件走向已经锁定。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何解释或元评论\n5. 只输出...",
+      "execution": {
+        "instruction_fidelity": 0.5,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.425,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "ignored",
+        "reasoning_evidence": "State 信息未出现在文本中",
+        "justification": [
+          "time"
+        ],
+        "construction": "对抗型叙事"
+      }
+    },
+    {
+      "metadata": {
+        "artifact_version": "1.2",
+        "oracle_version": "v1.0",
+        "generated_at": "2026-07-14T14:02:49.161193",
+        "model_name": "Qwen3-32B-Q5_K_M",
+        "scene_id": "social"
+      },
+      "scene_analysis": {
+        "tr": 0.86,
+        "prediction_plasticity": 0.14,
+        "source": "measured",
+        "confidence": 0.9,
+        "state_type": "exploration",
+        "features": {},
+        "reason": "来自 TR 测量实验"
+      },
+      "router_decision": {
+        "selected_policy": "conservative",
+        "candidate_scores": [
+          {
+            "policy": "conservative",
+            "score": 0.905,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "adaptive",
+            "score": 0.62,
+            "blocked": false,
+            "reason": null
+          },
+          {
+            "policy": "aggressive",
+            "score": 0.095,
+            "blocked": true,
+            "reason": null
+          }
+        ],
+        "policy_config": {
+          "prediction": "disabled",
+          "realization": "enhanced",
+          "policy_type": "conservative"
+        },
+        "confidence": 0.905,
+        "margin": 0.28500000000000003,
+        "rationale": "TR=0.86, source=measured; TR 来自实验测量值（置信度高）; TR 较高（≥0.85），Prediction 空间有限，选择保守策略; 策略分数: Conservative=0.91, Adaptive=0.62, Aggressive=0.10"
+      },
+      "layer_targets": {
+        "prediction": "fixed",
+        "reasoning": "enhanced",
+        "justification": "enhanced",
+        "construction": "enhanced"
+      },
+      "prompt": "你是一位小说作者。请根据以下场景开头，续写一段场景正文（300-500字）。\n\n【场景开头】\n林逸转身踏出议事堂门槛，晚风裹着青草气扑面而来。身后传来管事的茶杯碎裂声，他没有回头，沿着石阶朝外走去。脚步在青石板上发出清脆的回响，石阶尽头分出三条路。\n\n【状态信息】\n林逸知道管事的背后另有主使，而这个人很可能就在宗门高层之中。\n\n【分层控制目标 - 必须遵守】\n\nL1 - Prediction（事件选择）：\nState 不得改变已选定的事件。事件走向已经锁定。\n\nL2 - Reasoning（角色推理）：\nState 必须出现在角色的推理过程中，解释为什么选择这个事件是合理的。\n\nL3 - Justification（决策理由）：\nState 必须成为决策理由的一部分。\n\nL4 - Construction（叙事实现）：\nState 必须影响叙事实现的方式。\n\n【续写要求】\n请从以上场景继续，写一段林逸做出决定的场景。\n\n写作要求：\n1. 保持与开头一致的第三人称叙述风格\n2. 必须体现角色形成决策的思考过程\n3. 结尾必须出现明确的行动倾向\n4. 不要添加任何解释或元评论\n5. 只输出...",
+      "execution": {
+        "instruction_fidelity": 0.85,
+        "scene_compatibility": 0.85,
+        "execution_fidelity": 0.7224999999999999,
+        "retry_count": 0,
+        "retry_success": true,
+        "execution_time": 0.0,
+        "raw_reason": null
+      },
+      "propagation": {
+        "prediction": "A",
+        "prediction_confidence": 0.9,
+        "reasoning": "integrated",
+        "reasoning_evidence": "State 信息 (管事的) 成为推理依据",
+        "justification": [
+          "truth"
+        ],
+        "construction": "对抗型叙事"
+      }
+    }
+  ]
+}

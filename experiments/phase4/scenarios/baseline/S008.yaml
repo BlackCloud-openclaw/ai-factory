@@ -1,0 +1,43 @@
+# experiments/phase4/scenarios/baseline/S008.yaml
+scene_id: "S008"
+narrative_function: "reveal_truth"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "深入地宫，寻找典籍"
+  conflict: "地宫中的机关与封印"
+  expected_outcome: "发现宗门创派秘辛"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "深入地宫，触碰符纸"
+    - id: U2
+      label: action
+      description: "铜锈机关开启"
+    - id: U3
+      label: action
+      description: "发现宗门秘辛典籍"
+
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "地宫秘辛"
+      value: true
+
+interventions:
+  world:
+    location: "地宫"
+    time: "无光"
+    atmosphere: "压抑，黑暗厚重"
+    sensory: ["符纸", "铜锈", "土腥"]
+  reader_emotion:
+    begin: "平静"
+    middle: "震撼"
+    end: "决意"
+  narrative_function: "reveal_truth"
+  pov: "林逸"

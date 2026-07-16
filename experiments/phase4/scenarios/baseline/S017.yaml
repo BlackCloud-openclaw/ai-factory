@@ -1,0 +1,46 @@
+# experiments/phase4/scenarios/baseline/S017.yaml
+scene_id: "S017"
+narrative_function: "introduce_mystery"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "医馆探病，发现怪症"
+  conflict: "病人的症状与灵田枯竭相似"
+  expected_outcome: "怀疑与药园异动有关"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "医馆探病"
+    - id: U2
+      label: action
+      description: "发现症状与灵田枯竭相似"
+    - id: U3
+      label: action
+      description: "怀疑药园异动传染"
+
+observables:
+  state_changes:
+    - type: location
+      actor: "林逸"
+      location: "医馆"
+    - type: plot_flag
+      name: "怪症关联"
+      value: true
+
+interventions:
+  world:
+    location: "医馆"
+    time: "午后"
+    atmosphere: "药香混杂，压抑"
+    sensory: ["药香", "哀声", "药渣"]
+  reader_emotion:
+    begin: "忧虑"
+    middle: "惊讶"
+    end: "怀疑"
+  narrative_function: "introduce_mystery"
+  pov: "林逸"

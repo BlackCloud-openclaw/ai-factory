@@ -1,0 +1,55 @@
+Scene: pair_05_C2_rep00
+Condition: C2
+Repeat: 0
+EntryLocation: 议事堂
+============================================================
+
+林逸的拳头重重砸在山道边的松树上，树皮裂开一道细纹。他大口喘着气，黄昏的风裹挟青草碎屑灌进领口，像无数根细针在皮肤上划出褶皱。'你根本不在乎真相！'三个小时前的怒吼突然在耳膜炸开，他踉跄着扶住滚烫的岩石，指节在粗糙岩面摩挲出沙沙声。归鸟掠过苍青色山脊时，他忽然停住动作——风里混着腐叶气息，和实验室烧杯打翻那晚如出一辙。深呼吸间，草木清香渗入肺泡，将胸腔里灼烧的火苗浇成氤氲雾气。他摸出皱巴巴的笔记本，铅笔划过'磷化反应'字样，在暮色中勾勒出新的折线。最后一只山雀消失在远天时，林逸把帆布包甩上肩，靴底碾碎枯枝的脆响惊醒了整条山道。
+
+============================================================
+Events: [
+  {
+    "type": "environmental_detail",
+    "element": "山道"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "黄昏"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "风声"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "青草"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "归鸟"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "anger"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "calm"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "resolve"
+  },
+  {
+    "type": "transition_action",
+    "movement": "沿山道前行"
+  },
+  {
+    "type": "memory_trigger",
+    "content": "争吵内容"
+  },
+  {
+    "type": "mental_adjustment",
+    "outcome": "坚定决心"
+  }
+]

@@ -1,0 +1,11 @@
+Scene: S001
+Condition: isolation_world_fixed_emotion_curious
+Repetition: 1
+Timestamp: 20260707_144621
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

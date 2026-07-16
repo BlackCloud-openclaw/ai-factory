@@ -1,0 +1,56 @@
+Scene: S005
+Condition: isolation_world_fixed_emotion_curious
+Repetition: 1
+Timestamp: 20260707_195110
+============================================================
+
+林逸推开议事堂的木门时，暮色正沿着山道流淌。他踩着青石台阶往下走，草叶间凝结的露水沾湿了布鞋，药园特有的苦涩香气混着薄雾缠绕在衣袖上。
+
+山风忽然卷起几片银杏叶，掠过他腰间的药篓。三只白鹭从远处的当归丛中惊起，羽翼拍碎暮光时，他下意识按住了怀中的玉简——那截刻着裂纹的青玉还带着余温，却烫不透掌心凝结的冷汗。
+
+崖边的石斛在风里摇晃，细碎的紫花像悬在半空的血珠。林逸望着归巢的鸟群掠过山脊，喉间那句未问出口的话化作露水坠落在衣襟上。暮色渐浓处，他听见自己的脚步声与远处的捣药声重叠，却分不清哪一缕药香里裹着血竭的腥甜。
+
+============================================================
+Events: [
+  {
+    "type": "environment_change",
+    "element": "暮色流淌"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "露水沾湿布鞋"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "药香缠绕衣袖"
+  },
+  {
+    "type": "character_action",
+    "element": "按住玉简"
+  },
+  {
+    "type": "emotional_shift",
+    "element": "冷汗凝结"
+  },
+  {
+    "type": "environment_change",
+    "element": "山风卷叶"
+  },
+  {
+    "type": "symbolic_moment",
+    "element": "白鹭惊起"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "石斛紫花摇晃"
+  },
+  {
+    "type": "emotional_shift",
+    "element": "未问出口的话语"
+  },
+  {
+    "type": "atmospheric_tension",
+    "element": "药香裹血竭"
+  }
+]
+Segments: 2, Succeeded: 1

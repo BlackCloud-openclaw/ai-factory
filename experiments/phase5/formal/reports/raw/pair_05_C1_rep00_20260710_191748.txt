@@ -1,0 +1,45 @@
+Scene: pair_05_C1_rep00
+Condition: C1
+Repeat: 0
+EntryLocation: 议事堂
+============================================================
+
+林逸的登山靴碾过碎石，在暮色中扬起草屑。他猛地踢开半截枯枝，山风立刻卷着青草气灌进领口。方才的争吵在耳膜里嗡嗡震颤——'你永远只会按自己的逻辑推演'——此刻被呼啸的山风撕成碎片。
+
+海拔渐高的坡道让呼吸变得绵长，林逸扶着崖边老松压下怒意。归鸟群掠过绛紫色天际时，他忽然注意到岩缝里半埋的青铜残片。指腹摩挲过铭文纹路，掌心沁出的汗珠坠入石隙，惊醒了蜷缩在苔藓间的红腹螳螂。
+
+暮色漫过第七道山弯时，他解开帆布包系带。风卷着草木气息灌进半开的包裹，混着松脂与汗水的气息，在衣摆扬起的褶皱里沉淀成某种笃定。林逸将指南针卡回原位，鞋尖挑起块卵石，朝着山影最浓处掷去。
+
+============================================================
+Events: [
+  {
+    "type": "environmental_detail",
+    "elements": [
+      "mountain_path",
+      "dusk",
+      "wind",
+      "grass_scent",
+      "returning_birds"
+    ]
+  },
+  {
+    "type": "emotional_arc",
+    "phases": [
+      "anger",
+      "calm",
+      "resolve"
+    ]
+  },
+  {
+    "type": "narrative_function",
+    "role": "transition_with_rhythm"
+  },
+  {
+    "type": "sensory_immersion",
+    "modalities": [
+      "touch_wind_on_neck",
+      "smell_grass_resin",
+      "sound_bird_flight"
+    ]
+  }
+]

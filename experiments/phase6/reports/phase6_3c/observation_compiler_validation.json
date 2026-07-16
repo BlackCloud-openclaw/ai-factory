@@ -1,0 +1,145 @@
+{
+  "reunion_low": {
+    "hash": "2ef2d39436193f81",
+    "sentences": 19,
+    "patterns": 6,
+    "pattern_types": [
+      "logic_marker",
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "well_discovery": {
+    "hash": "2f68ac3fc9b285b4",
+    "sentences": 5,
+    "patterns": 6,
+    "pattern_types": [
+      "logic_marker",
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "temple_reunion": {
+    "hash": "558401c5dcc99ea0",
+    "sentences": 12,
+    "patterns": 2,
+    "pattern_types": [
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "ethical_dilemma": {
+    "hash": "f4d08da0af4dde24",
+    "sentences": 19,
+    "patterns": 2,
+    "pattern_types": [
+      "logic_marker",
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "secret_letter": {
+    "hash": "d1b29170335b81fe",
+    "sentences": 18,
+    "patterns": 8,
+    "pattern_types": [
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "old_man": {
+    "hash": "8c8ac15f92b23afc",
+    "sentences": 24,
+    "patterns": 8,
+    "pattern_types": [
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "library_mystery": {
+    "hash": "1df6d1626d78d473",
+    "sentences": 15,
+    "patterns": 4,
+    "pattern_types": [
+      "logic_marker",
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "field_anomaly": {
+    "hash": "049f60024da3e06d",
+    "sentences": 17,
+    "patterns": 0,
+    "pattern_types": [],
+    "valid": true,
+    "issues": []
+  },
+  "social_conflict": {
+    "hash": "0ab78783508696d3",
+    "sentences": 14,
+    "patterns": 1,
+    "pattern_types": [
+      "logic_marker"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "battle_aftermath": {
+    "hash": "36fd4554a9296612",
+    "sentences": 22,
+    "patterns": 8,
+    "pattern_types": [
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "night_raid": {
+    "hash": "f04c347bab46f602",
+    "sentences": 20,
+    "patterns": 5,
+    "pattern_types": [
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "market_rumor": {
+    "hash": "66bc65625c0636ff",
+    "sentences": 13,
+    "patterns": 3,
+    "pattern_types": [
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "meditation_interrupt": {
+    "hash": "81bb1cabb06ea788",
+    "sentences": 12,
+    "patterns": 2,
+    "pattern_types": [
+      "logic_marker",
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  },
+  "emergency_summon": {
+    "hash": "dc162d886e3bf688",
+    "sentences": 17,
+    "patterns": 6,
+    "pattern_types": [
+      "state_keyword"
+    ],
+    "valid": true,
+    "issues": []
+  }
+}

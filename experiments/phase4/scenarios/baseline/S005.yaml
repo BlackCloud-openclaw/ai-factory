@@ -1,0 +1,43 @@
+# experiments/phase4/scenarios/baseline/S005.yaml
+scene_id: "S005"
+narrative_function: "transition"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "离开议事堂，沿山道返回"
+  conflict: "心中有事，但表面平静"
+  expected_outcome: "在归途中调整心境"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "林逸走出议事堂，踏上黄昏山道"
+    - id: U2
+      label: action
+      description: "晚风吹拂，思绪翻涌"
+    - id: U3
+      label: action
+      description: "见到归鸟回巢，心境平和"
+
+observables:
+  state_changes:
+    - type: location
+      actor: "林逸"
+      location: "山道"
+
+interventions:
+  world:
+    location: "山道"
+    time: "黄昏"
+    atmosphere: "开阔，晚风微凉"
+    sensory: ["风声", "青草", "归鸟"]
+  reader_emotion:
+    begin: "平静"
+    middle: "期待"
+    end: "平和"
+  narrative_function: "transition"
+  pov: "林逸"

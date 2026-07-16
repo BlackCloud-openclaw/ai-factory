@@ -115,6 +115,9 @@ class AgentState(BaseModel):
     planning_contract: Optional[Dict[str, Any]] = None  # 当前场景的 Planning Contract
     planning_contracts: List[Dict[str, Any]] = Field(default_factory=list)  # 所有场景的 Contracts
 
+    # Runtime Metadata（新增）
+    runtime_metadata: Optional[Dict[str, Any]] = None
+
     def should_retry(self) -> bool:
         return self.retry_count < self.max_retries and self.error is not None
     

@@ -1,0 +1,48 @@
+Scene: pair_06_baseline_rep01
+Condition: baseline
+Repeat: 1
+EntryLocation: None
+============================================================
+
+林逸的拳头砸在河岸青石上，指节泛白。潺潺水声裹着槐花香漫过脚踝，他盯着倒映着晚霞的河面，喉间仍梗着擂台赛失利的苦涩。对战画面在暮色里重播——对手剑锋转向的刹那，自己的招式竟像折断的芦苇般空洞。风突然大了，吹散水面破碎的落花，也掀动他衣襟上未干的墨迹：『气劲不接』四个字被夕阳拉长，在岸边石滩投下蚯蚓般的阴影。他抓起把湿润的河沙，看细沙从指缝坠成金色瀑布，远处传来渔人断续的吟唱。当第七粒沙子落进水面，激起的涟漪惊醒了蜷缩在膝头的竹简，明日辰时开始的晨练计划在暮色中泛着青光。
+
+============================================================
+Events: [
+  {
+    "type": "environment_render",
+    "elements": [
+      "riverbank",
+      "sunset",
+      "water_rustle",
+      "槐花_scent",
+      "evening_wind"
+    ]
+  },
+  {
+    "type": "emotion_arc",
+    "stages": [
+      "frustration",
+      "contemplation",
+      "determination"
+    ]
+  },
+  {
+    "type": "narrative_function",
+    "function": "transition_with_reflection"
+  },
+  {
+    "type": "sensory_detail",
+    "details": [
+      "tactile_grit_of_sand",
+      "visual_ripples",
+      "olfactory_floral"
+    ]
+  },
+  {
+    "type": "plot_progression",
+    "points": [
+      "post-defeat_analysis",
+      "training_plan_formulation"
+    ]
+  }
+]

@@ -1,0 +1,46 @@
+# experiments/phase4/scenarios/baseline/S020.yaml
+scene_id: "S020"
+narrative_function: "transition"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "深夜穿过长廊返回住处"
+  conflict: "长廊尽头有黑影一闪"
+  expected_outcome: "虚惊一场，安全返回"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "深夜穿过长廊"
+    - id: U2
+      label: action
+      description: "穿堂风吹过，黑影闪过"
+    - id: U3
+      label: action
+      description: "发现是虚惊一场"
+
+observables:
+  state_changes:
+    - type: location
+      actor: "林逸"
+      location: "长廊"
+    - type: plot_flag
+      name: "长廊虚惊"
+      value: true
+
+interventions:
+  world:
+    location: "长廊"
+    time: "深夜"
+    atmosphere: "昏暗，穿堂风过"
+    sensory: ["脚步", "穿堂风", "灯影"]
+  reader_emotion:
+    begin: "匆忙"
+    middle: "压抑"
+    end: "轻松"
+  narrative_function: "transition"
+  pov: "林逸"

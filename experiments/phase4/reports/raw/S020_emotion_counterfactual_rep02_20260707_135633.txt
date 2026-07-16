@@ -1,0 +1,11 @@
+Scene: S020
+Condition: emotion_counterfactual
+Repetition: 2
+Timestamp: 20260707_135633
+============================================================
+
+
+
+============================================================
+Events: []
+Segments: 2, Succeeded: 0

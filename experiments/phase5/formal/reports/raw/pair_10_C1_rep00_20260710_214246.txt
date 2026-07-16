@@ -1,0 +1,39 @@
+Scene: pair_10_C1_rep00
+Condition: C1
+Repeat: 0
+EntryLocation: 药园
+============================================================
+
+晨光未破晓，丹房石门在林逸掌心渗出寒意。他俯身端详血灵芝根部时，喉头泛起药香裹着腐臭——石台青苔正沿着经脉状裂纹溃烂。指尖触到菌丝状黑斑的刹那，墙角灵田忽有水声炸开，三株夜交藤同时折断，断口处渗出沥青般黏液。他后退半步，靴底碾碎的枯叶在石缝间发出细碎呻吟，那些黑斑正以肉眼可见的速度顺着石壁蔓延，将晨雾染成铁锈色。
+
+============================================================
+Events: [
+  {
+    "type": "sensory_detail",
+    "element": "石壁凉意"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "药香"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "腐臭味"
+  },
+  {
+    "type": "object_interaction",
+    "element": "检查血灵芝根部"
+  },
+  {
+    "type": "discovery",
+    "element": "异常黑斑"
+  },
+  {
+    "type": "environmental_clue",
+    "element": "灵田异动"
+  },
+  {
+    "type": "decision_making",
+    "element": "决定深入调查"
+  }
+]

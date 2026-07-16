@@ -1,0 +1,47 @@
+Scene: pair_06_C2_rep00
+Condition: C2
+Repeat: 0
+EntryLocation: 擂台
+============================================================
+
+林逸的拳头在膝盖上碾过第三遍，指节压出青白。暮色把河水染成铁锈红，波纹推着败叶打转，像极了他卡顿的剑招。晚风送来野薄荷的凉意，却冲不散鼻腔里残留的血腥气。
+
+他数着对岸芦苇的摆动频率，让呼吸与之同步。水声漫过耳际时，分明听见自己骨骼深处传来裂帛般的钝响——第七式「惊鸿」的力道又偏了半寸。指尖拂过剑鞘上三道新月状划痕，每道都对应着被对手震飞的瞬间。
+
+对岸垂柳突然抖落一串水珠，溅在青石上碎成细雪。林逸猛地绷直脊背，喉间浊气随着甩出的剑鸣绞成丝线。他摸出怀中皱巴巴的竹简，用河滩拾来的鹅卵石压住四角，笔锋拖着未干的墨迹划掉第十七个失误标记。
+
+============================================================
+Events: [
+  {
+    "type": "sensory_detail",
+    "element": "water_sound"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "flower_scent"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "evening_breeze"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "discontent"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "contemplation"
+  },
+  {
+    "type": "emotional_arc",
+    "phase": "resolve"
+  },
+  {
+    "type": "plot_function",
+    "action": "combat_review"
+  },
+  {
+    "type": "plot_function",
+    "action": "plan_formulation"
+  }
+]

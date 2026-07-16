@@ -1,0 +1,47 @@
+Scene: pair_04_C1_rep01
+Condition: C1
+Repeat: 1
+EntryLocation: 古井
+============================================================
+
+烛火劈啪爆开一朵金色花，林逸揉了揉发涩的眼皮，羊皮纸的纤维在火光中泛起毛边。砚台里墨汁泛着松烟气息，狼毫笔尖悬在《云笈七签》的抄本上方三寸，将古井拓片上的符文与‘禁地’二字反复重叠。窗外的月光被飞檐割裂成碎片，他忽然注意到符文末端蜷曲的波纹——与典籍夹页里褪色的舆图标记如出一辙。铜炉升起的沉香在鼻腔凝成实体，当第三处吻合浮现时，书案上的青瓷镇纸竟被冷汗浸出雾气。他抓起烛台照向舆图残卷，指尖悬在标注‘玄冥’的朱砂红点上方，忽有夜风掀动纸页，墨迹在‘永淳二年’的字样上洇开一团阴影。
+
+============================================================
+Events: [
+  {
+    "type": "sensory_detail",
+    "element": "烛火"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "羊皮纸"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "笔墨气息"
+  },
+  {
+    "type": "emotional_shift",
+    "phase": "curiosity"
+  },
+  {
+    "type": "emotional_shift",
+    "phase": "focus"
+  },
+  {
+    "type": "emotional_shift",
+    "phase": "dread"
+  },
+  {
+    "type": "plot_progression",
+    "action": "符文比对"
+  },
+  {
+    "type": "plot_progression",
+    "action": "发现禁地关联"
+  },
+  {
+    "type": "plot_progression",
+    "action": "决定深入调查"
+  }
+]

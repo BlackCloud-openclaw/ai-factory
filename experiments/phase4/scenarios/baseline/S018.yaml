@@ -1,0 +1,43 @@
+# experiments/phase4/scenarios/baseline/S018.yaml
+scene_id: "S018"
+narrative_function: "reveal_truth"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "拜祭先辈，发现隐秘"
+  conflict: "灵位后的暗格封存旧信"
+  expected_outcome: "得知先辈也曾面临同样困境"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "拜祭先辈"
+    - id: U2
+      label: action
+      description: "发现灵位后暗格"
+    - id: U3
+      label: action
+      description: "读旧信得知先辈困境"
+
+observables:
+  state_changes:
+    - type: plot_flag
+      name: "先辈旧信"
+      value: true
+
+interventions:
+  world:
+    location: "祠堂"
+    time: "清晨"
+    atmosphere: "肃穆，香火缭绕"
+    sensory: ["香烛", "旧牌", "灰烬"]
+  reader_emotion:
+    begin: "敬畏"
+    middle: "悲戚"
+    end: "觉悟"
+  narrative_function: "reveal_truth"
+  pov: "林逸"

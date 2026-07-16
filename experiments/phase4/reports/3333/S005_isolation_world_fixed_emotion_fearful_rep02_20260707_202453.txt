@@ -1,0 +1,51 @@
+Scene: S005
+Condition: isolation_world_fixed_emotion_fearful
+Repetition: 2
+Timestamp: 20260707_202453
+============================================================
+
+林逸推开议事堂的门时，暮色正沿着山道爬行。他踩着青石台阶往下走，苔痕在靴底发出黏腻的叹息。西侧天空还残留着最后一缕绛紫色光晕，却照不透盘旋在半山腰的晨雾——那些灰白的絮状物正缓缓漫过他的袍角，将苦艾与当归的气味揉进布料纹路里。
+
+拐过三叠岩时，他停住了。几只灰雀惊惶地从石缝窜出，翅膀拍碎了凝结在忍冬藤上的露水。林逸的手指无意识按住腰间药囊，指节因用力而发白。山风掠过耳际时带着金属的震颤，像是有人用指甲划过青铜编钟。他想起半刻前议事堂深处传来的闷响，那声音裹着血气在石墙内震荡，此刻竟与风声完美重合。
+
+药园的轮廓从雾中浮现时，归鸟群正掠过他的头顶。上百只乌鸦盘旋成漆黑的漩涡，叫声却异常清越，仿佛万千玉片相击。林逸仰起头，看见领头的乌鸦喙间悬着半截朱红绸带——那是议事堂主位的装饰。他感觉喉结被冰棱刺穿，却仍保持着垂目的姿态，直到鸦群没入西边残阳。沾着夜露的柴胡叶在脚下碎裂，青草汁液顺着靴筒渗入皮肤，像某种缓慢的毒药注射。
+
+============================================================
+Events: [
+  {
+    "type": "environmental_detail",
+    "element": "药香"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "晨雾"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "露水"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "fear",
+    "to": "tension"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "tension",
+    "to": "despair"
+  },
+  {
+    "type": "character_action",
+    "description": "踏上黄昏山道"
+  },
+  {
+    "type": "sensory_experience",
+    "modality": "hearing",
+    "detail": "金属震颤的山风"
+  },
+  {
+    "type": "symbolic_appearance",
+    "object": "朱红绸带"
+  }
+]
+Segments: 2, Succeeded: 1

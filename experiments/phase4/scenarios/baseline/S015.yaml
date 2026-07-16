@@ -1,0 +1,46 @@
+# experiments/phase4/scenarios/baseline/S015.yaml
+scene_id: "S015"
+narrative_function: "transition"
+
+temperature: 0.3
+max_tokens: 4096
+writer_model: "Qwen3-32B-Q5_K_M"
+
+intent:
+  goal: "随车队前往下一个地点"
+  conflict: "路上有埋伏迹象"
+  expected_outcome: "有惊无险，抵达"
+
+execution:
+  units:
+    - id: U1
+      label: action
+      description: "随车队出发"
+    - id: U2
+      label: action
+      description: "察觉路边埋伏迹象"
+    - id: U3
+      label: action
+      description: "车队有惊无险通过"
+
+observables:
+  state_changes:
+    - type: location
+      actor: "林逸"
+      location: "车队"
+    - type: plot_flag
+      name: "路上埋伏"
+      value: true
+
+interventions:
+  world:
+    location: "车队"
+    time: "黄昏"
+    atmosphere: "颠簸，尘土漫天"
+    sensory: ["马嘶", "尘土", "鞭声"]
+  reader_emotion:
+    begin: "无聊"
+    middle: "警觉"
+    end: "疲惫"
+  narrative_function: "transition"
+  pov: "林逸"

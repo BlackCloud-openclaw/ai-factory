@@ -1,0 +1,50 @@
+Scene: S005
+Condition: isolation_emotion_fixed_world_temple
+Repetition: 2
+Timestamp: 20260707_220024
+============================================================
+
+祠堂的木门吱呀一声合拢，林逸踩着青石台阶往下走。晨雾像浸了水的棉絮压在肩头，石缝里渗出的露珠沾湿了布鞋。他经过香炉时顿了顿，铜炉里几支残烛将熄未熄，青烟在牌位间游移，灰烬落在写着「林文昭」的旧木牌上——那是祖父的名讳，边角已被虫蛀得斑驳。
+
+山道两侧的蕨草挂着水珠，每走一步都碾碎薄霜。晨风掠过耳际时，他听见自己骨骼里泛起潮声，仿佛有无数未说出口的话在喉头翻滚。转过第三道弯，几只白鹭从松林惊起，羽翼拍散雾气的刹那，他瞥见半山腰某处牌坊的残影，那上面该写着「忠孝传家」四个字吧？
+
+指尖无意识摩挲着腰间玉佩，冰凉的触感让他想起昨夜议事堂里的对峙。石阶在此处变窄，崖边垂落的藤蔓扫过脚踝，他停步将它拨正，却发现掌纹里粘着一缕暗红丝线。风突然转了向，送来腐叶与香灰混杂的气息，远处传来归鸟啄食竹粟的脆响，可当他仰头望去，只看见雾霭深处几粒游移的黑点，像谁刻意撒下的墨渣。
+
+============================================================
+Events: [
+  {
+    "type": "environmental_detail",
+    "element": "香烛"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "旧牌"
+  },
+  {
+    "type": "environmental_detail",
+    "element": "灰烬"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "curiosity",
+    "to": "confusion"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "confusion",
+    "to": "unease"
+  },
+  {
+    "type": "transition_action",
+    "description": "离开祠堂沿山道下行"
+  },
+  {
+    "type": "sensory_trigger",
+    "stimulus": "潮湿雾气与香灰气息"
+  },
+  {
+    "type": "symbolic_element",
+    "object": "暗红丝线"
+  }
+]
+Segments: 2, Succeeded: 1

@@ -1,0 +1,222 @@
+{
+  "pair_01": {
+    "C1": {
+      "winner": "B2",
+      "baseline_len": 287,
+      "cond_len": 329
+    },
+    "C2": {
+      "winner": "B2",
+      "baseline_len": 287,
+      "cond_len": 335
+    },
+    "C3": {
+      "winner": "B2",
+      "baseline_len": 287,
+      "cond_len": 278
+    },
+    "C4": {
+      "winner": "B2",
+      "baseline_len": 287,
+      "cond_len": 286
+    }
+  },
+  "pair_02": {
+    "C1": {
+      "winner": "B2",
+      "baseline_len": 245,
+      "cond_len": 274
+    },
+    "C2": {
+      "winner": "B2",
+      "baseline_len": 245,
+      "cond_len": 156
+    },
+    "C3": {
+      "winner": "B2",
+      "baseline_len": 245,
+      "cond_len": 225
+    },
+    "C4": {
+      "winner": "B2",
+      "baseline_len": 245,
+      "cond_len": 291
+    }
+  },
+  "pair_03": {
+    "C1": {
+      "winner": "B2",
+      "baseline_len": 264,
+      "cond_len": 323
+    },
+    "C2": {
+      "winner": "B2",
+      "baseline_len": 264,
+      "cond_len": 201
+    },
+    "C3": {
+      "winner": "B2",
+      "baseline_len": 264,
+      "cond_len": 282
+    },
+    "C4": {
+      "winner": "B2",
+      "baseline_len": 264,
+      "cond_len": 156
+    }
+  },
+  "pair_04": {
+    "C1": {
+      "winner": "B2",
+      "baseline_len": 219,
+      "cond_len": 255
+    },
+    "C2": {
+      "winner": "B2",
+      "baseline_len": 219,
+      "cond_len": 182
+    },
+    "C3": {
+      "winner": "B2",
+      "baseline_len": 219,
+      "cond_len": 154
+    },
+    "C4": {
+      "winner": "B2",
+      "baseline_len": 219,
+      "cond_len": 142
+    }
+  },
+  "pair_05": {
+    "C1": {
+      "winner": "B2",
+      "baseline_len": 314,
+      "cond_len": 279
+    },
+    "C2": {
+      "winner": "B2",
+      "baseline_len": 314,
+      "cond_len": 266
+    },
+    "C3": {
+      "winner": "B2",
+      "baseline_len": 314,
+      "cond_len": 366
+    },
+    "C4": {
+      "winner": "B2",
+      "baseline_len": 314,
+      "cond_len": 290
+    }
+  },
+  "pair_06": {
+    "C1": {
+      "winner": "B2",
+      "baseline_len": 319,
+      "cond_len": 279
+    },
+    "C2": {
+      "winner": "B2",
+      "baseline_len": 319,
+      "cond_len": 270
+    },
+    "C3": {
+      "winner": "B2",
+      "baseline_len": 319,
+      "cond_len": 313
+    },
+    "C4": {
+      "winner": "B2",
+      "baseline_len": 319,
+      "cond_len": 269
+    }
+  },
+  "pair_07": {
+    "C1": {
+      "winner": "B2",
+      "baseline_len": 217,
+      "cond_len": 275
+    },
+    "C2": {
+      "winner": "B2",
+      "baseline_len": 217,
+      "cond_len": 285
+    },
+    "C3": {
+      "winner": "B2",
+      "baseline_len": 217,
+      "cond_len": 281
+    },
+    "C4": {
+      "winner": "B2",
+      "baseline_len": 217,
+      "cond_len": 213
+    }
+  },
+  "pair_08": {
+    "C1": {
+      "winner": "B2",
+      "baseline_len": 204,
+      "cond_len": 191
+    },
+    "C2": {
+      "winner": "B2",
+      "baseline_len": 204,
+      "cond_len": 299
+    },
+    "C3": {
+      "winner": "B2",
+      "baseline_len": 204,
+      "cond_len": 346
+    },
+    "C4": {
+      "winner": "B2",
+      "baseline_len": 204,
+      "cond_len": 268
+    }
+  },
+  "pair_09": {
+    "C1": {
+      "winner": "B2",
+      "baseline_len": 224,
+      "cond_len": 266
+    },
+    "C2": {
+      "winner": "B2",
+      "baseline_len": 224,
+      "cond_len": 287
+    },
+    "C3": {
+      "winner": "B2",
+      "baseline_len": 224,
+      "cond_len": 334
+    },
+    "C4": {
+      "winner": "B2",
+      "baseline_len": 224,
+      "cond_len": 328
+    }
+  },
+  "pair_10": {
+    "C1": {
+      "winner": "B2",
+      "baseline_len": 174,
+      "cond_len": 157
+    },
+    "C2": {
+      "winner": "B2",
+      "baseline_len": 174,
+      "cond_len": 281
+    },
+    "C3": {
+      "winner": "B2",
+      "baseline_len": 174,
+      "cond_len": 240
+    },
+    "C4": {
+      "winner": "B2",
+      "baseline_len": 174,
+      "cond_len": 328
+    }
+  }
+}

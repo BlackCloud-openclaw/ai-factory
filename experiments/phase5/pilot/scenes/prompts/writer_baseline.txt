@@ -1,0 +1,29 @@
+请写一段场景正文（约 400-600 字）。
+
+【场景总目标】
+目标：{goal}
+冲突：{conflict}
+
+【场景规格】
+地点：{location}
+时间：{time}
+氛围：{atmosphere}
+感官细节：{sensory}
+情绪轨迹：{begin} → {middle} → {end}
+叙事功能：{function}
+视角：{pov}
+
+【本段任务】
+- {execution_unit_1}
+- {execution_unit_2}
+- {execution_unit_3}
+
+【写作要求】
+1. 直接描写上述【场景规格】中的所有元素
+2. 让读者经历【情绪轨迹】的三段式变化
+3. 只从【视角】指定的角色视角描述事件
+4. 不要使用「推进主线剧情」等占位符
+
+【格式】
+{"scene_text": "...", "events": [...]}
+只输出 JSON。

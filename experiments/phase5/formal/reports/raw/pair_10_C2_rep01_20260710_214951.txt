@@ -1,0 +1,45 @@
+Scene: pair_10_C2_rep01
+Condition: C2
+Repeat: 1
+EntryLocation: 药园
+============================================================
+
+晨光从丹房窄窗斜切而入，林逸蹲在血灵芝盆栽前，指尖拂过紫红茎秆时嗅到药香里渗出腐败的甜腻。石壁凉意顺着裤管攀上膝盖，他却腾不出手去抓衣摆——根部切口处正渗出墨色斑点，像被毒液蚀穿的伤口。「又迟了三日...」喉头腥气未散，忽见灵田深处青砖泛起涟漪，几株半枯的何首乌无风自动。他翻身跃下石阶时撞翻药篓，当归与黄连滚落脚边的声响惊得他后颈发紧，丹炉暗格里那卷《地煞经》的残页，此刻竟在记忆里浮出相似的黑斑图纹。
+
+============================================================
+Events: [
+  {
+    "type": "sensory_detail",
+    "element": "药香"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "腐臭味"
+  },
+  {
+    "type": "sensory_detail",
+    "element": "石壁凉意"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "curiosity",
+    "to": "alertness"
+  },
+  {
+    "type": "emotional_shift",
+    "from": "alertness",
+    "to": "unease"
+  },
+  {
+    "type": "transition_action",
+    "content": "检查血灵芝根部"
+  },
+  {
+    "type": "transition_discovery",
+    "content": "异常黑斑与灵田异动关联"
+  },
+  {
+    "type": "decision_point",
+    "action": "深入调查"
+  }
+]
