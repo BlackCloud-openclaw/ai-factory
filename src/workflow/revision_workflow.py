@@ -1,24 +1,20 @@
 # src/workflow/revision_workflow.py
 
 import time
-from typing import Dict, Any, Optional, List, Callable, Awaitable
 import logging
+from typing import Dict, Any, Optional, Callable, Awaitable, Tuple
 
 from src.runtime.observation_compiler import ObservationCompiler
 from src.runtime.validator import Validator
 from src.runtime.edit_compiler import EditCompiler
 from src.runtime.patch_renderer import PatchRenderer
+from src.runtime import RuntimeSnapshot
+from src.runtime.builder import build_default_snapshot  # ✅ 使用 builder 中的 helper
 
 logger = logging.getLogger("workflow.revision")
 
 
 class RevisionWorkflow:
-    """
-    修订工作流 - Phase 6.5
-    职责：编排 Runtime Compiler 和 LLM 调用，执行修订闭环。
-    返回 ExecutionResult（内部对象，非公共 API）。
-    """
-
     def __init__(
         self,
         llm_executor: Optional[Callable[[str], Awaitable[str]]] = None,
@@ -26,6 +22,9 @@ class RevisionWorkflow:
         max_rounds: int = 2,
         compliance_threshold: float = 0.7,
         enable_revision: bool = False,
+        snapshot: Optional[RuntimeSnapshot] = None,
+        surface_ids: Optional[Tuple[str, ...]] = None,
+        cache_snapshot: bool = True,  # ✅ 显式控制缓存
     ):
         self.llm_executor = llm_executor
         self.layer_targets = layer_targets or {
@@ -43,33 +42,61 @@ class RevisionWorkflow:
         self._edit_compiler = EditCompiler()
         self._patch_renderer = PatchRenderer()
 
+        # Phase 7: RuntimeSnapshot
+        self._snapshot = snapshot
+        self._surface_ids = surface_ids or ("reasoning",)
+        self._cache_snapshot = cache_snapshot
+        self._cached_snapshot: Optional[RuntimeSnapshot] = None
+        self._snapshot_built = False
+
+    def _get_snapshot(self) -> RuntimeSnapshot:
+        """获取 RuntimeSnapshot：优先注入，否则延迟构建（支持缓存）"""
+        if self._snapshot is not None:
+            return self._snapshot
+
+        if self._cache_snapshot and self._cached_snapshot is not None:
+            return self._cached_snapshot
+
+        # ✅ 使用 builder 中的统一 helper
+        snapshot = build_default_snapshot(self._surface_ids)
+
+        if self._cache_snapshot:
+            self._cached_snapshot = snapshot
+
+        self._snapshot_built = True
+        logger.info(
+            f"RuntimeSnapshot built: surfaces={snapshot.get_surface_ids()}"
+        )
+        return snapshot
+
     async def execute(self, draft: str) -> Dict[str, Any]:
-        """
-        执行修订闭环，返回 ExecutionResult（内部对象，非公共 API）
-        """
         current_draft = draft
         stages = []
         artifacts: Dict[str, Any] = {}
 
+        snapshot = self._get_snapshot()
+
+        # 仅记录 warning，不 assert
+        if "reasoning" not in snapshot.get_surface_ids():
+            logger.warning(
+                f"Snapshot missing 'reasoning' surface. Available: {snapshot.get_surface_ids()}"
+            )
+
         # ---- Stage 1: Validation ----
         start_time = time.perf_counter()
-        ir = self._obs_compiler.compile(current_draft)
-        report = self._validator.validate(ir, self.layer_targets)
+        ir = self._obs_compiler.compile(current_draft, snapshot)
+        report = self._validator.validate(snapshot, ir)
         compliance = report.overall_compliance
         duration_ms = (time.perf_counter() - start_time) * 1000
 
-        # ---- Phase 6.5.1: 映射 Layer 详情（只做提取，不做推导） ----
         layers = []
         for layer_result in report.layer_results:
-            # 每个 layer_result 可能包含多个 evidence（不同句子）
             for evidence in layer_result.evidence_list:
                 layers.append({
                     "layer": layer_result.layer,
                     "observed": list(evidence.present_patterns),
                     "missing": list(evidence.missing_pattern_types),
-                    # anchor_sentence_id 暂不输出，但已准备好
                 })
-            # 如果该层没有 evidence，但合规，添加一个空记录
             if not layer_result.evidence_list and layer_result.compliant:
                 layers.append({
                     "layer": layer_result.layer,
@@ -88,7 +115,6 @@ class RevisionWorkflow:
         })
         artifacts["validation"] = report
 
-        # 如果合规或未启用修订，直接返回
         if compliance >= self.compliance_threshold or not self.enable_revision:
             return {
                 "final_text": current_draft,
@@ -102,7 +128,9 @@ class RevisionWorkflow:
 
         # ---- Stage 2: Edit Planning ----
         start_time = time.perf_counter()
-        plan = self._edit_compiler.compile(ir, report, diagnosis_id="REV_001")
+        plan = self._edit_compiler.compile_with_snapshot(
+            snapshot, report, current_draft, ir, diagnosis_id="REV_001"
+        )
         action_count = len(plan.actions) if plan else 0
         duration_ms = (time.perf_counter() - start_time) * 1000
 
@@ -192,8 +220,8 @@ class RevisionWorkflow:
 
         # ---- Stage 5: Revalidation ----
         start_time = time.perf_counter()
-        final_ir = self._obs_compiler.compile(current_draft)
-        final_report = self._validator.validate(final_ir, self.layer_targets)
+        final_ir = self._obs_compiler.compile(current_draft, snapshot)
+        final_report = self._validator.validate(snapshot, final_ir)
         final_compliance = final_report.overall_compliance
         duration_ms = (time.perf_counter() - start_time) * 1000
 
@@ -205,7 +233,6 @@ class RevisionWorkflow:
         })
         artifacts["revalidation"] = final_report
 
-        # 返回最终结果
         return {
             "final_text": current_draft,
             "compliance": final_compliance,

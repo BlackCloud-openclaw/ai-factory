@@ -3,7 +3,7 @@ RuntimeBuilder - 组合层（Composition Layer）
 负责 resolve → order → freeze → snapshot
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 import uuid
 
@@ -11,6 +11,7 @@ from src.runtime.catalog import SurfaceCatalog
 from src.runtime.snapshot import RuntimeSnapshot, RuntimeConfig, RuntimeMetrics
 from src.runtime.exceptions import UnknownSurfaceError, SnapshotBuildError
 from src.surfaces.definition import SurfaceDefinition
+from src.runtime.registry import SurfaceRegistry
 
 
 class RuntimeBuilder:
@@ -155,3 +156,18 @@ class RuntimeBuilder:
         if config:
             builder.with_config(config)
         return builder.build()
+    
+# ========== 模块级函数（放在类外部） ==========
+def build_default_snapshot(
+    surface_ids: Tuple[str, ...] = ("reasoning",)
+) -> RuntimeSnapshot:
+    """
+    构建默认的 RuntimeSnapshot。
+    
+    这是 Workflow 获取 Snapshot 的统一入口。
+    如果未来引入统一工厂，只需修改此函数内部实现。
+    """
+    from src.surfaces.reasoning import ReasoningSurface
+    registry = SurfaceRegistry((ReasoningSurface,))
+    config = RuntimeConfig(enabled_surfaces=surface_ids)
+    return RuntimeBuilder(registry).with_config(config).build()
