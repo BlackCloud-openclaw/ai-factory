@@ -37,6 +37,7 @@ numpy
 jieba
 requests
 json_repair
+boto3 moto
 
 # Testing
 pytest
@@ -45,3 +46,6 @@ pytest-cov
 
 # Code quality
 black
+
+# requirements-phase14.txt
+jieba>=0.42.1

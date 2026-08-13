@@ -1,7 +1,10 @@
 # src/orchestrator/state_patch.py
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from enum import Enum
+from src.writing.narrative_intent import NarrativeIntent
 
 
 class WorkflowPhase(str, Enum):
@@ -49,6 +52,17 @@ class StatePatch:
 
     metadata: Optional[Dict[str, Any]] = None   # 新增
     
+    # ============================================================
+    # Phase 14.0C-3 Commit D.2: Writer Artifact Preservation
+    # ============================================================
+    writer_artifact: Optional[Dict[str, Any]] = None
+    # ============================================================
+    
+    # 在 StatePatch 类中添加
+    narrative_intent: Optional[NarrativeIntent] = None
+    
+    planner_outputs: Optional[List[Dict[str, Any]]] = None  # 新增
+    
     def to_dict(self) -> Dict[str, Any]:
-        """转换为 LangGraph 可合并的字典（仅非 None 字段）"""
+        """转换为 LangGraph 可合并的字典，过滤掉值为 None 的字段"""
         return {k: v for k, v in self.__dict__.items() if v is not None}

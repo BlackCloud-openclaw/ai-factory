@@ -1,12 +1,4 @@
-"""
-Dialogue Surface - Phase 7B 第一个验证插件
-验证 Runtime 能够通过新增 Surface 扩展能力，而无需修改核心代码
-
-第一轮：仅验证框架机制
-- Observation: dialogue_marker（引号检测）
-- Validation: dialogue_exists（至少有一段对话）
-- Repair: INSERT_DIALOGUE
-"""
+# src/surfaces/dialogue.py
 
 from src.surfaces.definition import (
     SurfaceDefinition,
@@ -19,7 +11,7 @@ from src.surfaces.definition import (
     MetricDefinition,
     RepairStrategy,
 )
-from src.capabilities.ids import Matchers, Metrics, Repairs, Triggers
+from src.capabilities import CapabilityRef
 
 
 # ============================================================
@@ -29,10 +21,11 @@ from src.capabilities.ids import Matchers, Metrics, Repairs, Triggers
 DIALOGUE_PATTERNS = (
     PatternDefinition(
         name="dialogue_marker",
-        matcher=Matchers.QUOTATION,
-        config={},  # 留空，使用默认正则
+        capability_ref=CapabilityRef.parse("builtin.quotation"),
+        config={},
     ),
 )
+
 
 # ============================================================
 # 2. Validation Layer Rules
@@ -60,8 +53,8 @@ DIALOGUE_LAYER_RULES = (
 DIALOGUE_REPAIR_STRATEGIES = (
     RepairStrategy(
         target_layer="dialogue",
-        trigger="non_compliant",  # 当 dialogue 层不合规时触发
-        operation=Repairs.INSERT_DIALOGUE,
+        trigger="non_compliant",
+        operation="INSERT_DIALOGUE",
         payload_type="dialogue_marker",
     ),
 )

@@ -1,0 +1,50 @@
+id: corpus.planning_execution.regenerated.corpus.planning_execution.auto.004
+version: '2.0'
+category: planning_execution
+failure_modes:
+- planning_execution
+difficulty: medium
+language: zh-CN
+scene_before: '林逸盘膝坐在藏书阁密室石台上，掌心托着二叔赠予的千年灵芝。他盯着眼前泛着红光的古老功法卷轴，喉头微动：「哼，区区炼气二层的瓶颈，我偏不信过不去！」
+
+
+  「孩子，这灵芝只能维持两时辰药效。」二叔的声音从玉佩中传来，「强行冲击若失败，轻则经脉受损...」
+
+
+  「我自有分寸！」林逸咬破指尖在功法上抹出血纹，丹田瞬间涌入狂暴火灵力。他感觉到小腹处的噬魂蛊突然躁动，暗红能量顺着灵脉奔涌。
+
+
+  「不好！」二叔的传音陡然拔高，「那功法残缺部分会引发反噬！你怎敢...」
+
+
+  「来不及了！」林逸额头青筋暴起，双掌拍在石台两侧的血符锁链上。灵芝光芒与阵图纹路交织的刹那，他听见自己经脉撕裂般的剧痛。
+
+
+  「尝试突破失败。」二叔的叹息混着玉佩碎裂声传来，林逸猛然睁眼时，发现掌心的灵芝已化作灰烬，而炼气二层的屏障反而变得更加森冷。
+
+
+  「为什么...要骗我？」林逸嘶哑的声音惊起密室石壁上的磷火。
+
+
+  「这是为了保护你。」玉佩残片中浮现出二叔模糊的虚影，「那功法残缺部分...本就是当年...」话音未落，整座密室突然震颤，墙缝里渗出带着血纹的紫晶砂砾。'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 513060
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

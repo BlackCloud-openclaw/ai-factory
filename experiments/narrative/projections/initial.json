@@ -1,0 +1,15 @@
+{
+  "projection_id": "a9aa0236a980f203",
+  "chapter_id": "initial",
+  "active_conflict": "林逸在密室中与盟友商讨应对血魂宗的策略",
+  "unresolved_threads": [],
+  "active_objectives": [
+    "林逸在密室中与盟友商讨应对血魂宗的策略"
+  ],
+  "emotional_state": "紧张",
+  "next_pressure": "推进: 林逸在密室中与盟友商讨应对血魂宗的策略",
+  "last_intent_id": "1f80566290ea349b",
+  "last_scene_role": "conflict_escalation",
+  "version": 1,
+  "updated_at": "2026-08-12T19:11:06.509916"
+}

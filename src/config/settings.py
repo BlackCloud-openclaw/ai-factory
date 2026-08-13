@@ -114,6 +114,10 @@ class Settings(BaseSettings):
         "plan": ["Qwen3-32B-Q5_K_M"],
         "default": ["Qwen3.6-27B-Q5_K_M"],
     }
+    
+    # 自适应运行时配置
+    adaptive_runtime_enabled: bool = True   # 是否启用自适应（默认开启，测试时可改 False）
+    adaptive_rollout_percentage: int = 100   # 灰度百分比，0-100，默认 10%
 
     @property
     def postgres_dsn(self) -> str:

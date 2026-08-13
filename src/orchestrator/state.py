@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 from typing import Annotated, Any, List, Dict, Optional
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 from src.orchestrator.state_patch import WorkflowPhase
 from src.common.canonical import canonical_hash  
+from src.writing.narrative_projection import NarrativeProjection
+from src.writing.narrative_intent import NarrativeIntent
+
 
 class AgentState(BaseModel):
     """State definition for the AI Factory LangGraph workflow."""
@@ -12,7 +17,10 @@ class AgentState(BaseModel):
     original_request: str = ""          # 与 user_input 等效，便于 planner 使用
     project_id: str = ""                # 记忆隔离
     novel_id: Optional[str] = None      # 当前小说ID（用于写作场景）
-    metadata: Dict[str, Any] = {}       # 仅用于临时、非结构化数据
+    metadata: Dict[str, Any] = {}
+    # 仅用于辅助/调试/诊断数据（如 gravity_warning, entropy_control_actions, active_loop）。
+    # 禁止用于传递核心业务状态（planner_outputs, narrative_intent, scene_plan_list）。
+    # 核心业务状态必须通过 AgentState 的强类型字段传递。
     state_hash: Optional[str] = None   # 新增：状态哈希，用于审计
 
     # ===== 消息历史 =====
@@ -87,6 +95,14 @@ class AgentState(BaseModel):
     current_scene_index: Optional[int] = 0   # 0‑based 已完成场景数（下一个要生成的场景索引）
     writing_constraints: Optional[Dict[str, Any]] = None
     scene_text: str = ""
+    # ============================================================
+    # Phase 14.0C-3 Commit D.2: Writer Artifact Preservation
+    # ============================================================
+    writer_artifact: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Writer 的结构化产物，包含 scene_text, events, foreshadowing"
+    )
+    # ============================================================
 
     # Director 输出字段（阶段2新增）
     narrative_blueprint: Optional[Dict[str, Any]] = None
@@ -117,6 +133,23 @@ class AgentState(BaseModel):
 
     # Runtime Metadata（新增）
     runtime_metadata: Optional[Dict[str, Any]] = None
+    
+    # 在 AgentState 类中添加（大约第 XX 行）
+    planner_outputs: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="每个场景的 PlannerOutput（含 NarrativeIntent 和 ExecutionContract）"
+    )
+    
+    projection: Optional[NarrativeProjection] = Field(
+        default=None,
+        description="当前章节的 NarrativeProjection（Phase 13.2）"
+    )
+    
+    # 在 AgentState 类中添加（在 projection 字段之后）
+    narrative_intent: Optional[NarrativeIntent] = Field(
+        default=None,
+        description="当前场景的叙事意图（Phase 13.2.1）"
+)    
 
     def should_retry(self) -> bool:
         return self.retry_count < self.max_retries and self.error is not None
@@ -140,4 +173,9 @@ class AgentState(BaseModel):
             "total_chapters_in_volume": self.total_chapters_in_volume,
             # 忽略容易变化的字段：messages, research_results, code_generated, execution_result, validation_result 等
         }
-        return canonical_hash(hash_fields)    
+        return canonical_hash(hash_fields)   
+    
+    
+    
+# 解决前向引用问题
+AgentState.model_rebuild()

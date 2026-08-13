@@ -1,0 +1,71 @@
+samples:
+  - novel_id: test_novel
+    volume: 1
+    chapter: 1
+    scene_idx: 0
+    planning_contract:
+      version: "1.0"
+      scene_id: scene_001
+      intent:
+        goal: "测试目标"
+        conflict: "测试冲突"
+        expected_outcome: "测试结果"
+      execution:
+        units:
+          - id: U1
+            label: action
+            description: "获得神秘玉佩"
+          - id: U2
+            label: action
+            description: "触发丹劫"
+      observables:
+        state_changes:
+          - type: realm
+            actor: 林逸
+            to_major_realm: 筑基
+            to_minor_stage: 1
+          - type: hp
+            actor: 林逸
+            new_hp: 80
+          - type: plot_flag
+            name: 丹劫触发
+            value: true
+      constraints: []
+      metadata:
+        chapter: 1
+        scene_index: 0
+    scene_text: "丹房内灵力骤然凝滞，林逸盯着炉顶翻涌的黑云皱眉。守卫长老抓起符咒咬破指尖。第一道劫雷劈下时，他甩出玄铁令牌与玉佩共鸣，巫族血契残片在掌心发烫。第二道雷火穿透阵纹裂口，七品灵丹在炉中发出悲鸣。林逸突然甩开护盾直冲云霄。第三道劫雷轰碎丹炉刹那，他捏碎血契残片将巫族印记打入雷核，整座禁地的青铜门环同时震颤。当紫电化作血狼虚影时，少年冷哼一声踩碎最后一枚阵旗。"
+    events:
+      - type: item_acquire
+        actor: 林逸
+        item: 神秘玉佩
+      - type: plot_flag_set
+        flag: 丹劫
+        value: true
+    snapshot_before:
+      characters:
+        林逸:
+          realm: 炼气
+          hp: 100
+      global_flags: {}
+      relationships: {}
+    snapshot_after:
+      characters:
+        林逸:
+          realm: 筑基
+          hp: 80
+      global_flags:
+        丹劫触发: true
+      relationships: {}
+    runtime_metrics:
+      retry_count: 1
+      fallback_count: 0
+      error_count: 0
+      validation_score: 0.95
+    revision_result:
+      metrics:
+        before_compliance: 0.6
+        after_compliance: 0.85
+        delta: 0.25
+    metadata:
+      previous_scene_text: "林逸在藏经阁发现了一本古籍，上面记载着丹劫的秘密。"

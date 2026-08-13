@@ -1,0 +1,44 @@
+id: corpus.planning_execution.regenerated.corpus.planning_execution.auto.005
+version: '2.0'
+category: planning_execution
+failure_modes:
+- planning_execution
+difficulty: medium
+language: zh-CN
+scene_before: '林逸盘膝坐在丹房角落，掌心托着那枚神秘玉佩。灵宠青鳞蛇突然吐出獠牙，冰冷蛇尾重重抽在石壁上。，“发现灵宠异常！”他低喝一声，元婴期灵力顺着锁链冲入蛇体，却见青鳞蛇瞳孔骤缩成竖线。
+
+
+  青鳞蛇猛地昂首，蛇信子喷出暗红雾气：「嘶——有人在你丹田种了噬魂蛊！」
+
+  林逸双眉紧皱：「胡说八道！我刚在禁地找到这玉佩。」
+
+  「玉佩在吸食主人精血！」青鳞蛇鳞片翻涌血光，锁链应声崩断，「三息后结界会碎，你到底封印我还是先逃命？」
+
+
+  林逸抓起药锄划破掌心：「用十年修为换你灵脉封印。」
+
+  「不划算！」青鳞蛇突然咬住他手腕，暗红能量顺着经脉倒灌，「除非...你肯用那株千年血灵芝炼化蛊毒。」
+
+
+  丹炉突然爆出刺目火光，林逸在漫天药香里狂笑：「有意思，我就赌这最后一把！」'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 544731
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

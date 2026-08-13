@@ -27,6 +27,7 @@ from src.writing.history_summarizer import get_chapter_summaries, get_key_events
 from src.writing.voice_memory import VoiceMemory
 from src.writing.narrative_projection import NarrativeProjector
 from src.writing.planning_contract import PlanningContract
+from src.writing.contracts.loader import PlanningContractLoader, ContractRecoveryError
 
 logger = setup_logging("agents.writer")
 
@@ -101,6 +102,20 @@ class WritingAgent(BaseAgent):
         logger.info("WritingAgent starting")
         start_time = time.time()
 
+        # ========== P0 诊断：检查 state.planning_contract 传入状态 ==========
+        logger.critical(
+            "WRITER_AGENT_STATE_PLANNING_CONTRACT: exists=%s, type=%s",
+            state.planning_contract is not None,
+            type(state.planning_contract).__name__ if state.planning_contract else "None"
+        )
+        # 如果为 None，检查 metadata 中是否有
+        if state.planning_contract is None:
+            logger.critical(
+                "WRITER_AGENT_METADATA_PLANNING_CONTRACT: exists=%s",
+                "planning_contract" in state.metadata
+            )
+        # ==================================================================
+
         scene_plan = state.scene_plan or {}
         constraints = state.writing_constraints or {}
 
@@ -108,12 +123,24 @@ class WritingAgent(BaseAgent):
         planning_contract = None
         if hasattr(state, 'planning_contract') and state.planning_contract:
             try:
-                contract_data = state.planning_contract
-                planning_contract = PlanningContract(**contract_data)
+                planning_contract = PlanningContractLoader.load(state.planning_contract)
                 logger.info(f"✅ Loaded Planning Contract for writer: {planning_contract.scene_id}")
+            except ContractRecoveryError as e:
+                logger.error(f"ContractRecoveryError in Writer: {e}")
+                raise  # 阻断降级，暴露问题
             except Exception as e:
-                logger.warning(f"Failed to parse Planning Contract: {e}, falling back to scene_plan")
-                planning_contract = None
+                logger.exception("WRITER_CONTRACT_LOAD_FAILED_UNEXPECTED")
+                raise
+        else:
+            logger.warning("WRITER_CONTRACT_NOT_FOUND_IN_STATE")
+                
+        # ========== 诊断：planning_contract 解析状态 ==========
+        logger.critical(
+            "WRITER_CONTRACT_PLANNING_VAR: planning_contract is None? %s, type=%s",
+            planning_contract is None,
+            type(planning_contract).__name__ if planning_contract else "None"
+        )
+        # ======================================================
 
         # ========== 读取 Director 输出 ==========
         narrative_blueprint = state.narrative_blueprint or {}
@@ -171,11 +198,111 @@ class WritingAgent(BaseAgent):
             key_events_summary=key_events_summary,
             voice_memory=voice_memory,
         )
+        
+        # ========== 在这之后插入 ==========
+        # 注入 NarrativeIntent 指令
+        if state.narrative_intent:
+            from src.writing.narrative_intent import NarrativeContext
+            context = NarrativeContext.from_intent(state.narrative_intent)
+            prompt += "\n\n" + context.to_prompt_instructions()
+        # ========== 插入结束 ==========
+
+        # ========== P1 诊断：Agent 层 Contract 接收 & Prompt 信号检查 ==========
+        # 使用独立的变量名，避免覆盖原有的 planning_contract
+        diagnostic_contract = state.planning_contract or (scene_plan.get("planning_contract") if scene_plan else None)
+        if diagnostic_contract:
+            # 提取 contract_id（兼容 dict 和对象）
+            contract_id = (
+                diagnostic_contract.get("scene_id", "unknown")
+                if isinstance(diagnostic_contract, dict)
+                else getattr(diagnostic_contract, "scene_id", "unknown")
+            )
+            # 提取 state_changes
+            if isinstance(diagnostic_contract, dict):
+                obs = diagnostic_contract.get("observables", {})
+                scs = obs.get("state_changes", [])
+            else:
+                scs = diagnostic_contract.observables.state_changes if hasattr(diagnostic_contract, 'observables') else []
+            
+            logger.critical(
+                "WRITER_AGENT_CONTRACT: type=%s contract_id=%s state_changes=%s",
+                type(diagnostic_contract).__name__,
+                contract_id,
+                [
+                    {"type": sc.get("type") if isinstance(sc, dict) else getattr(sc, "type", None)}
+                    for sc in scs
+                ]
+            )
+        else:
+            logger.critical("WRITER_AGENT_CONTRACT: planning_contract is None")
+
+        # 2. 检查 Prompt 中是否包含具体事件类型信号
+        expected_types = []
+        if diagnostic_contract:
+            if isinstance(diagnostic_contract, dict):
+                obs = diagnostic_contract.get("observables", {})
+                scs = obs.get("state_changes", [])
+            else:
+                scs = diagnostic_contract.observables.state_changes if hasattr(diagnostic_contract, 'observables') else []
+            expected_types = [
+                sc.get("type") if isinstance(sc, dict) else getattr(sc, "type", None)
+                for sc in scs
+                if sc
+            ]
+        
+        signal_status = {}
+        for et in expected_types:
+            if et:
+                signal_status[et] = et in prompt
+        
+        logger.critical(
+            "WRITER_PROMPT_CONTRACT_SIGNAL: expected_types=%s signal_status=%s",
+            expected_types,
+            signal_status
+        )
+        # ============================================================
+        # ========== 修复：将 metadata 中的不可序列化对象转换为可序列化格式 ==========
+        from datetime import datetime, date
+
+        def convert_metadata(obj):
+            """递归转换 metadata 中的对象为 JSON 可序列化格式"""
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            # 处理 Pydantic 模型（v2 使用 model_dump，v1 使用 dict）
+            if hasattr(obj, 'model_dump') and callable(obj.model_dump):
+                return {k: convert_metadata(v) for k, v in obj.model_dump().items()}
+            if hasattr(obj, 'dict') and callable(obj.dict):
+                return {k: convert_metadata(v) for k, v in obj.dict().items()}
+            if isinstance(obj, dict):
+                return {k: convert_metadata(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [convert_metadata(v) for v in obj]
+            # 如果无法转换，尝试使用 str() 作为 fallback
+            try:
+                json.dumps(obj)
+                return obj
+            except TypeError:
+                return str(obj)
+
+        metadata_for_log = convert_metadata(state.metadata)
+        # ================================================================
+
+        # 记录 prompt 日志
+        log_prompt("writer", prompt, metadata_for_log, constraints=constraints)
 
         # ========== 新增：如果存在 Contract，用 Contract 信息增强 Prompt ==========
-        if planning_contract:
+        if planning_contract:   # 注意：这里使用的是原有的 planning_contract，没有被诊断覆盖
+            # ========== D.4.1 第三层验证：Contract 已拼入最终 Prompt ==========
+            logger.critical(
+                "WRITER_FINAL_PROMPT_HAS_CONTRACT=True, scene_id=%s, state_changes=%d",
+                planning_contract.scene_id,
+                len(planning_contract.observables.state_changes)
+            )
+            # ================================================================            
             contract_prompt = self._build_contract_prompt(planning_contract)
             prompt += "\n\n" + contract_prompt
+        else:
+            logger.critical("WRITER_FINAL_PROMPT_HAS_CONTRACT=False (planning_contract is None)")
 
         # ====== 注入戏剧结构（来自 Drama Planner） ======
         drama_structure = state.drama_structure or {}
@@ -225,35 +352,35 @@ class WritingAgent(BaseAgent):
         if narrative_blueprint:
             director_instructions = f"""
     \n\n【🎬 导演蓝图 - 必须严格遵循】
-    - 注意力轨迹: {narrative_blueprint.get('attention_path', [])}
-    - 延迟的信息: {narrative_blueprint.get('withheld_information', '')}
-    - 揭示节拍: {narrative_blueprint.get('reveal_beat', '')}
-    - 压力来源: {narrative_blueprint.get('scene_pressure', '')}
-    - 沉默动作优先级: {narrative_blueprint.get('silent_action_priority', '')}
-    - 重复意象: {narrative_blueprint.get('recurring_image', '')}
-    - 场景角色: {narrative_blueprint.get('scene_role', 'SETUP')}
-    """
+        - 注意力轨迹: {narrative_blueprint.get('attention_path', [])}
+        - 延迟的信息: {narrative_blueprint.get('withheld_information', '')}
+        - 揭示节拍: {narrative_blueprint.get('reveal_beat', '')}
+        - 压力来源: {narrative_blueprint.get('scene_pressure', '')}
+        - 沉默动作优先级: {narrative_blueprint.get('silent_action_priority', '')}
+        - 重复意象: {narrative_blueprint.get('recurring_image', '')}
+        - 场景角色: {narrative_blueprint.get('scene_role', 'SETUP')}
+        """
 
         if knowledge_deltas:
             director_instructions += """
-    【📖 知识变化软约束 - 必须覆盖核心语义】
-    以下是导演要求在本场景中向读者释放的信息。你必须在 scene_text 中**通过自然的方式明确体现每条信息的核心语义**（可通过直接陈述、角色对话、内心独白、环境描写等），不得遗漏。你可以自由组织语言，但必须让读者能够清晰接收到这些信息。
+        【📖 知识变化软约束 - 必须覆盖核心语义】
+        以下是导演要求在本场景中向读者释放的信息。你必须在 scene_text 中**通过自然的方式明确体现每条信息的核心语义**（可通过直接陈述、角色对话、内心独白、环境描写等），不得遗漏。你可以自由组织语言，但必须让读者能够清晰接收到这些信息。
 
-    """
+        """
             for i, kd in enumerate(knowledge_deltas, 1):
                 info = kd.get('information', '')
                 if info:
                     director_instructions += f"{i}. {info}\n"
             director_instructions += """
-    示例：对于“灵气逆向运转会导致经脉重塑”，你可以写“他察觉到灵气在体内逆向流动，经脉隐隐有被重塑的感觉”。
-    注意：不要只通过隐晦暗示，要让信息明确可辨。
-    """
+        示例：对于“灵气逆向运转会导致经脉重塑”，你可以写“他察觉到灵气在体内逆向流动，经脉隐隐有被重塑的感觉”。
+        注意：不要只通过隐晦暗示，要让信息明确可辨。
+        """
 
         if character_intent:
             director_instructions += f"""
-    【角色意图 - 不可违背】
-    {json.dumps(character_intent, ensure_ascii=False, indent=2)}
-    """
+        【角色意图 - 不可违背】
+        {json.dumps(character_intent, ensure_ascii=False, indent=2)}
+        """
 
         prompt += director_instructions
 
@@ -269,45 +396,45 @@ class WritingAgent(BaseAgent):
                     loop = projection.get("loop", {})
                     if loop:
                         prompt += f"""
-    【叙事循环 (Narrative Loop) - 实验注入】
-    - 当前正在推进的过程：{loop.get('description', '')}
-    - 推动者：{loop.get('initiator', '')}
-    - 紧迫度：{loop.get('urgency', 0.5)}
-    请确保当前场景的推进方向与上述循环保持一致。
-    """
+        【叙事循环 (Narrative Loop) - 实验注入】
+        - 当前正在推进的过程：{loop.get('description', '')}
+        - 推动者：{loop.get('initiator', '')}
+        - 紧迫度：{loop.get('urgency', 0.5)}
+        请确保当前场景的推进方向与上述循环保持一致。
+        """
 
                 elif experiment_group == "focus":
                     focus = projection.get("focus", {})
                     if focus:
                         prompt += f"""
-    【叙事聚焦 (Narrative Focus) - 实验注入】
-    - 当前最重要的未完成事项：{focus.get('subject', '')}
-    - 类型：{focus.get('type', '')}
-    - 为什么重要：{focus.get('why_matters', '')}
-    请确保当前场景的行动与上述聚焦事项相关。
-    """
+        【叙事聚焦 (Narrative Focus) - 实验注入】
+        - 当前最重要的未完成事项：{focus.get('subject', '')}
+        - 类型：{focus.get('type', '')}
+        - 为什么重要：{focus.get('why_matters', '')}
+        请确保当前场景的行动与上述聚焦事项相关。
+        """
 
                 elif experiment_group == "both":
                     focus = projection.get("focus", {})
                     loop = projection.get("loop", {})
                     if focus or loop:
                         prompt += f"""
-    【叙事循环 + 聚焦 - 实验注入】
-    循环：{loop.get('description', '')}（紧迫度：{loop.get('urgency', 0.5)}）
-    聚焦：{focus.get('subject', '')}（类型：{focus.get('type', '')}）
-    请确保当前场景的推进方向与上述循环和聚焦保持一致。
-    """
+        【叙事循环 + 聚焦 - 实验注入】
+        循环：{loop.get('description', '')}（紧迫度：{loop.get('urgency', 0.5)}）
+        聚焦：{focus.get('subject', '')}（类型：{focus.get('type', '')}）
+        请确保当前场景的推进方向与上述循环和聚焦保持一致。
+        """
 
                 elif experiment_group == "full":
                     projection_data = projection
                     prompt += f"""
-    【完整叙事状态 - 实验注入】
-    - 循环：{projection_data.get('loop', {}).get('description', '')}
-    - 聚焦：{projection_data.get('focus', {}).get('subject', '')}
-    - 注意力：{projection_data.get('attention', {}).get('target', '')}
-    - 核心问题：{projection_data.get('question', {}).get('text', '')}
-    请基于以上叙事状态驱动当前场景的写作。
-    """
+        【完整叙事状态 - 实验注入】
+        - 循环：{projection_data.get('loop', {}).get('description', '')}
+        - 聚焦：{projection_data.get('focus', {}).get('subject', '')}
+        - 注意力：{projection_data.get('attention', {}).get('target', '')}
+        - 核心问题：{projection_data.get('question', {}).get('text', '')}
+        请基于以上叙事状态驱动当前场景的写作。
+        """
 
         # ========== 调用 LLM ==========
         router = get_router()
@@ -449,11 +576,6 @@ class WritingAgent(BaseAgent):
         # 然后将清洗后的 scene_text 放回 parsed
         if parsed:
             parsed["scene_text"] = scene_text
-
-        # ============================================================
-        # ========== Phase 6.5: 消费 ExecutionResult ==========
-        # ============================================================
-# src/agents/writer.py（仅 Phase 6.5 消费部分）
 
         # ============================================================
         # ========== Phase 6.5: 消费 ExecutionResult ==========
@@ -734,6 +856,16 @@ class WritingAgent(BaseAgent):
         return "\n".join(parts)
 
     def _build_contract_prompt(self, contract: PlanningContract) -> str:
+        # ========== D.4.1 验证：Contract 进入 Prompt 构建 ==========
+        try:
+            changes = [sc.type for sc in contract.observables.state_changes]
+        except Exception:
+            changes = []
+        logger.critical(
+            "WRITER_CONTRACT_PROMPT_INJECTED: state_changes=%s",
+            changes
+        )
+        # ===========================================================
         """根据 Planning Contract 生成写作指令"""
         lines = []
         lines.append("【📋 规划契约（Planning Contract）】")
@@ -771,6 +903,10 @@ class WritingAgent(BaseAgent):
                     lines.append(f"- {change.from_char} 与 {change.to_char} 的关系变化 {change.delta}")
                 elif change.type == "inventory":
                     lines.append(f"- {change.actor} {change.operation} {change.item}")
+                elif change.type == "inventory_acquire":
+                    lines.append(f"- {change.actor} 获得 {change.item}")
+                elif change.type == "inventory_lose":
+                    lines.append(f"- {change.actor} 失去 {change.item}")                
                 elif change.type == "realm":
                     lines.append(f"- {change.actor} 突破至 {change.to_major_realm}{change.to_minor_stage}层")
                 elif change.type == "location":

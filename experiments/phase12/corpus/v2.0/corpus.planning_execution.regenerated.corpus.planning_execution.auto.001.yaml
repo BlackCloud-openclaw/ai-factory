@@ -1,0 +1,56 @@
+id: corpus.planning_execution.regenerated.corpus.planning_execution.auto.001
+version: '2.0'
+category: planning_execution
+failure_modes:
+- planning_execution
+difficulty: medium
+language: zh-CN
+scene_before: '青色火焰在密室穹顶翻涌，林逸盘膝而坐的身形被灵脉暴动引发的紫光切割得支离破碎。宗门长老负手立于阵外，袍袖无风自动。
+
+
+  「三炷香已燃尽两根！」长老的声音裹着灵力震颤石壁，「再拖延下去整座藏书阁都要被灵泉反噬！」
+
+
+  林逸的指节抵住地面，青铜匣内传出的嗡鸣与经脉中游走的金丹气息形成奇异共振。他猛地抬头：「给我一盏茶的时间。」
+
+
+  「狂妄！」长老祭出三枚封印符，「以你筑基三层的根基强行催动金丹术式——」
+
+
+  「生死有命。」林逸的冷笑混着血沫喷出，八十一枚神秘玉佩突然悬浮半空，「要么现在中断仪式，让叛乱者有机可乘；要么...」
+
+
+  灵泉深处传来令人心悸的爆鸣，地底紫晶碎片折射出刺目光芒。长老瞳孔骤缩：「你竟敢以本源修为为引？！」
+
+
+  「有意思。」林逸咬破舌尖将血珠抹在青铜匣上，「当年二叔隐瞒的秘术，今日正好验证。」
+
+
+  当第七道金光没入眉心时，暴走的灵脉突然归于沉寂。长老踉跄着后退三步，看着少年完成筑基仪式的瞬间，八枚玉佩同时碎裂成齑粉。
+
+
+  「你...消耗了三成本源修为！」
+
+
+  林逸抹去嘴角血渍，指尖在石壁上划出新月状刻痕：「等我找到叛乱核心时，请二叔给个痛快。」'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 553093
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

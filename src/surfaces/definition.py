@@ -1,23 +1,30 @@
-"""
-SurfaceDefinition - 纯声明式配置
-Surface 描述 Capability，不描述 Composition
-"""
+# src/surfaces/definition.py
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
-from types import MappingProxyType
+
+from src.capabilities import CapabilityRef
 
 
-# ============================================================
-# 1. 基础数据结构：Pattern / Metric / Rule / Strategy
-# ============================================================
+@dataclass(frozen=True)
+class SurfaceMetadata:
+    """Surface 元数据，仅用于标识和展示"""
+    id: str
+    display_name: str
+
 
 @dataclass(frozen=True)
 class PatternDefinition:
     """声明一个 Pattern，由 ObservationCompiler 解释"""
     name: str
-    matcher: str  # "keyword" | "regex" | "quotation"
+    # 旧字段（已废弃，由 Loader 迁移到 capability_ref）
+    matcher: Optional[str] = field(
+        default=None,
+        metadata={"deprecated": True},
+    )
     config: Dict[str, Any] = field(default_factory=dict)
+    # 新字段（推荐使用）
+    capability_ref: Optional[CapabilityRef] = None
 
 
 @dataclass(frozen=True)
@@ -40,19 +47,12 @@ class LayerRule:
 
 @dataclass(frozen=True)
 class RepairStrategy:
-    """
-    声明一个修复策略，由 EditCompiler 解释
-    使用结构化 trigger，而非字符串 DSL
-    """
+    """声明一个修复策略，由 EditCompiler 解释"""
     target_layer: str
     trigger: str  # "non_compliant" | "ratio_low" | "turns_low" | "missing_pattern"
     operation: str  # "REPLACE_SENTENCE" | "INSERT_AFTER" | "INSERT_BEFORE"
     payload_type: str  # "combined" | "dialogue_marker" | "state_keyword" | "logic_marker"
 
-
-# ============================================================
-# 2. Spec 分组（每个 Surface 的组成部分）
-# ============================================================
 
 @dataclass(frozen=True)
 class ObservationSpec:
@@ -71,21 +71,6 @@ class RepairSpec:
     """Repair 能力：如何修复不合规"""
     repair_strategies: Tuple[RepairStrategy, ...] = field(default_factory=tuple)
 
-
-# ============================================================
-# 3. SurfaceMetadata（仅用于标识，不参与行为）
-# ============================================================
-
-@dataclass(frozen=True)
-class SurfaceMetadata:
-    """Surface 元数据，仅用于标识和展示"""
-    id: str
-    display_name: str
-
-
-# ============================================================
-# 4. SurfaceDefinition（纯声明，不含 Composition 信息）
-# ============================================================
 
 @dataclass(frozen=True)
 class SurfaceDefinition:

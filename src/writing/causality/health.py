@@ -11,7 +11,11 @@ class HealthChecker:
     @staticmethod
     async def _compute_core_predicates_hash(novel_id: str) -> str:
         """仅计算核心谓词的哈希值（priority='core' 或特定关系）"""
+        if not novel_id:
+            return ""
         pool = get_db_pool()
+        if pool is None:
+            return ""
         async with pool.acquire() as conn:
             rows = await conn.fetch(
                 """
@@ -32,7 +36,12 @@ class HealthChecker:
         检测投影漂移，返回漂移级别：'INFO', 'WARNING', 'CRITICAL'
         仅基于核心谓词比较，避免非核心变化导致的误报。
         """
+        if not novel_id:
+            return "UNKNOWN"
         pool = get_db_pool()
+        if pool is None:
+            return "UNKNOWN"
+
         current_hash = await HealthChecker._compute_core_predicates_hash(novel_id)
 
         async with pool.acquire() as conn:
@@ -71,7 +80,11 @@ class HealthChecker:
     @staticmethod
     async def set_validator_mode(novel_id: str, mode: str):
         """设置验证器模式：'normal', 'degraded'"""
+        if not novel_id:
+            return
         pool = get_db_pool()
+        if pool is None:
+            return
         async with pool.acquire() as conn:
             await conn.execute(
                 """

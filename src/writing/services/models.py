@@ -1,8 +1,12 @@
 # src/writing/services/models.py
-from dataclasses import dataclass
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 from src.orchestrator.state_patch import StatePatch
-from dataclasses import dataclass, field
+from src.narrative.intent import IntentResolver
+from src.writing.narrative_intent import NarrativeIntent
+
 
 @dataclass
 class SceneCompletionCommand:
@@ -15,10 +19,12 @@ class SceneCompletionCommand:
     current_world_state: Dict[str, Any]
     parsed_output: Dict[str, Any]      # 包含 events, scene_text
     scene_plan: Optional[Dict[str, Any]] = None
-    character_intents: Optional[Dict[str, Any]] = None   # 新增
-    voice_memory: Optional[Dict[str, Any]] = None   # 新增
-    raw_output: Optional[str] = None   # 新增
-    
+    character_intents: Optional[Dict[str, Any]] = None
+    voice_memory: Optional[Dict[str, Any]] = None
+    raw_output: Optional[str] = None
+    narrative_intent: Optional[NarrativeIntent] = None
+
+
 @dataclass
 class SceneCompletionResult:
     """场景完成事务的输出 - 只返回事实，不返回路由"""
@@ -27,7 +33,7 @@ class SceneCompletionResult:
     volume_finished: bool = False
     events_applied: int = 0
     error: Optional[str] = None
-    
+
 
 @dataclass
 class ScenePlanningCommand:
@@ -40,18 +46,28 @@ class ScenePlanningCommand:
     current_state: Optional[Dict[str, Any]]
     user_input: str
     resume: bool = False
-    # 可选：当前卷的总章节数，可从外部传入避免重复查询
     total_chapters_in_volume: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)  # 新增
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    intent_resolver: Optional[IntentResolver] = None
 
 
 @dataclass
 class ScenePlanningResult:
-    """场景计划生成事务的输出"""
+    """
+    场景计划生成事务的输出。
+
+    核心契约：
+    - state_patch: 通用状态修改
+    - total_scenes: 本场景计划包含的场景总数
+    - planner_outputs: 每个场景的 PlannerOutput（含 NarrativeIntent + ExecutionContract）
+      这是 Writer / Validator 消费的核心业务产物，必须通过显式契约传递。
+    - error: 失败传播
+    """
     state_patch: StatePatch
     total_scenes: int = 0
+    planner_outputs: List[Dict[str, Any]] = field(default_factory=list)  # Phase 13.2.2 新增
     error: Optional[str] = None
-    
+
 
 @dataclass
 class WritingCommand:
@@ -62,16 +78,15 @@ class WritingCommand:
     scene_idx: int
     scene_plan: Dict[str, Any]
     current_state: Dict[str, Any]
-    writing_feedback: str  # 来自上一次验证失败时的反馈
-    # 可选：声纹注册表路径等
+    writing_feedback: str
     voiceprint_config_path: Optional[str] = None
-    # ========== Director 输出字段（阶段2新增）==========
     narrative_blueprint: Optional[Dict[str, Any]] = None
     knowledge_deltas: Optional[List[Dict[str, Any]]] = None
     character_intent: Optional[Dict[str, Any]] = None
-    # ====== 新增：戏剧结构 ======
     drama_structure: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
+    # D.4.1-a: 显式契约传输
+    execution_contract: Optional[Dict[str, Any]] = None
 
 
 @dataclass

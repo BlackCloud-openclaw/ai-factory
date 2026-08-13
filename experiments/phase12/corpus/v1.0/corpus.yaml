@@ -1,0 +1,35 @@
+version: '1.0'
+created_at: '2026-07-27T00:00:00'
+categories:
+- character_state
+- dialogue_quality
+- planning_execution
+- runtime_state
+- scene_transition
+samples:
+- path: scene_transition/corpus.scene_transition.auto.001.yaml
+- path: scene_transition/corpus.scene_transition.auto.002.yaml
+- path: scene_transition/corpus.scene_transition.auto.003.yaml
+- path: scene_transition/corpus.scene_transition.auto.004.yaml
+- path: scene_transition/corpus.scene_transition.auto.005.yaml
+- path: character_state/corpus.character_state.auto.001.yaml
+- path: character_state/corpus.character_state.auto.002.yaml
+- path: character_state/corpus.character_state.auto.003.yaml
+- path: character_state/corpus.character_state.auto.004.yaml
+- path: character_state/corpus.character_state.auto.005.yaml
+- path: dialogue_quality/corpus.dialogue_quality.auto.001.yaml
+- path: dialogue_quality/corpus.dialogue_quality.auto.002.yaml
+- path: dialogue_quality/corpus.dialogue_quality.auto.003.yaml
+- path: dialogue_quality/corpus.dialogue_quality.auto.004.yaml
+- path: dialogue_quality/corpus.dialogue_quality.auto.005.yaml
+- path: planning_execution/corpus.planning_execution.auto.001.yaml
+- path: planning_execution/corpus.planning_execution.auto.002.yaml
+- path: planning_execution/corpus.planning_execution.auto.003.yaml
+- path: planning_execution/corpus.planning_execution.auto.004.yaml
+- path: planning_execution/corpus.planning_execution.auto.005.yaml
+- path: runtime_state/corpus.runtime_state.auto.001.yaml
+- path: runtime_state/corpus.runtime_state.auto.002.yaml
+- path: runtime_state/corpus.runtime_state.auto.003.yaml
+- path: runtime_state/corpus.runtime_state.auto.004.yaml
+- path: runtime_state/corpus.runtime_state.auto.005.yaml
+total_samples: 25

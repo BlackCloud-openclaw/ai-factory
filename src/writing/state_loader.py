@@ -4,7 +4,7 @@ from src.db import get_db_pool
 from src.writing.world_state import WorldState
 from src.writing.delta import StateDelta
 from src.writing.event_store import NarrativeEventStore
-from src.writing.snapshot import SnapshotManager
+from src.writing.snapshot_manager import SnapshotManager
 
 async def load_state_at_event(novel_id: str, target_event_id: int) -> Tuple[Optional[WorldState], int]:
     pool = get_db_pool()

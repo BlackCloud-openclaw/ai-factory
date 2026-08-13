@@ -1,0 +1,44 @@
+id: corpus.scene_transition.regenerated.corpus.scene_transition.auto.004
+version: '2.0'
+category: scene_transition
+failure_modes:
+- scene_transition
+difficulty: medium
+language: zh-CN
+scene_before: '林逸盯着摊开的密信，青铜匣纹路残片在指尖泛着幽光。「有意思，这符文竟与剑阁古籍里的封印术相似。」他翻动典籍的手指突然顿住——某页夹缝中浮现的血色痕迹，竟与丹房残留的血痕如出一辙。
+
+
+  「好一个双重加密！」林逸咬破指尖，血珠在密信上晕开诡异纹路。符文突然游动起来，化作九宫八卦阵图。「只剩三息，必须在阵眼闭合前......」
+
+
+  「哼！想藏得这么深？」他抓起神秘玉佩按在阵眼处，玉佩骤然发烫。「果然涉及灵脉转移计划...」话音未落，整座禁书阁的符文突然震颤。
+
+
+  「有意思，原来二叔的残口诀藏着这等秘密。」林逸将玉佩贴在额间强行解析，视野中浮现出宗门高层议事厅的全息投影。「揭露灵脉转移计划...竟有半数长老参与！」
+
+
+  「时间到！」他甩出噬魂蛊青铜针刺入阵眼，密文在爆裂前最后定格：「三日后子时，灵泉分水口」。
+
+
+  「好，这次赌对了。」林逸抹去嘴角血渍，发现怀中七枚神秘玉佩已碎裂两枚。'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 518566
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

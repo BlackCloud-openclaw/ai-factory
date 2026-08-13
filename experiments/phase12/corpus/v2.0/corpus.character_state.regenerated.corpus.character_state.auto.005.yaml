@@ -1,0 +1,47 @@
+id: corpus.character_state.regenerated.corpus.character_state.auto.005
+version: '2.0'
+category: character_state
+failure_modes:
+- character_state
+difficulty: medium
+language: zh-CN
+scene_before: '藏书阁密室的烛火忽明忽暗，林逸将第九块神秘玉佩按进石台凹槽时，整面墙壁突然裂开一道血痕。「推进主线剧情（场景3）」——他咬牙在心里默念，却听见背后传来衣袂翻飞声。
+
+
+  「根基不稳还想突破？！」长老的声音如同惊雷炸响。林逸转身时撞见老者手中拂尘已停在他喉前三寸，青灰色的真气正蚕食着玉佩上血纹的光泽。
+
+
+  「外门叛乱的傀儡术...」林逸攥紧衣角，炼气二层的灵力在经脉里躁动，「大比只剩三天...」
+
+
+  「三天？」长老突然冷笑，拂尘扫过他腰间紫晶纹丹渣，「你二叔留下的破功法，让经脉里火符反噬都察觉不到。」玉佩血纹骤然黯淡，林逸踉跄半步，后背抵住冰凉的石壁。
+
+
+  「要我重修筑基？不可能！」他猛地抬头，却见长老指尖凝出金芒，直接劈向他握着阵法碎片的手心。「哼——」闷哼声中，林逸感觉丹田像被火燎，怀里的叛乱旗帜拓印突然发烫。
+
+
+  「有意思。」长老盯着他渗血的掌心，拂尘尖端凝聚出一滴清泉，「先喝下这月华露，去后山石窟把二十八道灵脉重炼一遍。」
+
+
+  林逸盯着地上碎裂的玉佩，突然想起昨夜在禁地发现的噬魂蛊巢穴...「好。」他吐出带血的牙齿，转身时瞥见长老袖中闪过一丝紫晶微光。'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 510810
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

@@ -1,0 +1,45 @@
+id: corpus.planning_execution.regenerated.corpus.planning_execution.auto.003
+version: '2.0'
+category: planning_execution
+failure_modes:
+- planning_execution
+difficulty: medium
+language: zh-CN
+scene_before: '林逸在试炼场青石上猛然惊醒，丹田处传来针扎般的刺痛。「推进主线剧情（场景3）」——他咬破舌尖强行稳住神智，却发现灵力如脱缰野马般冲撞经脉。三日前得自二叔的灵脉共鸣术残卷在怀中发烫，那些晦涩的口诀此刻竟与玉佩产生诡异共鸣。
+
+
+  「经脉裂痕比预想严重三倍。」林逸攥紧衣角，掌心沁出的冷汗浸透了那枚冰属性玄纹灵狐契约。「三日之约...」他冷笑一声，忽然抓起桌案上未拆封的蚀骨丹：「这种程度的心魔余波，我偏不信治不好。」
+
+
+  师父推门而入时，正撞见少年将丹药捏成粉末撒向玉佩。青袍微微一顿：「你想用噬魂蛊反噬心魔？」
+
+  林逸盯着玉佩表面浮现的血色纹路，声音发颤：「要么赌它能削弱虚影，要么等经脉彻底崩断——师父觉得哪条路更划算？」
+
+
+  老者拂尘扫过少年崩裂的右臂经络，叹息声裹着药香飘散：「三日前你本该察觉心魔初现...」
+
+  「现在说这些有意思吗？」林逸突然暴起将玉佩按在胸口，「两刻钟后灵脉暴动，您最好准备好止血藤！」
+
+
+  当房门轰然闭合的刹那，七枚神秘玉佩同时亮起幽光。林逸蜷缩在阵纹中央，看着心魔虚影在经脉中扭成蛇形：「就赌这三个月修为积累...」'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 528564
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

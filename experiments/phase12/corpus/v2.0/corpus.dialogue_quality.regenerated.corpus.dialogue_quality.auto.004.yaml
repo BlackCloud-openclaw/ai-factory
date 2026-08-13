@@ -1,0 +1,44 @@
+id: corpus.dialogue_quality.regenerated.corpus.dialogue_quality.auto.004
+version: '2.0'
+category: dialogue_quality
+failure_modes:
+- dialogue_quality
+difficulty: medium
+language: zh-CN
+scene_before: '林逸咬牙按住腰间流血的伤口，脚下灵脉纹路突然泛起幽蓝光芒。「有意思。，」他冷笑一声，指尖抹过悬浮石桥表面的蚀刻符文。三枚紫晶碎片在掌心震动，与护体罡气共振发出嗡鸣。
+
+
+  「小子，你跑不掉了。」黑袍人从石柱后闪现，袖中飞出数道锁链缠住林逸脚踝。林逸反手甩出两枚玉佩，爆开的灵光震碎半截锁链。
+
+
+  「叛乱核心在哪？」林逸反问，脚下灵脉纹路突然扭曲成八卦阵。黑袍人脸色微变：「你竟能解读上古阵图？」
+
+
+  石壁深处传来轰鸣，地底冲出暗红色能量流。「哼！，」林逸踏着翻涌的灵泉跃起，三枚玉佩同时亮起，将袭来的毒雾凝成实体。他翻身落地时，发现叛乱核心——密室入口正从脚下裂隙渗出血色。
+
+
+  「你逃不出禁地。」黑袍人甩出噬魂蛊，却被林逸反向操控的灵脉共鸣术震碎。石桥尽头传来机关转动声，林逸抓起紫晶碎片砸向控制台：「正好用你们验证阵法效果。」
+
+
+  「找死！」黑袍人怒吼着扑来，林逸已撞入开启的密室，身后传来剧烈爆炸。他踉跄着扶住墙壁，看见密室石壁上刻满叛乱组织的行动路线。'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 624015
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

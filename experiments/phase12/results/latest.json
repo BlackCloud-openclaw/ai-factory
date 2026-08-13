@@ -1,0 +1,144 @@
+{
+  "overall_score": 1.0,
+  "metric_results": [
+    {
+      "name": "planning_coverage",
+      "score": 1.0,
+      "state": "ok",
+      "raw_value": 1.0,
+      "details": {
+        "sample_count": 25,
+        "valid_count": 25,
+        "missing_count": 0,
+        "passed_count": 25,
+        "failed_count": 0,
+        "average_score": 1.0
+      },
+      "passed": true
+    },
+    {
+      "name": "state_consistency",
+      "score": 1.0,
+      "state": "ok",
+      "raw_value": 1.0,
+      "details": {
+        "sample_count": 25,
+        "valid_count": 25,
+        "missing_count": 0,
+        "passed_count": 25,
+        "failed_count": 0,
+        "average_score": 1.0
+      },
+      "passed": true
+    },
+    {
+      "name": "runtime_health",
+      "score": null,
+      "state": "missing",
+      "raw_value": null,
+      "details": {
+        "sample_count": 25,
+        "valid_count": 0,
+        "missing_count": 25,
+        "message": "All samples missing data"
+      },
+      "passed": false
+    },
+    {
+      "name": "revision_pass_rate",
+      "score": null,
+      "state": "missing",
+      "raw_value": null,
+      "details": {
+        "sample_count": 25,
+        "valid_count": 0,
+        "missing_count": 25,
+        "message": "All samples missing data"
+      },
+      "passed": false
+    },
+    {
+      "name": "continuity",
+      "score": null,
+      "state": "missing",
+      "raw_value": null,
+      "details": {
+        "sample_count": 25,
+        "valid_count": 0,
+        "missing_count": 25,
+        "message": "All samples missing data"
+      },
+      "passed": false
+    },
+    {
+      "name": "character",
+      "score": null,
+      "state": "missing",
+      "raw_value": null,
+      "details": {
+        "sample_count": 25,
+        "valid_count": 0,
+        "missing_count": 25,
+        "message": "All samples missing data"
+      },
+      "passed": false
+    },
+    {
+      "name": "dialogue",
+      "score": null,
+      "state": "missing",
+      "raw_value": null,
+      "details": {
+        "sample_count": 25,
+        "valid_count": 0,
+        "missing_count": 25,
+        "message": "All samples missing data"
+      },
+      "passed": false
+    },
+    {
+      "name": "flow",
+      "score": null,
+      "state": "missing",
+      "raw_value": null,
+      "details": {
+        "sample_count": 25,
+        "valid_count": 0,
+        "missing_count": 25,
+        "message": "All samples missing data"
+      },
+      "passed": false
+    }
+  ],
+  "metadata": {
+    "benchmark_version": "12.2",
+    "total_samples": 25,
+    "total_tasks": 200,
+    "success_count": 200,
+    "error_count": 0,
+    "metrics": [
+      "planning_coverage",
+      "state_consistency",
+      "runtime_health",
+      "revision_pass_rate",
+      "continuity",
+      "character",
+      "dialogue",
+      "flow"
+    ],
+    "metrics_count": 8,
+    "aggregator": {
+      "method": "weighted_mean",
+      "weights": {
+        "planning_coverage": 0.15,
+        "state_consistency": 0.15,
+        "runtime_health": 0.1,
+        "revision_pass_rate": 0.1,
+        "continuity": 0.15,
+        "character": 0.15,
+        "dialogue": 0.1,
+        "flow": 0.1
+      }
+    }
+  }
+}

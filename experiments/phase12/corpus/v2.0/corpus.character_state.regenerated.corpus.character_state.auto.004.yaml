@@ -1,0 +1,44 @@
+id: corpus.character_state.regenerated.corpus.character_state.auto.004
+version: '2.0'
+category: character_state
+failure_modes:
+- character_state
+difficulty: medium
+language: zh-CN
+scene_before: '林逸踉跄着后退，右臂传来灼烧般的刺痛。远处灵泉喷涌的赤色光柱在夜空中扭曲，方圆百里的灵气乱流将整座村庄笼罩。，「遭遇灵力暴动！」村民甲捂着胸口跪倒在地，面色青紫。
+
+
+  「林道友快想办——」村民乙话音未落就被狂风掀翻。林逸咬破舌尖，丹田处的金丹虚影在经脉中震荡，明明才炼气九层的修为却透出筑基境的气息。
+
+
+  村民甲挣扎着爬到他脚边：「我娘她...昏迷前还在念叨宗门的灵泉术式！」
+
+
+  「哼，当年二叔藏起的古籍残页倒能派上用场。」林逸甩出神秘玉佩，玉面浮现出与紫晶碎片相似的纹路。
+
+
+  「你疯了？要强行吸收暴走的灵力？，」村民乙死死攥住他衣袖。林逸反手扣住对方手腕：「现在全村人的命就压在这赌注上！
+
+
+  地脉共鸣印在胸口亮起，青铜残页中涌出的古拙符文竟与玉佩产生共振。狂暴灵气如潮水般冲刷经脉时，林逸突然听见二叔的声音在识海回响：「...傀儡术核心紫晶的位置线索...」'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 579614
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

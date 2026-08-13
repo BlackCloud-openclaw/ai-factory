@@ -1,12 +1,11 @@
-"""
-RuntimeSnapshot - 一次 Runtime 执行开始时的不可变快照
-"""
+# src/runtime/snapshot.py
 
 from dataclasses import dataclass, field
 from typing import Tuple, Dict, Any, Optional
 from datetime import datetime
 
 from src.surfaces.definition import SurfaceDefinition
+from src.capabilities import CapabilityLookup
 
 
 @dataclass(frozen=True)
@@ -31,39 +30,32 @@ class RuntimeMetrics:
 class RuntimeSnapshot:
     """
     一次 Runtime 执行开始时的不可变快照
-    
+
     这是 Compiler 的唯一依赖来源：
     - Compiler 不查 Registry
     - Compiler 不依赖 Config 或 Surfaces 列表以外的对象
     - 所有信息在构造时已解析完成
-    
-    执行表示（Execution Representation）：
-    - `surfaces` 字段存储的是 Builder 输出的执行表示
-    - Phase 7A 中为 SurfaceDefinition（与声明表示相同）
-    - 未来可升级为 CompiledSurface（Builder 内部转换），Compiler 接口不变
     """
-    # 必须字段
     snapshot_id: str
     config: RuntimeConfig
-    surfaces: Tuple[SurfaceDefinition, ...]  # 执行表示，未来可为 CompiledSurface
-    
-    # 可选字段
+    surfaces: Tuple[SurfaceDefinition, ...]
+    capability_registry: CapabilityLookup  # 字段名描述对象，类型描述抽象
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
     metrics: RuntimeMetrics = field(default_factory=RuntimeMetrics)
     options: Dict[str, Any] = field(default_factory=dict)
-    source: str = "builder"  # 仅用于调试，不参与执行
-    
+    source: str = "builder"
+
     def get_surface(self, id: str) -> Optional[SurfaceDefinition]:
         """按 ID 查找 Surface（不暴露内部结构）"""
         for surface in self.surfaces:
             if surface.metadata.id == id:
                 return surface
         return None
-    
+
     def get_surface_ids(self) -> Tuple[str, ...]:
         """返回所有 Surface ID"""
         return tuple(s.metadata.id for s in self.surfaces)
-    
+
     def __len__(self) -> int:
         """返回 Surface 数量"""
         return len(self.surfaces)

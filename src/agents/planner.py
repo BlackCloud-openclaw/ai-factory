@@ -22,6 +22,20 @@ from src.writing.narrative_entropy import EntropyController, EntropyReport, Cont
 from src.db import get_db_pool
 from src.writing.loop_store import LoopStore
 from src.writing.planning_contract import create_contract_from_dict
+from src.writing.narrative_intent import (
+    NarrativeIntent,
+    SceneRole,
+    NarrativeConsequence,
+    NarrativeCondition,
+)
+from src.writing.planning_contract import (
+    PlanningContract, Observables, StateChange,
+    Intent, Execution, ExecutionUnit, ContractMetadata,
+    SceneSpecification, ContractEnrichment
+)
+from src.writing.planner_output import PlannerOutput
+from src.writing.projection_context import ProjectionContext
+from src.writing.narrative_projection import NarrativeProjection
 
 logger = setup_logging("agents.planner")
 
@@ -80,8 +94,15 @@ class PlannerAgent(BaseAgent):
         return self.rule_engine
 
     async def run(self, state: AgentState) -> Dict[str, Any]:
-        self._state = state  # 保存供日志使用
-        
+        """
+        PlannerAgent 主入口。
+        根据 task_type 执行不同任务：
+        - novel_outline: 分步式大纲生成
+        - scene_plan: 场景计划 + NarrativeIntent 生成
+        - code: 代码任务规划
+        """
+        logger.info("🔥🔥🔥 PLANNER RUN IS EXECUTING 🔥🔥🔥")
+        self._state = state
         agent_name = "PlannerAgent"
         state.step_count += 1
         step = state.step_count
@@ -99,12 +120,13 @@ class PlannerAgent(BaseAgent):
                 return {
                     "plan_result": outline,
                     "outline": outline,
+                    "planner_outputs": [],  # 大纲生成不产生 planner_outputs
                     "error": None,
                 }
             except Exception as e:
                 duration = time.time() - start_time
                 logger.error(f"{agent_name} failed (stepwise outline), step={step}, error={e}, duration={duration:.2f}")
-                return {"plan_result": {}, "error": str(e)}
+                return {"plan_result": {}, "outline": None, "planner_outputs": [], "error": str(e)}
 
         # ---------- 对于 scene_plan 任务，计算可供性提示（冷却） ----------
         if task_type == "scene_plan":
@@ -114,29 +136,23 @@ class PlannerAgent(BaseAgent):
                 from src.writing.causality.affordance import get_affordance_cooldown_penalty
                 scored = []
                 for rule in affordance_rules:
-                    # 使用第一个能力作为标识（可根据规则定义调整）
                     aff_id = rule.enables[0] if rule.enables else rule.id
                     penalty = await get_affordance_cooldown_penalty(
                         state.novel_id, aff_id, state.current_chapter, rule.cooldown
                     )
-                    # 基础分数（此处简单使用 1，未来可结合谓词满足程度）
                     score = 1.0 * penalty
-                    hint_text = rule.hint if rule.hint else rule.suggestion   # 关键修改
+                    hint_text = rule.hint if rule.hint else rule.suggestion
                     scored.append((score, hint_text))
-                # 按分数降序排序，取前 5
                 scored.sort(reverse=True, key=lambda x: x[0])
                 top_hints = [hint for _, hint in scored[:5]]
                 state.metadata["affordance_hints"] = top_hints
             else:
                 state.metadata["affordance_hints"] = []
 
-            # ========== 新增：熵控制子系统（替代旧的熵警告） ==========
-            # 从 compressed_state 中读取三维熵
+            # ========== 熵控制子系统 ==========
             entropy_report = None
             compressed_state = state.compressed_state
             if compressed_state:
-                # 兼容新旧格式：如果 compressed_state 有 local_entropy 等字段，直接使用
-                # 否则创建默认熵报告
                 local_entropy = compressed_state.get("local_entropy", 0.0)
                 arc_entropy = compressed_state.get("arc_entropy", 0.0)
                 civ_entropy = compressed_state.get("civilization_entropy", 0.0)
@@ -148,19 +164,15 @@ class PlannerAgent(BaseAgent):
                 )
             else:
                 entropy_report = EntropyReport()
-            
-            # 调用熵控制器生成调控动作
+
             control_actions = EntropyController.regulate(entropy_report)
-            # 将动作列表存入 metadata（序列化为字典列表）
             state.metadata["entropy_control_actions"] = [action.to_dict() for action in control_actions]
-            
-            # 记录调控动作（用于调试）
+
             if control_actions:
                 logger.info(f"Entropy control actions: {[a.type for a in control_actions]}")
             else:
                 logger.debug("No entropy control actions needed")
-            
-            # 可选：保留旧的熵警告字段以兼容（但新系统已覆盖）
+
             if compressed_state:
                 narrative_entropy = compressed_state.get("narrative_entropy", 0.0)
                 state.metadata["narrative_entropy_warning"] = narrative_entropy > 0.7
@@ -168,66 +180,71 @@ class PlannerAgent(BaseAgent):
             else:
                 state.metadata["narrative_entropy_warning"] = False
 
-            # ========== 新增：防止叙事扩散（硬性限制） ==========
-            # 限制活跃弧线数量
+            # 防止叙事扩散
             if compressed_state:
-                # 获取弧线信息（从 compressed_state 或 state）
                 character_arcs = compressed_state.get("character_arcs", {})
                 unresolved_arcs = sum(1 for status in character_arcs.values() if status != "resolved")
-                max_active_arcs = 5  # 最多同时存在 5 条未解决弧线
+                max_active_arcs = 5
                 if unresolved_arcs > max_active_arcs:
-                    # 创建禁止新弧线的动作
                     forbid_arcs_action = ControlAction(
                         type="forbid_new_arcs",
                         params={"duration_chapters": 2, "reason": f"已有 {unresolved_arcs} 个未解决弧线，超过限制 {max_active_arcs}"}
                     )
                     existing_actions = state.metadata.get("entropy_control_actions", [])
-                    # 检查是否已经存在类似动作
                     if not any(a.get("type") == "forbid_new_arcs" for a in existing_actions):
                         existing_actions.append(forbid_arcs_action.to_dict())
                         state.metadata["entropy_control_actions"] = existing_actions
                         logger.info(f"Preventing diffusion: forced forbid_new_arcs due to {unresolved_arcs} unresolved arcs (limit {max_active_arcs})")
-            
-            # 限制新 lore 引入率（可选，简单基于全局标记数量，但更精确的由熵控制处理）
-            # 为了完整性，我们也可以在这里添加基于 recent_events 的统计，但为了简化，依赖熵控制的 forbid_new_lore 已经足够。
-            # ================================================================
-        # ===========================================================
 
-        # ========== [新增] 确保有激活的 Loop（生命周期管理） ==========
-        if state.novel_id and task_type == "scene_plan":
-            pool = get_db_pool()
-            if pool:
-                loop_store = LoopStore(pool)
-                active_loop = await loop_store.get_active_loop(state.novel_id)
-                if active_loop is None:
-                    # 从大纲中提取核心冲突作为 Loop 描述
-                    loop_desc = "主角提升实力，探索世界，推动主线剧情"
-                    if state.outline and "volumes" in state.outline:
-                        volumes = state.outline.get("volumes", [])
-                        if volumes and state.current_volume <= len(volumes):
-                            vol = volumes[state.current_volume - 1]
-                            loop_desc = vol.get("core_conflict", loop_desc)
-                    active_loop = await loop_store.create_loop(
-                        state.novel_id,
-                        title=f"主线推进 - 卷{state.current_volume}",
-                        description=loop_desc
-                    )
-                    logger.info(f"✅ Created new active Loop for novel {state.novel_id}: {active_loop.title}")
-                # 将 Loop 信息存入 state.metadata，供 Writer 和 Validator 使用
-                state.metadata["active_loop"] = {
-                    "id": str(active_loop.id),
-                    "title": active_loop.title,
-                    "description": active_loop.description,
-                    "progress": active_loop.progress,
-                }
-        # =============================================================
+            # ========== 确保有激活的 Loop ==========
+            if state.novel_id:
+                pool = get_db_pool()
+                if pool:
+                    loop_store = LoopStore(pool)
+                    active_loop = await loop_store.get_active_loop(state.novel_id)
+                    if active_loop is None:
+                        loop_desc = "主角提升实力，探索世界，推动主线剧情"
+                        if state.outline and "volumes" in state.outline:
+                            volumes = state.outline.get("volumes", [])
+                            if volumes and state.current_volume <= len(volumes):
+                                vol = volumes[state.current_volume - 1]
+                                loop_desc = vol.get("core_conflict", loop_desc)
+                        active_loop = await loop_store.create_loop(
+                            state.novel_id,
+                            title=f"主线推进 - 卷{state.current_volume}",
+                            description=loop_desc
+                        )
+                        logger.info(f"✅ Created new active Loop for novel {state.novel_id}: {active_loop.title}")
+                    state.metadata["active_loop"] = {
+                        "id": str(active_loop.id),
+                        "title": active_loop.title,
+                        "description": active_loop.description,
+                        "progress": active_loop.progress,
+                    }
 
-        # ---------- 其他任务类型（code, scene_plan 等）使用原有逻辑 ----------
+        # ---------- 构建 Prompt ----------
         builder = PROMPT_REGISTRY.get(task_type)
         if not builder:
             builder = PROMPT_REGISTRY["code"]
 
-        prompt = builder.build(state)   # builder.build 内部会读取 state.metadata 中的 affordance_hints 和 entropy 警告以及新的控制动作
+        prompt = builder.build(state)
+
+        # ========== Phase 13.2: 注入 NarrativeProjection ==========
+        if task_type == "scene_plan" and state.projection is not None:
+            try:
+                from src.writing.projection_context import ProjectionContext
+                ctx = ProjectionContext.from_projection(state.projection)
+                projection_text = ctx.to_prompt_text()
+                prompt = prompt + "\n\n" + projection_text
+                logger.info(
+                    f"[PlannerAgent] Injected Projection (version {state.projection.version}) "
+                    f"with {len(state.projection.unresolved_threads)} unresolved threads"
+                )
+            except Exception as e:
+                logger.warning(f"[PlannerAgent] Failed to inject Projection: {e}")
+
+        # 初始化 planner_outputs（用于 scene_plan 返回）
+        planner_outputs = []
 
         try:
             response = await self.plan_request_with_prompt(prompt, task_type)
@@ -237,42 +254,170 @@ class PlannerAgent(BaseAgent):
             if task_type == "scene_plan" and isinstance(result, list):
                 result = {"scenes": result}
 
-            # ========== 新增：生成 Planning Contract ==========
+            # ========== 生成 Planning Contract + NarrativeIntent ==========
             if task_type == "scene_plan" and result and "scenes" in result:
                 scenes = result["scenes"]
+                planner_outputs = []  # 重新初始化，确保清空
+
                 for idx, scene in enumerate(scenes):
                     try:
-                        # 补全必要字段
                         if "scene_id" not in scene:
                             scene["scene_id"] = f"scene_{state.current_volume}_{state.current_chapter}_{idx}"
                         if "chapter" not in scene:
                             scene["chapter"] = state.current_chapter
                         if "scene_index" not in scene:
                             scene["scene_index"] = idx
+
+                        # ========== 直接构造 PlanningContract，保留 observables ==========
+                        obs_data = scene.get("observables", {})
                         
-                        # 转换为 Contract
-                        contract = create_contract_from_dict(scene)
-                        scene["planning_contract"] = contract.model_dump()
+                        # 🔥 清洗 state_changes 中的数据（转换 to_minor_stage 字符串、处理 hp_change）
+                        if "state_changes" in obs_data:
+                            cleaned_changes = []
+                            for sc in obs_data["state_changes"]:
+                                # 处理 realm_change: to_minor_stage 字符串转整数
+                                if sc.get("type") == "realm_change":
+                                    stage = sc.get("to_minor_stage")
+                                    if isinstance(stage, str):
+                                        stage_map = {"初期": 1, "中期": 5, "后期": 9, "巅峰": 9}
+                                        if stage in stage_map:
+                                            sc["to_minor_stage"] = stage_map[stage]
+                                        else:
+                                            try:
+                                                sc["to_minor_stage"] = int(stage)
+                                            except ValueError:
+                                                sc["to_minor_stage"] = 1
+                                    elif stage is None:
+                                        sc["to_minor_stage"] = 1
+                                
+                                # 处理 hp_change -> plot_flag（避免 Pydantic 验证错误）
+                                if sc.get("type") == "hp_change":
+                                    sc["type"] = "plot_flag"
+                                    actor = sc.get("actor", "unknown")
+                                    sc["name"] = f"hp_{actor}_changed"
+                                    sc["value"] = True
+                                    sc.pop("delta", None)
+                                    sc.pop("actor", None)
+                                    sc.pop("new_hp", None)
+                                
+                                cleaned_changes.append(sc)
+                            obs_data["state_changes"] = cleaned_changes
                         
+                        # 现在构建 StateChange 对象
+                        state_changes = []
+                        for sc in obs_data.get("state_changes", []):
+                            # 如果没有 id，生成一个稳定的 id
+                            if not sc.get("id"):
+                                import hashlib
+                                raw = f"{scene['scene_id']}|{sc.get('type', 'unknown')}|{sc.get('name', '')}|{sc.get('actor', '')}"
+                                sc_id = hashlib.sha256(raw.encode('utf-8')).hexdigest()[:12]
+                                sc["id"] = sc_id
+                            state_changes.append(StateChange(**sc))
+                        
+                        observables = Observables(state_changes=state_changes)
+
+                        # 构建执行单元
+                        execution_units = []
+                        for i, event in enumerate(scene.get("must_events", [])):
+                            execution_units.append(ExecutionUnit(
+                                id=f"U{i+1}",
+                                label="action",
+                                description=event,
+                                attributes={}
+                            ))
+
+                        # 构建 scene_spec（如果有）
+                        scene_spec = None
+                        if scene.get("scene_spec"):
+                            scene_spec = SceneSpecification(**scene.get("scene_spec"))
+
+                        contract = PlanningContract(
+                            version="1.0",
+                            scene_id=scene["scene_id"],
+                            intent=Intent(
+                                goal=scene.get("goal", ""),
+                                conflict=scene.get("conflict", ""),
+                                expected_outcome=scene.get("outcome", "")
+                            ),
+                            execution=Execution(units=execution_units),
+                            observables=observables,
+                            constraints=[],  # 暂时为空，可由 Normalizer 补全
+                            metadata=ContractMetadata(
+                                chapter=state.current_chapter,
+                                scene_index=idx,
+                                arc=None
+                            ),
+                            scene_spec=scene_spec,
+                            enrichment=ContractEnrichment()
+                        )
+
+                        # 构建 contract_dict（用于场景计划）
+                        contract_dict = {
+                            "version": contract.version,
+                            "scene_id": contract.scene_id,
+                            "intent": contract.intent.model_dump(),
+                            "execution": contract.execution.model_dump(),
+                            "observables": observables.model_dump(),
+                            "constraints": [],
+                            "metadata": contract.metadata.model_dump(),
+                            "scene_spec": contract.scene_spec.model_dump() if contract.scene_spec else None,
+                            "enrichment": contract.enrichment.model_dump(),
+                        }
+                        scene["planning_contract"] = contract_dict
+
+                        # ========== 构建 NarrativeIntent ==========
+                        narrative_intent = self._build_narrative_intent_from_scene(
+                            scene=scene,
+                            scene_id=scene["scene_id"],
+                            chapter=state.current_chapter,
+                            scene_idx=idx,
+                        )
+
+                        planner_output = PlannerOutput(
+                            narrative_intent=narrative_intent,
+                            execution_contract=contract,
+                        )
+                        planner_outputs.append(planner_output.model_dump())
+
                         logger.info(f"✅ Generated Planning Contract for scene {scene['scene_id']}")
                     except Exception as e:
                         logger.warning(f"Failed to generate Planning Contract for scene {idx}: {e}")
-                        scene["planning_contract"] = None
-            # =====================================================
+                        scene["planning_contract"] = None                 
+
 
             duration = time.time() - start_time
             logger.info(f"{agent_name} completed, step={step}, status=success, duration={duration:.2f}")
-            return {
+
+            # 构建返回字典
+            return_dict = {
                 "plan_result": result,
                 "task_plan": result if task_type == "code" else None,
                 "outline": result if task_type == "novel_outline" else None,
                 "scene_plan": result if task_type == "scene_plan" else None,
+                "planner_outputs": planner_outputs,  # 关键添加
                 "error": None,
             }
+            
+            # ========== 在这里插入上面的验证日志 ==========
+            if task_type == "scene_plan" and "scene_plan" in return_dict:
+                scene_plan_data = return_dict["scene_plan"]
+                if scene_plan_data and isinstance(scene_plan_data, dict) and "scenes" in scene_plan_data:
+                    scenes_in_return = scene_plan_data["scenes"]
+                    if scenes_in_return:
+                        logger.info(f"🔍 Returning scenes[0] keys: {list(scenes_in_return[0].keys())}")
+                        logger.info(f"🔍 Returning scenes[0] planning_contract: {scenes_in_return[0].get('planning_contract', 'MISSING')}")
+                    else:
+                        logger.warning("🔍 Returning scenes is empty")
+                else:
+                    logger.warning("🔍 Returning scene_plan is not a dict or missing 'scenes'")
+
+            
+            return return_dict
+
         except Exception as e:
             duration = time.time() - start_time
             logger.error(f"{agent_name} failed, step={step}, error={e}, duration={duration:.2f}")
-            return {"plan_result": {}, "error": str(e)}
+            return {"plan_result": {}, "planner_outputs": [], "error": str(e)}
 
     # ========== 分步式大纲生成核心逻辑（支持分批生成章节） ==========
     async def _generate_outline_step_by_step(self, state: AgentState) -> Dict[str, Any]:
@@ -528,3 +673,46 @@ class PlannerAgent(BaseAgent):
         if len(order) != len(subtasks):
             return [st.id for st in subtasks]
         return order
+    
+    def _build_narrative_intent_from_scene(
+        self,
+        scene: Dict[str, Any],
+        scene_id: str,
+        chapter: int,
+        scene_idx: int,
+    ) -> NarrativeIntent:
+        """
+        从场景数据构建 NarrativeIntent。
+        当前为启发式构建，后续由 Planner LLM 直接输出。
+        """
+        goal = scene.get("goal", "推进剧情")
+        scene_spec = scene.get("scene_spec", {})
+        narrative_function = scene_spec.get("narrative_function", "")
+
+        # 推断 SceneRole
+        role_map = {
+            "introduce_mystery": SceneRole.SETUP,
+            "escalate": SceneRole.CONFLICT_ESCALATION,
+            "reveal_truth": SceneRole.DISCOVERY,
+            "release_tension": SceneRole.RECOVERY,
+            "transition": SceneRole.TRANSITION,
+            "foreshadow": SceneRole.CLIMAX_PREPARATION,
+        }
+        scene_role = role_map.get(narrative_function, SceneRole.TRANSITION)
+
+        # 生成确定性 intent_id
+        intent_id = NarrativeIntent.generate_intent_id(
+            scene_id=scene_id,
+            role=scene_role,
+            objective=goal
+        )
+
+        return NarrativeIntent(
+            intent_id=intent_id,
+            scene_role=scene_role,
+            objective=goal,
+            preconditions=[],      # 暂由 Planner LLM 填充
+            beats=[],              # 暂由 Planner LLM 填充
+            consequences=[],       # 暂由 Planner LLM 填充
+            interaction_plan=None,
+        )

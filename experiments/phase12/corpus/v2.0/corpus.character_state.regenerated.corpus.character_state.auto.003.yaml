@@ -1,0 +1,50 @@
+id: corpus.character_state.regenerated.corpus.character_state.auto.003
+version: '2.0'
+category: character_state
+failure_modes:
+- character_state
+difficulty: medium
+language: zh-CN
+scene_before: '林逸盘膝坐在禁地石台上，掌心托着神秘玉佩缓缓运转功法。突然丹田处传来撕裂般的剧痛，周身空气凝成血色漩涡——「主角修炼时遭遇心魔幻境」！
+
+
+  "呵，又见面了废物！"三年前宗门大比的虚影在幻境中具现，同门苏辰捏碎他护体真元的模样分外清晰。林逸右臂经脉突然抽搐，玉佩表面浮出诡异纹路。
+
+
+  心魔幻化的苏辰冷笑道："怎么？还要装作没事人？你永远无法突破金丹四层！"
+
+
+  林逸咬碎舌尖以痛压痛："有意思...我倒要看看你能维持几息。"
+
+
+  "七息后你的神魂就会崩解！"幻影挥出染血长剑，林逸反手按住玉佩上新浮现的封印符文："哼！我偏不信这命定之数。"
+
+
+  当第三道剑气劈来时，玉佩突然吸收了心魔气息。林逸瞳孔骤缩："不对...这幻境藏着二叔功法缺陷的破解之法？"
+
+
+  苏辰幻影狞笑："你连真相都不敢直视！"
+
+
+  林逸猛然催动九转玄冥诀残页："好，那我就用这半块金丹碎片强行压制！"'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 562453
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

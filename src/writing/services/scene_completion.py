@@ -3,7 +3,7 @@ import asyncpg
 from pathlib import Path
 from src.db import get_db_pool
 from src.writing.event_store import NarrativeEventStore
-from src.writing.snapshot import SnapshotManager
+from src.writing.snapshot_manager import SnapshotManager
 from src.writing.delta import StateDelta
 from src.writing.world_state import WorldState
 from src.writing.events import event_from_dict
@@ -122,6 +122,35 @@ class SceneCompletionService:
 
 
                     await ensure_core_predicates(cmd.novel_id, new_world)
+                    
+                # ========== Phase 13.2.1: Projection 更新（事务内） ==========
+                if cmd.narrative_intent and events:
+                    try:
+                        from src.writing.projection_service import NarrativeProjectionService
+                        from src.writing.projection_updater import ProjectionUpdater
+                        from src.writing.exceptions import ProjectionUpdateFailed
+                        import inspect
+
+                        # 关键：传入同一个 conn，确保事务一致
+                        service = NarrativeProjectionService(conn=conn)
+                        current_result = service.load_current()
+                        current = await current_result if inspect.isawaitable(current_result) else current_result
+
+                        updater = ProjectionUpdater()
+                        new_projection = updater.update(
+                            previous=current,
+                            intent=cmd.narrative_intent,
+                            events=events
+                        )
+                        save_result = service.save(new_projection)
+                        if inspect.isawaitable(save_result):
+                            await save_result
+
+                        logger.info(f"✅ Projection 更新成功 (version {new_projection.version})")
+                    except Exception as e:
+                        logger.error(f"Projection 更新失败，事务回滚: {e}", exc_info=True)
+                        raise ProjectionUpdateFailed("Projection update failed") from e
+                # ===========================================================
 
                 # ========== 保存场景正文到文件（独立于事件） ==========
                 logger.info(f"[SAVE_DEBUG] cmd.parsed_output keys: {list(cmd.parsed_output.keys()) if cmd.parsed_output else 'None'}")

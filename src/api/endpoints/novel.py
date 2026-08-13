@@ -12,7 +12,7 @@ from src.orchestrator.state import AgentState
 from src.orchestrator.graph import compile_workflow
 from src.db import get_db_pool
 from src.writing.event_store import NarrativeEventStore
-from src.writing.snapshot import SnapshotManager
+from src.writing.snapshot_manager import SnapshotManager
 from src.writing.world_state import WorldState
 from src.writing.delta import StateDelta
 from src.db.pool import load_writing_progress, init_writing_progress

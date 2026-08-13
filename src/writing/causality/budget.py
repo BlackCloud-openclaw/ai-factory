@@ -16,7 +16,12 @@ class ConsistencyBudget:
         self.remaining_soft = self.max_soft
 
     async def load(self) -> None:
+        # 如果 novel_id 为空，直接返回
+        if not self.novel_id:
+            return
         pool = get_db_pool()
+        if pool is None:
+            return
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
                 """

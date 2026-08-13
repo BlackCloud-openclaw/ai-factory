@@ -1,0 +1,29 @@
+id: corpus.dialogue_quality.auto.005
+version: '1.0'
+category: dialogue_quality
+failure_modes:
+- dialogue_quality
+difficulty: medium
+language: zh-CN
+scene_before: '林逸反手抽出腰间短剑刺入地面，紫色灵气漩涡骤然扩大三倍，剑阵核心裂开蛛网状纹路。“推进主线剧情（场景3）”的提示音在识海炸响时，五道剑气已撕碎他左肩护甲。
+
+
+  「林兄！东南角缺口还能撑十息！，」二叔咳着血喊。，林逸盯着傀儡胸口跳动的紫晶，玉佩突然发烫灼痛掌心。「有意思...」他冷笑抹去嘴角血迹，脚下剑阵纹路开始逆向流动。
+
+
+  傀儡发出金属摩擦般的怒吼，七十二道剑气织成光网罩下。“轰——”炸开的冲击波震飞两个重伤队友，石壁裂缝间渗出暗红能量流。，「你疯了？，要陪他们一起死？」二叔拽住他衣袖。
+
+
+  「这邪！」林逸甩开束缚，玉佩与紫晶共鸣声刺耳如裂帛。，剑阵核心突然投射出三道虚影，正是石碑上记载的剑意。，「好！正缺个火符反噬的试验品！
+
+
+  空间乱流开始吞噬地面，林逸咬破指尖在玉佩刻下血契。「哼...」他纵身跃向光网中心，紫晶碎片突然自动悬浮组成传送阵。二叔眼睁睁看着少年被强光吞没，剑阵核心轰然闭合时，倒计时归零的瞬间传来闷雷般的崩塌声。'
+scene_after: null
+source: auto
+license: internal
+tags:
+- auto
+- phase12.1b
+- category_dialogue_quality
+expected: {}
+artifacts: {}

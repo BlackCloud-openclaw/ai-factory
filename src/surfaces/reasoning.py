@@ -1,6 +1,4 @@
-"""
-Reasoning Surface - Phase 6 内建控制面的声明式表达
-"""
+# src/surfaces/reasoning.py
 
 from src.surfaces.definition import (
     SurfaceDefinition,
@@ -12,6 +10,7 @@ from src.surfaces.definition import (
     LayerRule,
     RepairStrategy,
 )
+from src.capabilities import CapabilityRef
 
 
 # ============================================================
@@ -22,7 +21,7 @@ STATE_KEYWORDS = [
     # 原有
     "密信", "血契", "玉牌", "玉佩", "烙印", "印记", "罗盘", "青铜",
     "药水", "符纸", "龙纹", "胎记", "黑曜石", "铜铃",
-    # 扩展（来自 field_anomaly 等）
+    # 扩展
     "法器", "符箓", "阵眼", "灵脉", "封印", "禁制", "阵法",
     "灵田", "灵气", "灵根", "功法", "残卷", "秘笈", "密卷",
     "令牌", "剑穗", "香灰", "灰烬", "血玉", "玄铁",
@@ -38,12 +37,12 @@ LOGIC_KEYWORDS = [
 REASONING_PATTERNS = (
     PatternDefinition(
         name="state_keyword",
-        matcher="keyword",
+        capability_ref=CapabilityRef.parse("builtin.keyword"),
         config={"keywords": STATE_KEYWORDS}
     ),
     PatternDefinition(
         name="logic_marker",
-        matcher="keyword",
+        capability_ref=CapabilityRef.parse("builtin.keyword"),
         config={"keywords": LOGIC_KEYWORDS}
     ),
 )

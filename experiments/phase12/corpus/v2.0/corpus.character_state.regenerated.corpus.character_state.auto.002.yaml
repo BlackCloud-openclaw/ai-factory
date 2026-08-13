@@ -1,0 +1,47 @@
+id: corpus.character_state.regenerated.corpus.character_state.auto.002
+version: '2.0'
+category: character_state
+failure_modes:
+- character_state
+difficulty: medium
+language: zh-CN
+scene_before: '「主角修炼时遭遇心魔幻境」
+
+
+  林逸盘坐在禁地石室，掌中神秘玉佩泛着幽光。他正尝试以金丹三层境界催动九转玄冥诀，忽然察觉丹田真气如沸水般翻涌。"有意思...三年前宗门大比时那群鼠辈的笑声又来了？"他咬紧牙关，心魔幻境已具象化——三日前大比擂台上，少年林逸被金丹四层修士一掌轰碎护体罡气的画面不断重播。
+
+
+  虚影中的筑基期修士冷笑道："金丹三层就敢挑战？不自量力的蝼蚁！"
+
+
+  林逸右掌按在石壁上，经脉传来撕裂般的疼痛："哼，你不过是心魔幻化的投影。"
+
+
+  "你永远无法突破到金丹四层！"幻影举起染血长剑劈下，石室崩塌声与三年前如出一辙。
+
+
+  林逸突然捏碎手中玉佩："我偏不信这个邪！"玉佩碎裂瞬间，七颗悬浮的神秘玉佩同时震颤。他趁机运转二叔留下的残缺口诀："九宫八卦阵眼可吸收淬毒武器能量..."
+
+
+  "你这是自毁根基！"心魔咆哮着，却发现林逸丹田真气暴涨三成。七息时限将至的刹那，林逸闷哼一声跪倒在地，右臂经脉传来灼烧感——他强行压制了心魔，但幻境深处某处符文悄然烙印在玉佩残片上。'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 554350
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

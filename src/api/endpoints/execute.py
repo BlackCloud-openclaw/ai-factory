@@ -21,7 +21,7 @@ from src.config import config
 
 # 新架构事件存储和快照
 from src.writing.event_store import NarrativeEventStore
-from src.writing.snapshot import SnapshotManager
+from src.writing.snapshot_manager import SnapshotManager
 from src.writing.world_state import WorldState
 from src.writing.delta import StateDelta
 
@@ -115,7 +115,7 @@ async def _run_workflow(req: ExecuteRequest) -> dict:
                     initial_state.current_chapter = row["current_chapter"] or 1
                     initial_state.current_scene_index = row["current_scene_index"] or 0
                     
-                    initial_state.metadata["scene_plan_list"] = []
+                    initial_state.scene_plan_list = []                    
                     initial_state.metadata["total_scenes_in_chapter"] = 0
                     initial_state.metadata["current_scene_index"] = initial_state.current_scene_index
                     initial_state.metadata["current_scene_plan"] = None

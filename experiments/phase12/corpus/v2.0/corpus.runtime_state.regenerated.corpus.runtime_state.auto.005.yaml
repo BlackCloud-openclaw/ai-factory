@@ -1,0 +1,41 @@
+id: corpus.runtime_state.regenerated.corpus.runtime_state.auto.005
+version: '2.0'
+category: runtime_state
+failure_modes:
+- runtime_state
+difficulty: medium
+language: zh-CN
+scene_before: "{\n    \"scene_text\": \"林逸指尖轻抚过《心魔录》泛黄的书页，忽见某页墨迹在玉佩辉映下浮现双影。他眯眼辨认：'三日前子时，藏书阁烛火暗三次，对应心魔躁动时刻分毫不差'。\\\
+  n\\n「有意思...」林逸将玉简抵住后颈，血色符文顺着锁骨蔓延，\"哼！借心魔夺舍之术，倒比那些粗浅傀儡术高明。\"窗外忽然掠过黑袍残影，他猛地合上典籍。\\\
+  n\\n石阶传来靴声，林逸翻身跃上横梁。长老的玄色长衫在烛火中晃动：「小辈莫非也对心魔感兴趣？」\\n\\n「我偏不信什么天生心魔之说。」林逸压低声音，袖中玉佩与书架暗格产生共鸣。\\\
+  n\\n长老指尖划过《心魔录》标题，火光在他瞳孔里折射出诡异纹路：「破妄诀第七重...你连筑基期的境界都未稳固，擅闯禁地当真有趣。」\\n\\n林逸突然甩出玉简：「九转玄冥诀残页？二叔当年可没说过这等秘术！」他借着翻书动作将袖中玉佩按向暗格机关。\\\
+  n\\n长老神色微变，袍角无风自动：「你...」\\n\\n「好。既然如此，我倒要看看是谁在操控这些心魔。」林逸纵身跃窗而出，身后传来纸张撕裂声。\",\n \
+  \   \"events\": [\n        {\"type\": \"discovery\", \"discoverer\": \"林逸\", \"\
+  discovery\": \"长老修炼笔记异常\", \"importance\": 5},\n        {\"type\": \"plot_flag_set\"\
+  , \"flag\": \"揭露某长老暗中操控\", \"value\": true},\n        {\"type\": \"relationship_change\"\
+  , \"from_char\": \"林逸\", \"to_char\": \"长老\", \"delta\": -20},\n        {\"type\"\
+  : \"item_acquire\", \"actor\": \"林逸\", \"item\": \"九转玄冥诀残页\", \"source\": \"暗格机关\"\
+  },\n        {\"type\": \"location_enter\", \"actor\": \"林逸\", \"location\": \"藏书阁密道\"\
+  }\n    ],\n    \"foreshadowing\": [\n        \"玉佩与暗格机关的共鸣暗示更古老的传承\",\n        \"\
+  长老瞳孔中火光折射的纹路与二叔功法缺陷相关\"\n    ]\n}"
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 522499
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

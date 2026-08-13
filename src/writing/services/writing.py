@@ -49,10 +49,46 @@ class WritingService:
             # ====== 新增：传递戏剧结构 ======
             drama_structure=cmd.drama_structure,
             metadata=cmd.metadata or {},  # 添加这一行
+            planning_contract=cmd.execution_contract,   # D.4.1-a
+        )
+        # ========== D.4.1-a 边界日志 ==========
+        logger.critical(
+            "WRITING_SERVICE_AGENT_STATE_CONTRACT: exists=%s type=%s",
+            cmd.execution_contract is not None,
+            type(cmd.execution_contract).__name__ if cmd.execution_contract is not None else "None"
         )
         # 注入反馈
         if cmd.writing_feedback:
             temp_state.metadata["writing_feedback"] = cmd.writing_feedback
+
+        # ========== P1 诊断：Service 层 Contract 传递 ==========
+        planning_contract = getattr(cmd, "execution_contract", None)
+        if planning_contract:
+            # 提取 contract_id（兼容 dict 和对象）
+            contract_id = (
+                planning_contract.get("scene_id", "unknown")
+                if isinstance(planning_contract, dict)
+                else getattr(planning_contract, "scene_id", "unknown")
+            )
+            # 提取 state_changes
+            if isinstance(planning_contract, dict):
+                obs = planning_contract.get("observables", {})
+                scs = obs.get("state_changes", [])
+            else:
+                scs = planning_contract.observables.state_changes if hasattr(planning_contract, 'observables') else []
+            
+            logger.critical(
+                "WRITER_CONTRACT_INPUT: type=%s contract_id=%s state_changes=%s",
+                type(planning_contract).__name__,
+                contract_id,
+                [
+                    {"type": sc.get("type") if isinstance(sc, dict) else getattr(sc, "type", None)}
+                    for sc in scs
+                ]
+            )
+        else:
+            logger.critical("WRITER_CONTRACT_INPUT: planning_contract is None")
+        # ===========================================================
 
         writer = WritingAgent()
         result = await writer.run(temp_state)

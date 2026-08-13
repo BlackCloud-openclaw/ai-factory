@@ -1,0 +1,31 @@
+version: '2.0'
+created_at: '2026-07-28T16:26:15.100729'
+categories:
+- v2.0
+samples:
+- path: corpus.character_state.regenerated.corpus.character_state.auto.001.yaml
+- path: corpus.character_state.regenerated.corpus.character_state.auto.002.yaml
+- path: corpus.character_state.regenerated.corpus.character_state.auto.003.yaml
+- path: corpus.character_state.regenerated.corpus.character_state.auto.004.yaml
+- path: corpus.character_state.regenerated.corpus.character_state.auto.005.yaml
+- path: corpus.dialogue_quality.regenerated.corpus.dialogue_quality.auto.001.yaml
+- path: corpus.dialogue_quality.regenerated.corpus.dialogue_quality.auto.002.yaml
+- path: corpus.dialogue_quality.regenerated.corpus.dialogue_quality.auto.003.yaml
+- path: corpus.dialogue_quality.regenerated.corpus.dialogue_quality.auto.004.yaml
+- path: corpus.dialogue_quality.regenerated.corpus.dialogue_quality.auto.005.yaml
+- path: corpus.planning_execution.regenerated.corpus.planning_execution.auto.001.yaml
+- path: corpus.planning_execution.regenerated.corpus.planning_execution.auto.002.yaml
+- path: corpus.planning_execution.regenerated.corpus.planning_execution.auto.003.yaml
+- path: corpus.planning_execution.regenerated.corpus.planning_execution.auto.004.yaml
+- path: corpus.planning_execution.regenerated.corpus.planning_execution.auto.005.yaml
+- path: corpus.runtime_state.regenerated.corpus.runtime_state.auto.001.yaml
+- path: corpus.runtime_state.regenerated.corpus.runtime_state.auto.002.yaml
+- path: corpus.runtime_state.regenerated.corpus.runtime_state.auto.003.yaml
+- path: corpus.runtime_state.regenerated.corpus.runtime_state.auto.004.yaml
+- path: corpus.runtime_state.regenerated.corpus.runtime_state.auto.005.yaml
+- path: corpus.scene_transition.regenerated.corpus.scene_transition.auto.001.yaml
+- path: corpus.scene_transition.regenerated.corpus.scene_transition.auto.002.yaml
+- path: corpus.scene_transition.regenerated.corpus.scene_transition.auto.003.yaml
+- path: corpus.scene_transition.regenerated.corpus.scene_transition.auto.004.yaml
+- path: corpus.scene_transition.regenerated.corpus.scene_transition.auto.005.yaml
+total_samples: 25

@@ -110,56 +110,6 @@ class NarrativeEventStore:
         import sys
         sys.stderr.write(f"type(NarrativeProjector) = {type(NarrativeProjector)}\n")
         sys.stderr.flush()       
-             
-        # ====== Narrative Projection（临时同步调试） ======
-                # ====== 测试：直接插入一条记录 ======
-        import sys
-        sys.stderr.write(">>> DIRECT TEST INSERTION <<<\n")
-        sys.stderr.flush()
-        try:
-            pool = get_db_pool()
-            if pool is None:
-                sys.stderr.write(">>> pool is None!\n")
-            else:
-                async with pool.acquire() as conn:
-                    await conn.execute(
-                        """
-                        INSERT INTO narrative_projection_snapshots
-                        (id, novel_id, chapter, event_id, projection_data)
-                        VALUES ($1, $2, $3, $4, $5)
-                        """,
-                        "test_" + str(event_db_id),
-                        novel_id,
-                        chapter_num or 1,
-                        event_db_id,
-                        '{"test": true}'
-                    )
-                sys.stderr.write(">>> DIRECT INSERT SUCCESS <<<\n")
-        except Exception as e:
-            sys.stderr.write(f">>> DIRECT INSERT FAILED: {e}\n")
-        sys.stderr.flush()
-        # ====== 结束测试 ======
-        try:
-            logger.info(">>> NARRATIVE PROJECTION TRIGGERED (EVENT_STORE) <<<")
-            evt_chapter = chapter_num or 1
-            last_proj = await NarrativeProjector.get_latest(novel_id)
-            event_dict = event.model_dump()
-            event_dict["event_id"] = event_db_id
-
-            # 直接 await，移除 wait_for
-            result = await NarrativeProjector.project(
-                novel_id=novel_id,
-                event=event_dict,
-                chapter=evt_chapter,
-                event_id=event_db_id,
-                last_projection=last_proj.to_dict() if last_proj else None
-            )
-            if result is not None:
-                logger.info(">>> NARRATIVE PROJECTION SYNC SUCCESS <<<")
-            else:
-                logger.warning(">>> NARRATIVE PROJECTION RETURNED NONE <<<")
-        except Exception as e:
-            logger.error(f"Narrative projection failed: {e}", exc_info=True)
 
         return event.event_id
 

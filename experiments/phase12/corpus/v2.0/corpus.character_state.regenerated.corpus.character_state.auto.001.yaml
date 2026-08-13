@@ -1,0 +1,38 @@
+id: corpus.character_state.regenerated.corpus.character_state.auto.001
+version: '2.0'
+category: character_state
+failure_modes:
+- character_state
+difficulty: medium
+language: zh-CN
+scene_before: '丹房檀香缭绕，林逸将掌心按在青石案几上，指节因用力而发白：「三日前比试的临场规则变更，分明是针对我的特殊条款。」裁判长老捏碎手中玉简：「外门弟子也敢质疑长老会裁定？，」林逸甩出那卷星图拓片，残缺纹路与验灵阵的共鸣轨迹在空中显化：「这是从禁地文书阁第三重禁制下发现的真实规则框架！你们修改了关键节点！
+
+
+  长老会代表拂袖而立，玄色长袍扫过丹炉青烟：「确有不妥。」裁判长老突然暴起掐住林逸咽喉，却被半空浮现的青铜符篆光幕阻隔——那是先祖血脉图录自动护主的痕迹。林逸冷笑一声：「有意思，看来某些人连巫族血契的预警机制都敢抹杀。」
+
+
+  「引发规则争议」的声音在丹房穹顶回荡，灵力震波将丹炉中的幽蓝火焰结晶激得四溅。裁判长老额角渗出冷汗：「你这是扰乱宗门...」「省省力气吧。」林逸按住丹田处隐隐作痛的经脉，炼气四层的修为在血脉图录加持下竟生出一丝金丹境的威压，「你们修改规则时，可曾考虑过血脉觉醒者的公平？」
+
+
+  长老会代表取出玉简当众投射星图拓片全貌，青铜符篆与三重门环的禁地入口虚影同时亮起：「即刻中止比试，重审规则。」裁判长老踉跄后退撞翻丹炉，炼气境修士却能引发如此动静，显然低估了这个少年体内沉睡的力量。'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 501388
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

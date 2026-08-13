@@ -1,0 +1,33 @@
+id: corpus.runtime_state.regenerated.corpus.runtime_state.auto.004
+version: '2.0'
+category: runtime_state
+failure_modes:
+- runtime_state
+difficulty: medium
+language: zh-CN
+scene_before: "林逸攥着半块金丹碎片在藏经阁阴影中蹲伏，月光透过窗棂照在青石板上。他盯着丹房副手匆匆离去的背影，突然按住腰间玉佩——方才那人袖口飘过的血色符文与玉佩共鸣异常。\n\
+  \n「哼！这三日第七次了。」林逸冷笑，指尖划过石缝里残留的火符纹路，珍贵灵药神秘失踪的线索竟被焚毁得如此彻底。\n\n『小友且慢。』丹房副手突然转身，袖中滑出枚青铜匣，\"\
+  新到的千年血灵芝，宗门特赐。\" \n\n林逸盯着匣中摇曳的赤红光晕：「有意思，外门弟子也能得此殊荣？」\n\n老者捋须而笑，袖风卷起满地经卷：「我等尽心，自当受赏。」话音未落，墙角青瓷瓶突然炸裂，黑雾裹着蚀骨丹气息扑面而来。\n\
+  \n林逸玉佩骤亮，身形暴退三丈：「好个忠心耿耿的副手！」他甩出金丹碎片击碎毒雾，却发现药香已顺着地底石缝流向西北方向。\n\n『三日后宗门例会...』丹房副手的声音突然贴近耳后，\"\
+  届时外门仓库记录全数焚毁。\" \n\n林逸反手扣住对方手腕：「好啊，正好我这玉佩能照见虚妄。」他盯着对方瞳孔里闪烁的噬魂蛊纹路，突然明白为何灵宠锁链会与青铜针共鸣。"
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 553123
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

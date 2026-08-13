@@ -336,21 +336,14 @@ class ScenePlanPromptBuilder(PromptBuilder):
 - 所有场景的 must_events **合集必须完整覆盖**全部必须事件，且各场景之间**不能重复**相同事件。
 - 如果某场景不包含任何必须事件，`"must_events": []` 是允许的（例如示例中的场景3）。
 
+**🆕 每个场景必须包含 observables.state_changes**：描述场景结束后世界状态应发生的变化。至少一个，用于验证场景是否真正推进了故事状态。
+
 **场景计划格式要求**：
-每个场景是一个 JSON 对象，必须包含 "goal", "conflict", "outcome", "characters", "must_events" 字段。
+每个场景是一个 JSON 对象，必须包含 "goal", "conflict", "outcome", "characters", "must_events", "observables", "scene_spec" 字段。
 
 **剧情推进规则**：
 - 不要重复已经在前几章完成的事件（例如第1章的“捡到神秘玉佩”不应在第2章及以后重复出现）。
 - 剧情必须持续推进，不要停滞在同一个情节上。
-
-**示例**：
-{{
-    "goal": "场景目标",
-    "conflict": "冲突描述",
-    "outcome": "结果",
-    "characters": ["角色1", "角色2"],
-    "must_events": ["该场景需要体现的其中一个必须事件"]
-}}
 
 **state_delta 示例**：
 {{
@@ -362,6 +355,40 @@ class ScenePlanPromptBuilder(PromptBuilder):
 **depends_on 示例**：
 - 场景2依赖场景1的结果：`"depends_on": [1]`
 - 场景3无依赖：`"depends_on": []`
+
+**observables.state_changes 详细说明**：
+每个 state_change 包含：
+- `type`: 类型（必填），可选值：`plot_flag`, `inventory_acquire`, `location_change`, `realm_change`, `relationship_change`, `knowledge_gain`
+- `source`: 固定为 `"llm"`（表示由 Planner 直接生成）
+- 根据类型不同，需要提供不同字段：
+  - plot_flag: `"name"`（标记名）, `"value"`（true/false）
+  - inventory_acquire: `"actor"`, `"item"`
+  - location_change: `"actor"`, `"location"`
+  - realm_change: `"actor"`, `"to_major_realm"`, `"to_minor_stage"`
+  - relationship_change: `"from_char"`, `"to_char"`, `"delta"`（整数，正数表示友好）
+  - knowledge_gain: `"name"`（知识名）, `"value"`（true）
+
+**完整场景示例**（包含 observables）：
+{{
+    "goal": "林逸在丹室躲避追杀",
+    "conflict": "炼丹长老步步紧逼",
+    "outcome": "林逸触发禁制，长老受伤",
+    "characters": ["林逸", "炼丹长老"],
+    "must_events": ["触发丹室自爆禁制"],
+    "observables": {{
+        "state_changes": [
+            {{ "type": "plot_flag", "name": "丹室自爆触发", "value": true, "source": "llm" }},
+            {{ "type": "relationship_change", "from_char": "林逸", "to_char": "炼丹长老", "delta": -30, "source": "llm" }}
+        ]
+    }},
+    "scene_spec": {{
+        "world": {{ "location": "丹室", "time": "深夜", "atmosphere": "紧张", "sensory": ["火光", "爆炸声"] }},
+        "reader_emotion": {{ "begin": "紧张", "middle": "震惊", "end": "释然" }},
+        "narrative_function": "reveal_truth",
+        "pov": "林逸"
+    }},
+    "depends_on": []
+}}
 
 输出格式：一个 JSON 数组，每个元素包含上述所有字段。不要输出任何额外文本。"""
 
@@ -458,16 +485,16 @@ class ScenePlanPromptBuilder(PromptBuilder):
     }
 }
 字段说明
-字段	说明	示例
-world.location	场景发生地点	药园、议事堂、密室
-world.time	场景时间	清晨、正午、黄昏、子夜
-world.atmosphere	氛围基调	潮湿、冷冽、宁静、肃杀
-world.sensory	感官细节（2-4个）	["药香", "晨雾", "露水"]
-reader_emotion.begin	开头读者情绪	好奇、警惕、平静
-reader_emotion.middle	中间读者情绪	疑惑、愤怒、震惊
-reader_emotion.end	结尾读者情绪	不安、冷静、沉重
-narrative_function	场景叙事功能	introduce_mystery / escalate / reveal_truth / release_tension / transition
-pov	视角角色	林逸
+字段    说明    示例
+world.location    场景发生地点    药园、议事堂、密室
+world.time    场景时间    清晨、正午、黄昏、子夜
+world.atmosphere    氛围基调    潮湿、冷冽、宁静、肃杀
+world.sensory    感官细节（2-4个）    ["药香", "晨雾", "露水"]
+reader_emotion.begin    开头读者情绪    好奇、警惕、平静
+reader_emotion.middle    中间读者情绪    疑惑、愤怒、震惊
+reader_emotion.end    结尾读者情绪    不安、冷静、沉重
+narrative_function    场景叙事功能    introduce_mystery / escalate / reveal_truth / release_tension / transition
+pov    视角角色    林逸
 场景功能指南
 
     introduce_mystery：留下谜团，结尾产生悬念，不解释

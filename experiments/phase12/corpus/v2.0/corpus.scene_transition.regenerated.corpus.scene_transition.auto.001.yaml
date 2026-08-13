@@ -1,0 +1,56 @@
+id: corpus.scene_transition.regenerated.corpus.scene_transition.auto.001
+version: '2.0'
+category: scene_transition
+failure_modes:
+- scene_transition
+difficulty: medium
+language: zh-CN
+scene_before: '林逸攥紧手心的神秘玉佩，玉面血纹在密室幽光中泛着诡谲红芒。
+
+
+  "按苏婉推算的星图坐标走，但李岩非要闯中间祭坛。"他盯着石壁上浮动的紫晶脉纹，"这禁制每刻都在增强。"
+
+
+  李岩拔出佩剑劈向阵眼："拖什么时间？有我在前头开路——"
+
+
+  "停手！"林逸冷喝打断，玉佩突然爆发出血色光晕，将三人身影笼罩。苏婉瞳孔骤缩："玉佩在回应阵图！"
+
+
+  林逸单膝跪地按住地面裂缝："三刻钟前发现的矿脉核心裂痕，和这紫晶纹路完全吻合。"他翻出叛乱旗帜拓印，"这符号和天剑宗旧址壁画一样——"
+
+
+  李岩冷笑："装神弄鬼，要不是你二叔教的破魔诀古籍里提过类似阵法——"
+
+
+  "够了！"苏婉突然插入，"林逸说的矿脉裂痕位置，和我推演的灵脉暴动点重合。李岩，你强行破阵会触发玉佩禁制连锁反应！"
+
+
+  林逸翻身跃上悬浮石桥："组队进入秘境。苏婉带地图居中指挥，李岩殿后戒备。这血纹是解阵钥匙——"玉佩突然迸射七道剑气，将禁制轰出裂隙。
+
+
+  李岩咬牙跟上："你最好没算错..."
+
+
+  苏婉在后低语："难怪二叔笔记里警告不要靠近灵脉暴动区，这玉佩分明在吞噬矿脉能量。"'
+scene_after: ''
+source: generated
+license: internal
+tags:
+- phase12.2b
+- auto_generated
+expected: {}
+artifacts:
+  runtime_metrics:
+    retry_count: 0
+    fallback_count: 0
+    error_count: 1
+    validation_score: 1.0
+    execution_time_ms: 490791
+    llm_calls: 0
+    total_tokens: 0
+    segments_total: 0
+    segments_succeeded: 0
+  revision_result: null
+  judge_context: null
+  events: []

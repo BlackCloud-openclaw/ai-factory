@@ -1,0 +1,1 @@
+# tests/narrative/adaptive/__init__.py

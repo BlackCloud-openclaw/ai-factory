@@ -1,5 +1,14 @@
 # src/workflow/revision_workflow.py
 
+"""
+Revision Workflow — 编排 Runtime Compiler 和 LLM 调用，执行修订闭环。
+
+Phase 8 适配：
+- 使用 build_default_snapshot() 从 default_runtime 获取 Snapshot
+- 导入路径从 builder 改为 default_runtime
+- 支持外部注入 snapshot，支持缓存控制
+"""
+
 import time
 import logging
 from typing import Dict, Any, Optional, Callable, Awaitable, Tuple
@@ -8,13 +17,19 @@ from src.runtime.observation_compiler import ObservationCompiler
 from src.runtime.validator import Validator
 from src.runtime.edit_compiler import EditCompiler
 from src.runtime.patch_renderer import PatchRenderer
-from src.runtime import RuntimeSnapshot
-from src.runtime.builder import build_default_snapshot  # ✅ 使用 builder 中的 helper
+from src.runtime import RuntimeSnapshot, RuntimeConfig
+from src.runtime.default_runtime import build_default_snapshot
 
 logger = logging.getLogger("workflow.revision")
 
 
 class RevisionWorkflow:
+    """
+    修订工作流 - Phase 6.5 / Phase 7 兼容版 / Phase 8 适配版
+
+    职责：编排 Runtime Compiler 和 LLM 调用，执行修订闭环。
+    """
+
     def __init__(
         self,
         llm_executor: Optional[Callable[[str], Awaitable[str]]] = None,
@@ -24,8 +39,19 @@ class RevisionWorkflow:
         enable_revision: bool = False,
         snapshot: Optional[RuntimeSnapshot] = None,
         surface_ids: Optional[Tuple[str, ...]] = None,
-        cache_snapshot: bool = True,  # ✅ 显式控制缓存
+        cache_snapshot: bool = True,
     ):
+        """
+        Args:
+            llm_executor: 异步函数，接收 prompt 返回修订后文本
+            layer_targets: 各层的目标等级
+            max_rounds: 最大修订轮数
+            compliance_threshold: 合规阈值，高于此值跳过修订
+            enable_revision: 是否启用修订
+            snapshot: 外部注入的 RuntimeSnapshot（优先）
+            surface_ids: 备用构建时启用的 Surface ID
+            cache_snapshot: 是否缓存构建的 Snapshot
+        """
         self.llm_executor = llm_executor
         self.layer_targets = layer_targets or {
             "reasoning": "enhanced",
@@ -42,7 +68,7 @@ class RevisionWorkflow:
         self._edit_compiler = EditCompiler()
         self._patch_renderer = PatchRenderer()
 
-        # Phase 7: RuntimeSnapshot
+        # Phase 7/8: RuntimeSnapshot
         self._snapshot = snapshot
         self._surface_ids = surface_ids or ("reasoning",)
         self._cache_snapshot = cache_snapshot
@@ -50,36 +76,65 @@ class RevisionWorkflow:
         self._snapshot_built = False
 
     def _get_snapshot(self) -> RuntimeSnapshot:
-        """获取 RuntimeSnapshot：优先注入，否则延迟构建（支持缓存）"""
+        """
+        获取 RuntimeSnapshot。
+
+        优先级：
+        1. 外部注入的 snapshot
+        2. 缓存的 snapshot（如果启用）
+        3. 通过 default_runtime 构建
+        """
         if self._snapshot is not None:
             return self._snapshot
 
         if self._cache_snapshot and self._cached_snapshot is not None:
             return self._cached_snapshot
 
-        # ✅ 使用 builder 中的统一 helper
-        snapshot = build_default_snapshot(self._surface_ids)
+        # 通过 Composition Root 构建默认 Snapshot
+        config = RuntimeConfig(
+            enabled_surfaces=self._surface_ids,
+            # diagnostics 默认 False，由调用方按需开启
+        )
+        snapshot = build_default_snapshot(config=config)
 
         if self._cache_snapshot:
             self._cached_snapshot = snapshot
 
         self._snapshot_built = True
         logger.info(
-            f"RuntimeSnapshot built: surfaces={snapshot.get_surface_ids()}"
+            "RuntimeSnapshot built: surfaces=%s",
+            snapshot.get_surface_ids(),
         )
         return snapshot
 
     async def execute(self, draft: str) -> Dict[str, Any]:
+        """
+        执行修订闭环，返回 ExecutionResult。
+
+        Args:
+            draft: 待修订的草稿文本
+
+        Returns:
+            Dict 包含：
+            - final_text: 最终文本
+            - compliance: 最终合规率
+            - before_compliance: 修订前合规率
+            - after_compliance: 修订后合规率
+            - compliance_delta: 合规率变化
+            - stages: 各阶段执行详情
+            - artifacts: 各阶段产物
+        """
         current_draft = draft
         stages = []
         artifacts: Dict[str, Any] = {}
 
         snapshot = self._get_snapshot()
 
-        # 仅记录 warning，不 assert
+        # 仅记录 warning，不 assert（Workflow 不承担配置验证职责）
         if "reasoning" not in snapshot.get_surface_ids():
             logger.warning(
-                f"Snapshot missing 'reasoning' surface. Available: {snapshot.get_surface_ids()}"
+                "Snapshot missing 'reasoning' surface. Available: %s",
+                snapshot.get_surface_ids(),
             )
 
         # ---- Stage 1: Validation ----
@@ -110,11 +165,12 @@ class RevisionWorkflow:
             "duration_ms": duration_ms,
             "payload": {
                 "compliance": compliance,
-                "layers": layers
-            }
+                "layers": layers,
+            },
         })
         artifacts["validation"] = report
 
+        # 如果合规或未启用修订，直接返回
         if compliance >= self.compliance_threshold or not self.enable_revision:
             return {
                 "final_text": current_draft,
@@ -123,13 +179,17 @@ class RevisionWorkflow:
                 "after_compliance": compliance,
                 "compliance_delta": 0.0,
                 "stages": stages,
-                "artifacts": artifacts
+                "artifacts": artifacts,
             }
 
         # ---- Stage 2: Edit Planning ----
         start_time = time.perf_counter()
         plan = self._edit_compiler.compile_with_snapshot(
-            snapshot, report, current_draft, ir, diagnosis_id="REV_001"
+            snapshot,
+            report,
+            current_draft,
+            ir,
+            diagnosis_id="REV_001",
         )
         action_count = len(plan.actions) if plan else 0
         duration_ms = (time.perf_counter() - start_time) * 1000
@@ -139,7 +199,7 @@ class RevisionWorkflow:
                 "stage": "edit_plan",
                 "status": "skipped",
                 "duration_ms": duration_ms,
-                "payload": {"action_count": 0, "reason": "no_actions"}
+                "payload": {"action_count": 0, "reason": "no_actions"},
             })
             return {
                 "final_text": current_draft,
@@ -148,14 +208,14 @@ class RevisionWorkflow:
                 "after_compliance": compliance,
                 "compliance_delta": 0.0,
                 "stages": stages,
-                "artifacts": artifacts
+                "artifacts": artifacts,
             }
 
         stages.append({
             "stage": "edit_plan",
             "status": "completed",
             "duration_ms": duration_ms,
-            "payload": {"action_count": action_count}
+            "payload": {"action_count": action_count},
         })
         artifacts["edit_plan"] = plan
 
@@ -168,7 +228,7 @@ class RevisionWorkflow:
             "stage": "patch_render",
             "status": "completed",
             "duration_ms": duration_ms,
-            "payload": {"prompt_length": len(rendered.full_prompt)}
+            "payload": {"prompt_length": len(rendered.full_prompt)},
         })
         artifacts["rendered_prompt"] = rendered
 
@@ -187,7 +247,11 @@ class RevisionWorkflow:
                 current_draft = llm_output
             except Exception as e:
                 error = str(e)
-                finish_reason = "length" if ("truncated" in error.lower() or "missing closing" in error.lower()) else "error"
+                finish_reason = (
+                    "length"
+                    if "truncated" in error.lower() or "missing closing" in error.lower()
+                    else "error"
+                )
         else:
             error = "llm_executor is None"
             finish_reason = "error"
@@ -201,8 +265,8 @@ class RevisionWorkflow:
             "payload": {
                 "success": llm_success,
                 "finish_reason": finish_reason,
-                "error": error
-            }
+                "error": error,
+            },
         })
         if llm_output:
             artifacts["llm_output"] = llm_output
@@ -215,7 +279,7 @@ class RevisionWorkflow:
                 "after_compliance": compliance,
                 "compliance_delta": 0.0,
                 "stages": stages,
-                "artifacts": artifacts
+                "artifacts": artifacts,
             }
 
         # ---- Stage 5: Revalidation ----
@@ -229,7 +293,7 @@ class RevisionWorkflow:
             "stage": "revalidation",
             "status": "completed",
             "duration_ms": duration_ms,
-            "payload": {"final_compliance": final_compliance}
+            "payload": {"final_compliance": final_compliance},
         })
         artifacts["revalidation"] = final_report
 
@@ -240,5 +304,5 @@ class RevisionWorkflow:
             "after_compliance": final_compliance,
             "compliance_delta": final_compliance - compliance,
             "stages": stages,
-            "artifacts": artifacts
+            "artifacts": artifacts,
         }

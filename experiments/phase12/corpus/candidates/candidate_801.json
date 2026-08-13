@@ -1,0 +1,8 @@
+{
+  "id": 285,
+  "volume": 1,
+  "chapter": 2,
+  "scene_idx": 1,
+  "version": "C",
+  "scene_text": "{\n    \"scene_text\": \"石窟深处的烛火在林逸掌心跳动，外门执事青袍下的手指正摩挲着檀木契约盒。「签订入门契约需三思」，老者的声音裹着药香飘来。，林逸盯着泛黄纸卷第三行突然浮现的血色小篆——「生死试炼·三年期」。\\n\\n「有意思多了。\n    \"events\": [\n        {\"type\": \"plot_flag_set\", \"flag\": \"生死试炼契约签订\", \"value\": true},\n        {\"type\": \"relationship_change\", \"from_char\": \"林逸\", \"to_char\": \"外门执事\", \"delta\": -15},\n        {\"type\": \"discovery\", \"discoverer\": \"林逸\", \"discovery\": \"玉简血纹与契约条款的关联\", \"importance\": 3}\n    ],\n    \"foreshadowing\": [\n        \"生死试炼中出现的紫色雾气实体化\",\n        \"幽蓝光点对血色符文的侵蚀现象\"\n    ]\n}"
+}
