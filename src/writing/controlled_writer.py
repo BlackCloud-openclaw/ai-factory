@@ -669,10 +669,27 @@ class ControlledWriter:
                 False, True, failure_reason,
             )
 
-        # 5. Commit 1: structural_safe 硬编码 False
-        #    Commit 3 唯一 flip 点：替换为真实 Structural Lock 判定
-        structural_safe = False
-
+        # ========== Phase 15.8 Commit 3B: Structural Lock FLIP ==========
+        # 唯一 flip 点：从硬编码 False → 真实 StructuralLock 判定
+        structural_safe = False  # fallback if check fails
+        try:
+            from src.writing.structural_lock import StructuralLock
+            _lock = await StructuralLock().check_async(
+                original_text=original_text,
+                rewritten_text=rewritten_text,
+                contract=execution_contract,
+            )
+            structural_safe = _lock.structural_safe
+            logger.info(
+                "[15.8-C3B] FLIP: structural_safe=%s checks=%s summary=%s",
+                structural_safe,
+                {c.name: c.passed for c in _lock.checks},
+                _lock.failure_summary or "-",
+            )
+        except Exception as _e:
+            logger.error("[15.8-C3B] StructuralLock failed (fallback to False): %s", _e, exc_info=True)
+            structural_safe = False
+        # ==================================================================
         if not structural_safe:
             return _mk_original(
                 RewriteSelectionReason.STRUCTURAL_UNSAFE,
@@ -833,9 +850,19 @@ class ControlledWriter:
             selection.rewrite_attempted,
         )
 
-        # Commit 1 硬不变量：final_text 恒等于 original_text
-        final_text = original_text
-
+        # Phase 15.8 Commit 3B: 根据 selection 决定 final_text
+        if selection.selected_source == "rewritten" and rewritten_text:
+            final_text = rewritten_text
+            logger.info(
+                "[15.8-C3B] final_text=rewritten (len=%d)", len(final_text)
+            )
+        else:
+            final_text = original_text
+            logger.info(
+                "[15.8-C3B] final_text=original (reason=%s)",
+                selection.selection_reason,
+            )
+            
         return ControlledWriteResult(
             text=final_text,
             events=events,

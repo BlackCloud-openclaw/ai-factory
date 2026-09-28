@@ -1743,10 +1743,9 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
         # 同步回 state
         state.writer_artifact = writer_artifact
 
-    # ---- 1.5 生产文本锁定 ----
-    # 无论 Rewrite 结果如何，state.scene_text 始终为 Original
-    state.scene_text = original_scene_text
-    state.final_answer = original_scene_text
+    # ---- 1.5 Phase 15.8 Commit 3B: scene_text 由 writer_node 决定 ----
+    # 不再强制锁定为 original；保持当前 state.scene_text
+    state.final_answer = state.scene_text
 
     # ========== 2. 后续原有业务逻辑（SceneCompletionService 等） ==========
     # 注意：以下代码复用自原有 validate_node，仅作示意，实际应保持原样。
@@ -1769,19 +1768,20 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
     rewritten_passed = False if validation_rewritten is None else validation_rewritten.get("passed", False)
     rewritten_exists = bool(writer_artifact.get("rewritten_text"))
 
-    # 从 ControlledWriter 的 selection 契约读取；缺失则回退到 original 语义
+    # 从 ControlledWriter 的 selection 契约读取；缺失则回退到 artifact 顶层
     selection = writer_artifact.get("selection") or {}
-    selected_source = selection.get("selected_source") or "original"
-    selection_reason = selection.get("selection_reason") or "missing_selection"
+    selected_source = (
+        selection.get("selected_source")
+        or writer_artifact.get("selected_source")
+        or "original"
+    )
+    selection_reason = (
+        selection.get("selection_reason")
+        or writer_artifact.get("selection_reason")
+        or "missing_selection"
+    )
 
-    # Commit 1 硬不变量防御：若上游异常返回 rewritten，强制 original
-    if selected_source != "original":
-        logger.critical(
-            "[15.8-C1] UNEXPECTED selected_source=%s in Commit 1, forcing original",
-            selected_source,
-        )
-        selected_source = "original"
-        selection_reason = "commit1_invariant_forced"
+    # Phase 15.8 Commit 3B: 信任 ControlledWriter 的 selection，不再强制 original
 
     writer_artifact["selected_source"] = selected_source
     writer_artifact["selection_reason"] = selection_reason

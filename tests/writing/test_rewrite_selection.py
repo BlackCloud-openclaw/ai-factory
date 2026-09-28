@@ -106,10 +106,53 @@ async def test_branch_5_rewrite_returns_blank():
 
 
 @pytest.mark.asyncio
-async def test_branch_6_structural_unsafe_commit1():
-    """rewriter 成功 → structural_unsafe（Commit 1 主路径）"""
+async def test_branch_6_flip_to_rewritten(monkeypatch):
+    """Phase 15.8 Commit 3B: structural_safe=True → selected_source='rewritten'"""
     mock_rewriter = AsyncMock()
     mock_rewriter.rewrite = AsyncMock(return_value="改写后的文本。" * 30)
+
+    # mock StructuralLock.check_async 恒返回 safe（不依赖 embedding 服务）
+    async def _fake_check_async(self, original_text, rewritten_text, contract):
+        from src.writing.structural_lock import LockResult, LockCheck
+        return LockResult(
+            structural_safe=True,
+            checks=[LockCheck("mocked", True, "test")],
+            failure_summary="",
+        )
+
+    from src.writing.structural_lock import StructuralLock
+    monkeypatch.setattr(StructuralLock, "check_async", _fake_check_async)
+
+    cw = ControlledWriter(rewriter=mock_rewriter)
+    selection, rewritten = await cw._select_rewrite(
+        original_text=_long_text(),
+        execution_contract=_make_contract(),
+    )
+    assert selection.selected_source == "rewritten"
+    assert selection.selection_reason == RewriteSelectionReason.SELECTED.value
+    assert selection.structural_safe is True
+    assert selection.rewrite_available is True
+    assert selection.rewrite_attempted is True
+    assert rewritten is not None
+
+
+@pytest.mark.asyncio
+async def test_branch_7_flip_to_original_when_unsafe(monkeypatch):
+    """Phase 15.8 Commit 3B: structural_safe=False → selected_source='original'"""
+    mock_rewriter = AsyncMock()
+    mock_rewriter.rewrite = AsyncMock(return_value="改写后的文本。" * 30)
+
+    async def _fake_check_async(self, original_text, rewritten_text, contract):
+        from src.writing.structural_lock import LockResult, LockCheck
+        return LockResult(
+            structural_safe=False,
+            checks=[LockCheck("mocked", False, "unsafe")],
+            failure_summary="mocked unsafe",
+        )
+
+    from src.writing.structural_lock import StructuralLock
+    monkeypatch.setattr(StructuralLock, "check_async", _fake_check_async)
+
     cw = ControlledWriter(rewriter=mock_rewriter)
     selection, rewritten = await cw._select_rewrite(
         original_text=_long_text(),
@@ -119,5 +162,4 @@ async def test_branch_6_structural_unsafe_commit1():
     assert selection.selection_reason == RewriteSelectionReason.STRUCTURAL_UNSAFE.value
     assert selection.structural_safe is False
     assert selection.rewrite_available is True
-    assert selection.rewrite_attempted is True
-    assert rewritten is not None  # 双轨观察保留
+    assert rewritten is not None

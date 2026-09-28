@@ -132,6 +132,8 @@ class Settings(BaseSettings):
     shadow_llm_timeout: float = 1800
     
     literary_rewrite_enabled: bool = True
+    
+    structural_lock_observe_enabled: bool = True   # Phase 15.8 Commit 2 观测开关
 
     @property
     def postgres_dsn(self) -> str:
