@@ -9,7 +9,10 @@ from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from .voiceprint import VoiceprintRegistry
 from .state_projection import extract_hard_constraints, format_constraints_as_xml
 from src.writing.planning_directive import PlanningDirective, PlanningRepresentation
-    
+import logging
+
+logger = logging.getLogger(__name__)
+
     
 class ContextCompiler:
     def __init__(self, max_tokens: int = 3000):
@@ -351,4 +354,17 @@ class ContextCompiler:
             lines.append("\n" + directive_lines)
         # ==============================================
 
-        return "\n".join(lines)
+        full_prompt = "\n".join(lines)
+        
+        # ========== PHASE 15.0 AUDIT ==========
+        import re
+        logger.critical(
+            "[PHASE15] context_compiler_prompt contains_linyi=%s contains_protagonist=%s abcd=%s prompt_len=%s",
+            "林逸" in full_prompt,
+            "protagonist" in full_prompt,
+            re.findall(r'\b[A-D]\b', full_prompt),
+            len(full_prompt)
+        )
+        # =====================================
+
+        return full_prompt

@@ -1,0 +1,17 @@
+{
+  "scene_id": "scene_1_8_0",
+  "volume": 1,
+  "chapter": 8,
+  "scene_idx": 0,
+  "extracted_events": [
+    "（从 contract 中未提取到具体事件，请人工判断）"
+  ],
+  "extracted_characters": [
+    "林逸",
+    "二叔",
+    "富家子弟赵明"
+  ],
+  "original_length": 68,
+  "minimal_length": 53,
+  "constrained_length": 229
+}

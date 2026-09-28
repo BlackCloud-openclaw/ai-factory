@@ -427,6 +427,18 @@ class ScenePlanningService:
 
         # ---------- 11. 构建 StatePatch ----------
         total_scenes = len(scenes)
+        
+        # ========== PHASE 15.0 AUDIT ==========
+        for idx, scene in enumerate(scenes):
+            logger.critical(
+                "[PHASE15] scene_planning scene_idx=%s scene_id=%s characters=%s planning_contract=%s",
+                idx,
+                scene.get("scene_id", "unknown"),
+                scene.get("characters", []),
+                scene.get("planning_contract") is not None
+            )
+        # =====================================
+
         first_scene = scenes[0] if scenes else {}
 
         # 合并 metadata（包含验证结果）
@@ -511,6 +523,11 @@ class ScenePlanningService:
             if contract_data:
                 try:
                     contract = PlanningContract(**contract_data)
+                    # ========== 🔍 诊断日志插入点 1 ==========
+                    logger.critical(f"🔍 CONTRACT_VALIDATION_ENTRY scene_id={contract.scene_id}")
+                    logger.critical(f"🔍 CONTRACT_VALIDATION_ENTRY observables: {contract.observables.model_dump()}")
+                    logger.critical(f"🔍 CONTRACT_VALIDATION_ENTRY state_changes: {[sc.model_dump() for sc in contract.observables.state_changes]}")
+                    # ========================================
                     result = ContractConsistencyValidator.validate(contract)
                     contract_validation_results.append(result)
 

@@ -41,8 +41,15 @@ _last_memory_cleanup = 0
 
 def get_workflow():
     global _workflow
+    # 临时强制重建，方便查看诊断日志（完成后删除此行）
+    _workflow = None
     if _workflow is None:
+        import sys
+        print("[DIAG] get_workflow: calling compile_workflow()", file=sys.stderr)
+        sys.stderr.flush()
         _workflow = compile_workflow()
+        print("[DIAG] get_workflow: compile_workflow returned", file=sys.stderr)
+        sys.stderr.flush()
     return _workflow
 
 

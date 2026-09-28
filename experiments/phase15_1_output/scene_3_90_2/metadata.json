@@ -1,0 +1,17 @@
+{
+  "scene_id": "scene_3_90_2",
+  "volume": 3,
+  "chapter": 90,
+  "scene_idx": 2,
+  "extracted_events": [
+    "林逸 到达 上古战场边缘",
+    "林逸 与 傀儡残魂 关系变化 15"
+  ],
+  "extracted_characters": [
+    "林逸",
+    "傀儡残魂"
+  ],
+  "original_length": 68,
+  "minimal_length": 44,
+  "constrained_length": 353
+}

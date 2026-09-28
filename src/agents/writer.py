@@ -49,6 +49,24 @@ def get_voiceprint_registry():
         _voiceprint_registry = VoiceprintRegistry("config/voiceprints.yaml")
     return _voiceprint_registry
 
+# ============================================================
+# Phase 15.4C: Writer-facing StateChange 字段白名单
+# ============================================================
+PHASE_15_4C_WRITER_STATE_CHANGE_FIELDS = (
+    "name",
+    "value",
+    "from_char",
+    "to_char",
+    "delta",
+    "actor",
+    "item",
+    "operation",
+    "quantity",
+    "to_major_realm",
+    "to_minor_stage",
+    "location",
+    "new_hp",
+)
 
 class WritingAgent(BaseAgent):
     task_type = "writing"
@@ -287,23 +305,33 @@ class WritingAgent(BaseAgent):
         metadata_for_log = convert_metadata(state.metadata)
         # ================================================================
 
+        # Phase 15.4C: 仅在 Treatment 时标记 prompt_version
+        if planning_contract:
+            metadata_for_log["prompt_version"] = "phase15.4c.contract_reinforced.v1"
+
         # 记录 prompt 日志
         log_prompt("writer", prompt, metadata_for_log, constraints=constraints)
 
-        # ========== 新增：如果存在 Contract，用 Contract 信息增强 Prompt ==========
-        if planning_contract:   # 注意：这里使用的是原有的 planning_contract，没有被诊断覆盖
-            # ========== D.4.1 第三层验证：Contract 已拼入最终 Prompt ==========
+        # ========== Phase 15.4C: Contract 强化注入 ==========
+        if planning_contract:
+            # 1. 顶部强制块（结构化 state_changes，置顶）
+            requirements_block = self._build_contract_requirements_block(planning_contract)
+            if requirements_block:
+                prompt = requirements_block + "\n" + prompt
+
+            # 2. 底部完整契约（Intent + Execution + Constraints，不含 state_changes）
+            contract_prompt = self._build_contract_prompt(planning_contract)
+            prompt += "\n\n" + contract_prompt
+
             logger.critical(
                 "WRITER_FINAL_PROMPT_HAS_CONTRACT=True, scene_id=%s, state_changes=%d",
                 planning_contract.scene_id,
                 len(planning_contract.observables.state_changes)
             )
-            # ================================================================            
-            contract_prompt = self._build_contract_prompt(planning_contract)
-            prompt += "\n\n" + contract_prompt
         else:
             logger.critical("WRITER_FINAL_PROMPT_HAS_CONTRACT=False (planning_contract is None)")
-
+        # ===================================================
+        
         # ====== 注入戏剧结构（来自 Drama Planner） ======
         drama_structure = state.drama_structure or {}
         if drama_structure:
@@ -485,7 +513,18 @@ class WritingAgent(BaseAgent):
             else:
                 data = {"scene_text": "[生成失败: JSON解析错误]", "events": [], "foreshadowing": []}
                 logger.error("Failed to extract scene_text even with regex")
-
+        # ========== PHASE 15.0 AUDIT ==========
+        scene_text = data.get("scene_text", "")
+        raw_events = data.get("events", [])
+        logger.critical(
+            "[PHASE15] writer_parse_result contains_linyi=%s contains_protagonist=%s abcd=%s text_len=%s events_count=%s",
+            "林逸" in scene_text,
+            "protagonist" in scene_text,
+            re.findall(r'\b[A-D]\b', scene_text),
+            len(scene_text),
+            len(raw_events)
+        )
+        # =====================================
         # ========== 验证输出 ==========
         must_events = scene_plan.get("must_events", [])
         context = {"must_events": must_events}
@@ -710,7 +749,18 @@ class WritingAgent(BaseAgent):
         max_tokens = 32768
         temperature = 0.7
 
-        # ---- LLM Request 观测 ----
+        # ========== PHASE 15.0 AUDIT ==========
+        import re
+        # 直接检查 prompt 中是否包含角色名（因为 messages 就是 [{"role": "user", "content": prompt}]）
+        logger.critical(
+            "[PHASE15] writer_llm_request model=%s contains_linyi=%s contains_protagonist=%s abcd=%s",
+            actual_model,
+            "林逸" in prompt,
+            "protagonist" in prompt,
+            re.findall(r'\b[A-D]\b', prompt)
+        )
+        # =====================================
+
         logger.info(
             "[LLM] request model=%s temperature=%.2f max_tokens=%d prompt_chars=%d prompt_lines=%d grammar_sent=%s extra_body_keys=%s",
             actual_model,
@@ -721,7 +771,6 @@ class WritingAgent(BaseAgent):
             bool(grammar_str),
             list(extra_body.keys()) if extra_body else [],
         )
-
         response = await client.chat.completions.create(
             model=actual_model,
             messages=[{"role": "user", "content": prompt}],
@@ -856,17 +905,12 @@ class WritingAgent(BaseAgent):
         return "\n".join(parts)
 
     def _build_contract_prompt(self, contract: PlanningContract) -> str:
-        # ========== D.4.1 验证：Contract 进入 Prompt 构建 ==========
-        try:
-            changes = [sc.type for sc in contract.observables.state_changes]
-        except Exception:
-            changes = []
-        logger.critical(
-            "WRITER_CONTRACT_PROMPT_INJECTED: state_changes=%s",
-            changes
-        )
-        # ===========================================================
-        """根据 Planning Contract 生成写作指令"""
+        """
+        构建 Contract 的完整描述（Intent + Execution + Constraints）。
+
+        注意：state_changes 已由 _build_contract_requirements_block() 承担，
+        此处不再重复。
+        """
         lines = []
         lines.append("【📋 规划契约（Planning Contract）】")
         lines.append(f"场景目标：{contract.intent.goal}")
@@ -894,29 +938,11 @@ class WritingAgent(BaseAgent):
                 elif c.type == "at_least_once":
                     lines.append(f"  🔁 {c.target} 至少发生一次")
 
-        if contract.observables.state_changes:
-            lines.append("\n场景结束后世界状态应发生变化：")
-            for change in contract.observables.state_changes:
-                if change.type == "plot_flag":
-                    lines.append(f"- 剧情标记 {change.name} 应为 {change.value}")
-                elif change.type == "relationship":
-                    lines.append(f"- {change.from_char} 与 {change.to_char} 的关系变化 {change.delta}")
-                elif change.type == "inventory":
-                    lines.append(f"- {change.actor} {change.operation} {change.item}")
-                elif change.type == "inventory_acquire":
-                    lines.append(f"- {change.actor} 获得 {change.item}")
-                elif change.type == "inventory_lose":
-                    lines.append(f"- {change.actor} 失去 {change.item}")                
-                elif change.type == "realm":
-                    lines.append(f"- {change.actor} 突破至 {change.to_major_realm}{change.to_minor_stage}层")
-                elif change.type == "location":
-                    lines.append(f"- {change.actor} 进入 {change.location}")
-                elif change.type == "hp":
-                    lines.append(f"- {change.actor} HP 变为 {change.new_hp}")
+        # state_changes 已移除，由顶部 _build_contract_requirements_block() 承担
+        # 底部不再重复
 
         lines.append("\n⚠️ 请严格遵循以上契约，尤其是执行单元和硬性约束。")
         return "\n".join(lines)
-
     # ============================================================
     # Phase 6 Runtime 辅助方法
     # ============================================================
@@ -954,3 +980,78 @@ class WritingAgent(BaseAgent):
                 scene_text, json.dumps(validation_result))
 
             logger.debug(f"Saved Runtime report to narrative_versions for {novel_id}")
+            
+    def _build_contract_requirements_block(self, contract: PlanningContract) -> str:
+        """
+        生成顶部强化契约块。
+
+        只包含 state_changes 的结构化表示。
+        放置在 Prompt 最顶部，强制 Writer 注意。
+        """
+        state_changes = contract.observables.state_changes
+        if not state_changes:
+            return ""
+
+        lines = []
+        lines.append("=" * 60)
+        lines.append("【强制契约要求 / CONTRACT REQUIREMENTS】")
+        lines.append("=" * 60)
+        lines.append("")
+        lines.append("以下 state changes 是本场景必须实现的契约要求。")
+        lines.append("你必须在生成的场景中真实实现这些状态变化。")
+        lines.append("每一项要求都不得省略、合并或静默丢弃。")
+        lines.append("")
+        lines.append("必须实现的状态变化：")
+        lines.append("")
+
+        for idx, change in enumerate(state_changes, 1):
+            parts = [f"type={change.type}"]
+
+            for field in PHASE_15_4C_WRITER_STATE_CHANGE_FIELDS:
+                value = getattr(change, field, None)
+                if value is not None:
+                    if isinstance(value, bool):
+                        parts.append(f"{field}={str(value)}")
+                    else:
+                        parts.append(f"{field}={value}")
+
+            lines.append(f"  {idx}. {', '.join(parts)}")
+
+            # ============================================================
+            # Phase 15.6-B: plot_flag 字段指引 (已冻结)
+            # ============================================================
+            if change.type == "plot_flag":
+                lines.append(
+                    "     ⚠️ plot_flag 规范字段: name 表示标记名称, "
+                    "value 表示布尔值。不要使用 flag。"
+                )
+            # ============================================================
+
+            # ============================================================
+            # Phase 15.6-H: realm_change 精确值约束
+            # ============================================================
+            if change.type == "realm_change" and change.to_minor_stage is not None:
+                lines.append("")
+                lines.append("     ⚠️ EXACT VALUE REQUIREMENT:")
+                lines.append(
+                    "     realm_change 的 to_minor_stage 必须严格使用 Contract 指定值："
+                )
+                lines.append(f"     to_minor_stage={change.to_minor_stage}")
+                lines.append("")
+                lines.append(
+                    "     不得根据上下文、当前境界、剧情合理性或其他信息自行修改该值。"
+                )
+                lines.append(
+                    "     如果生成的场景中包含境界提升，必须使用上述精确值。"
+                )
+            # ============================================================
+
+        lines.append("")
+        lines.append("以上要求属于硬性契约，必须在本场景中得到实现。")
+        lines.append("")
+        lines.append("=" * 60)
+        lines.append("【强制契约要求结束】")
+        lines.append("=" * 60)
+        lines.append("")
+
+        return "\n".join(lines)

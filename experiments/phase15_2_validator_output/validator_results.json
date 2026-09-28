@@ -1,0 +1,162 @@
+{
+  "scene_3_90_1": {
+    "original": {
+      "passed": false,
+      "status": "failed",
+      "violations_count": 3,
+      "violations": [
+        {
+          "rule_id": "validation_error",
+          "severity": "error",
+          "description": "❌ 阻断性缺失：上古战场坐标, 血祭符文解密完成, knowledge_新线索",
+          "context": null,
+          "location": null
+        },
+        {
+          "rule_id": "validation_error",
+          "severity": "error",
+          "description": "缺失 3 个预期状态变化",
+          "context": null,
+          "location": null
+        },
+        {
+          "rule_id": "voice_violation",
+          "severity": "warning",
+          "description": "对话占比 2% 超出范围 25%-60%",
+          "context": null,
+          "location": null
+        }
+      ]
+    },
+    "constrained": {
+      "passed": false,
+      "status": "failed",
+      "violations_count": 3,
+      "violations": [
+        {
+          "rule_id": "validation_error",
+          "severity": "error",
+          "description": "❌ 阻断性缺失：上古战场坐标, 血祭符文解密完成, knowledge_新线索",
+          "context": null,
+          "location": null
+        },
+        {
+          "rule_id": "validation_error",
+          "severity": "error",
+          "description": "缺失 3 个预期状态变化",
+          "context": null,
+          "location": null
+        },
+        {
+          "rule_id": "voice_violation",
+          "severity": "warning",
+          "description": "对话占比 2% 超出范围 25%-60%",
+          "context": null,
+          "location": null
+        }
+      ]
+    }
+  },
+  "scene_3_90_2": {
+    "original": {
+      "passed": false,
+      "status": "failed",
+      "violations_count": 3,
+      "violations": [
+        {
+          "rule_id": "validation_error",
+          "severity": "error",
+          "description": "❌ 阻断性缺失：上古战场边缘, 林逸_傀儡残魂",
+          "context": null,
+          "location": null
+        },
+        {
+          "rule_id": "validation_error",
+          "severity": "error",
+          "description": "缺失 2 个预期状态变化",
+          "context": null,
+          "location": null
+        },
+        {
+          "rule_id": "voice_violation",
+          "severity": "warning",
+          "description": "对话占比 1% 超出范围 25%-60%",
+          "context": null,
+          "location": null
+        }
+      ]
+    },
+    "constrained": {
+      "passed": false,
+      "status": "failed",
+      "violations_count": 3,
+      "violations": [
+        {
+          "rule_id": "validation_error",
+          "severity": "error",
+          "description": "❌ 阻断性缺失：上古战场边缘",
+          "context": null,
+          "location": null
+        },
+        {
+          "rule_id": "validation_error",
+          "severity": "error",
+          "description": "缺失 2 个预期状态变化",
+          "context": null,
+          "location": null
+        },
+        {
+          "rule_id": "voice_violation",
+          "severity": "warning",
+          "description": "对话占比 3% 超出范围 25%-60%",
+          "context": null,
+          "location": null
+        }
+      ]
+    }
+  },
+  "scene_1_8_0": {
+    "original": {
+      "passed": false,
+      "status": "failed",
+      "violations_count": 2,
+      "violations": [
+        {
+          "rule_id": "validation_error",
+          "severity": "error",
+          "description": "❌ 阻断性缺失：",
+          "context": null,
+          "location": null
+        },
+        {
+          "rule_id": "voice_violation",
+          "severity": "warning",
+          "description": "对话占比 1% 超出范围 25%-60%",
+          "context": null,
+          "location": null
+        }
+      ]
+    },
+    "constrained": {
+      "passed": false,
+      "status": "failed",
+      "violations_count": 2,
+      "violations": [
+        {
+          "rule_id": "validation_error",
+          "severity": "error",
+          "description": "❌ 阻断性缺失：",
+          "context": null,
+          "location": null
+        },
+        {
+          "rule_id": "voice_violation",
+          "severity": "warning",
+          "description": "对话占比 3% 超出范围 25%-60%",
+          "context": null,
+          "location": null
+        }
+      ]
+    }
+  }
+}

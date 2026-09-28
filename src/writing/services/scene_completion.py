@@ -261,15 +261,32 @@ class SceneCompletionService:
 
                 # 更新 writing_progress
                 new_scene_idx = cmd.scene_idx + 1
+                chapter_finished_for_db = (cmd.total_scenes > 0 and new_scene_idx >= cmd.total_scenes)
+
+                if chapter_finished_for_db:
+                    next_volume = cmd.volume          # 卷切换由 ChapterTransitionService 处理
+                    next_chapter = cmd.chapter + 1
+                    next_scene = 0
+                    chapter_completed_flag = True
+                else:
+                    next_volume = cmd.volume
+                    next_chapter = cmd.chapter
+                    next_scene = new_scene_idx
+                    chapter_completed_flag = False
+
                 await conn.execute(
                     """
-                    INSERT INTO writing_progress (project_id, current_volume, current_chapter, current_scene, chapter_completed, last_updated)
-                    VALUES ($1, $2, $3, $4, false, NOW())
+                    INSERT INTO writing_progress
+                        (project_id, current_volume, current_chapter, current_scene, chapter_completed, last_updated)
+                    VALUES ($1, $2, $3, $4, $5, NOW())
                     ON CONFLICT (project_id) DO UPDATE SET
+                        current_volume = EXCLUDED.current_volume,
+                        current_chapter = EXCLUDED.current_chapter,
                         current_scene = EXCLUDED.current_scene,
+                        chapter_completed = EXCLUDED.chapter_completed,
                         last_updated = NOW()
                     """,
-                    cmd.novel_id, cmd.volume, cmd.chapter, new_scene_idx
+                    cmd.novel_id, next_volume, next_chapter, next_scene, chapter_completed_flag
                 )
 
         chapter_finished = (cmd.total_scenes > 0 and new_scene_idx >= cmd.total_scenes)
@@ -279,10 +296,21 @@ class SceneCompletionService:
             retry_count=0,
             validation_result=cmd.parsed_output,
         )
+
         if chapter_finished:
-            patch.phase = WorkflowPhase.TRANSITIONING
+            patch = StatePatch(
+                current_scene_index=0,
+                current_chapter=cmd.chapter + 1,
+                current_volume=cmd.volume,  # 如果卷切换，这里也需要处理
+                phase=WorkflowPhase.TRANSITIONING,
+                current_state=new_world.to_dict(),
+            )
         else:
-            patch.phase = WorkflowPhase.WRITING
+            patch = StatePatch(
+                current_scene_index=new_scene_idx,
+                current_state=new_world.to_dict(),
+                phase=WorkflowPhase.WRITING,
+            )
 
         return SceneCompletionResult(
             state_patch=patch,
@@ -292,7 +320,12 @@ class SceneCompletionService:
 
     @staticmethod
     async def _save_scene_to_file(cmd: SceneCompletionCommand, scene_text: str):
-        """保存场景正文到章节文件"""
+        """保存场景正文到章节文件，只在验证通过时写入"""
+        # 检查验证是否通过
+        if not cmd.validation_passed:
+            logger.debug(f"跳过保存场景 {cmd.scene_idx} (验证未通过)")
+            return
+
         logger.info(f"_save_scene_to_file called for chapter {cmd.chapter}, scene {cmd.scene_idx}, text length={len(scene_text)}")
         if not scene_text or len(scene_text.strip()) < 50:
             logger.warning(f"Scene text too short ({len(scene_text)} chars), skip saving")

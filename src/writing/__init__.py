@@ -1,18 +1,10 @@
 # src/writing/__init__.py
 """
 Writer Runtime Module — 公共 API 导出
-
-注意：本文件仅作为导出入口，不导入任何可能触发循环依赖的内部模块。
-内部模块请直接从子模块导入：
-    from src.writing.event_store import NarrativeEventStore
 """
 
 # 延迟导入，避免循环依赖
-# 所有导入在函数内部进行，仅在访问时加载
-
-
 def __getattr__(name):
-    """延迟加载模块，避免循环导入"""
     if name == "WorldState":
         from .world_state import WorldState
         return WorldState
@@ -70,8 +62,22 @@ def __getattr__(name):
     elif name == "VersionedWritingResult":
         from .services.versioned_writer import VersionedWritingResult
         return VersionedWritingResult
+    elif name == "ContractSanityGuard":
+        from .contract_sanity import ContractSanityGuard
+        return ContractSanityGuard
+    elif name == "SanityResult":
+        from .contract_sanity import SanityResult
+        return SanityResult
+    elif name == "SanityViolation":
+        from .contract_sanity import SanityViolation
+        return SanityViolation
+    elif name == "DefaultRealmAuthority":
+        from .realm_authority import DefaultRealmAuthority
+        return DefaultRealmAuthority
+    elif name == "get_default_realm_authority":
+        from .realm_authority import get_default_realm_authority
+        return get_default_realm_authority
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 
 __all__ = [
     "WorldState",
@@ -93,4 +99,9 @@ __all__ = [
     "ChapterTransitionService",
     "VersionedWriter",
     "VersionedWritingResult",
+    "ContractSanityGuard",
+    "SanityResult",
+    "SanityViolation",
+    "DefaultRealmAuthority",
+    "get_default_realm_authority",
 ]

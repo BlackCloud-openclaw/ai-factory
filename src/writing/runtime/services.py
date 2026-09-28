@@ -8,6 +8,9 @@ from typing import Any, Optional, ContextManager
 from src.capabilities.runtime import FrozenRuntimeCapabilityRegistry
 from .protocols import AuditService
 
+# ========== Phase 15.7-A: Rewriter 导入 ==========
+from src.writing.shadow.runner import Rewriter
+
 
 class RuntimeServices:
     """
@@ -17,8 +20,13 @@ class RuntimeServices:
     所有服务返回接口（Protocol），隐藏具体实现。
     """
 
-    def __init__(self, capabilities: FrozenRuntimeCapabilityRegistry):
+    def __init__(
+        self,
+        capabilities: FrozenRuntimeCapabilityRegistry,
+        rewriter: Optional[Rewriter] = None,  # Phase 15.7-A
+    ):
         self._capabilities = capabilities
+        self._rewriter = rewriter  # Phase 15.7-A
 
     def audit(self) -> AuditService:
         """
@@ -43,3 +51,15 @@ class RuntimeServices:
         """
         service = self.audit()
         return service.audit(novel_id, volume, chapter, scene_idx, metadata=metadata)
+    
+    # ========== Phase 15.7-A: Rewriter getter ==========
+    @property  # ← 关键：将方法变为属性
+    def rewriter(self) -> Optional[Rewriter]:
+        """获取 Rewriter 实例（Phase 15.7-A）。"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.critical(
+            "[15.7-A] RuntimeServices.rewriter property called, returning type=%s",
+            type(self._rewriter).__name__ if self._rewriter is not None else "None"
+        )
+        return self._rewriter

@@ -271,6 +271,12 @@ def compile_workflow(runtime: Optional[WriterRuntime] = None) -> Any:
     Returns:
         CompiledGraph: 编译后的工作流
     """
+    
+    print(">>> [Shadow] compile_workflow called, runtime is None:", runtime is None)
+    if runtime is None:
+        print(">>> [Shadow] Creating new runtime via build_writer_runtime()")
+        runtime = build_writer_runtime()
+        
     workflow = create_workflow(runtime)
     if _checkpointer is not None:
         return workflow.compile(checkpointer=_checkpointer)

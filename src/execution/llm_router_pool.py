@@ -308,6 +308,25 @@ class LLMRouterPool:
                         async with self.large_model_semaphore:
                             await slot.acquire()
                             try:
+# ==                            ======== PHASE 15.0 AUDIT ==========
+                                import re
+                                import json
+                                # 尝试从 args 中提取 messages
+                                messages_str = ""
+                                if args and len(args) > 0:
+                                    # func 可能是 _call_llm，args[0] 是 prompt
+                                    if len(args) >= 1 and isinstance(args[0], str):
+                                        messages_str = args[0]
+                                    elif len(args) >= 1 and isinstance(args[0], list):
+                                        messages_str = json.dumps(args[0], ensure_ascii=False)
+                                logger.critical(
+                                    "[PHASE15] llm_router_call model=%s contains_linyi=%s contains_protagonist=%s abcd=%s",
+                                    model_name,
+                                    "林逸" in messages_str,
+                                    "protagonist" in messages_str,
+                                    re.findall(r'\b[A-D]\b', messages_str)
+                                )
+                                # =====================================
                                 return await asyncio.wait_for(func(model_name, *args, **kwargs),
                                                             timeout=timeout or self.default_timeout)
                             finally:
@@ -315,6 +334,23 @@ class LLMRouterPool:
                     else:
                         await slot.acquire()
                         try:
+                            # ========== PHASE 15.0 AUDIT ==========
+                            import re
+                            import json
+                            messages_str = ""
+                            if args and len(args) > 0:
+                                if len(args) >= 1 and isinstance(args[0], str):
+                                    messages_str = args[0]
+                                elif len(args) >= 1 and isinstance(args[0], list):
+                                    messages_str = json.dumps(args[0], ensure_ascii=False)
+                            logger.critical(
+                                "[PHASE15] llm_router_call model=%s contains_linyi=%s contains_protagonist=%s abcd=%s",
+                                model_name,
+                                "林逸" in messages_str,
+                                "protagonist" in messages_str,
+                                re.findall(r'\b[A-D]\b', messages_str)
+                            )
+                            # =====================================
                             return await asyncio.wait_for(func(model_name, *args, **kwargs),
                                                         timeout=timeout or self.default_timeout)
                         finally:

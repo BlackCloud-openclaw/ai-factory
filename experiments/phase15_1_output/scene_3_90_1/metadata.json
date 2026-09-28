@@ -1,0 +1,18 @@
+{
+  "scene_id": "scene_3_90_1",
+  "volume": 3,
+  "chapter": 90,
+  "scene_idx": 1,
+  "extracted_events": [
+    "获得知识：上古战场坐标",
+    "血祭符文解密完成 发生",
+    "获得知识：knowledge_新线索"
+  ],
+  "extracted_characters": [
+    "林逸",
+    "傀儡守护者"
+  ],
+  "original_length": 53,
+  "minimal_length": 99,
+  "constrained_length": 370
+}

@@ -1,15 +1,15 @@
 {
-  "projection_id": "a9aa0236a980f203",
+  "projection_id": "2b14f49705978827",
   "chapter_id": "initial",
-  "active_conflict": "林逸在密室中与盟友商讨应对血魂宗的策略",
+  "active_conflict": null,
   "unresolved_threads": [],
   "active_objectives": [
-    "林逸在密室中与盟友商讨应对血魂宗的策略"
+    "林逸在天道棋局中心解开九重道痕的谜题"
   ],
-  "emotional_state": "紧张",
-  "next_pressure": "推进: 林逸在密室中与盟友商讨应对血魂宗的策略",
-  "last_intent_id": "1f80566290ea349b",
-  "last_scene_role": "conflict_escalation",
+  "emotional_state": "震惊",
+  "next_pressure": null,
+  "last_intent_id": "1fa83fc87d7c2a86",
+  "last_scene_role": "discovery",
   "version": 1,
-  "updated_at": "2026-08-12T19:11:06.509916"
+  "updated_at": "2026-08-28T14:01:30.035162"
 }

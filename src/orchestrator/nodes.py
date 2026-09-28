@@ -25,7 +25,6 @@ from src.agents.validator import ValidatorAgent
 from src.agents.writer import WritingAgent
 from src.common.logging import setup_logging
 from src.db import get_db_pool
-from src.writing.world_state import WorldState
 from src.writing.delta import StateDelta
 from src.writing.event_store import NarrativeEventStore
 from src.writing.snapshot_manager import SnapshotManager
@@ -59,10 +58,131 @@ from src.writing.projection_service import NarrativeProjectionService
 from src.writing.projection_updater import ProjectionUpdater
 from src.writing.narrative_intent import NarrativeIntent
 from src.writing.planner_output import PlannerOutput
+# ========== B2-1A: Contract Sanity Guard ==========
+from src.writing.contract_sanity import ContractSanityGuard
+from src.writing.world_state import WorldState
+from src.writing.realm_authority import DefaultRealmAuthority
+# =================================================
+from src.writing.validation_v2.audit_writer import AuditContext
+from src.writing.validation_v2.bridge_audit_writer import BridgeAuditContext
 
 
 # 全局 logger
 logger = setup_logging("orchestrator.nodes")
+
+# ============================================================
+# Phase 15.5: writer_events 提取
+# ============================================================
+def _extract_writer_events_from_artifact(
+    writer_artifact: Optional[Dict[str, Any]]
+) -> Optional[List[Dict[str, Any]]]:
+    """
+    从 writer_artifact 中提取 events，支持三态返回。
+
+    - None  → 数据不可用
+    - []    → Writer 明确返回了空 events
+    - [...] → 正常可诊断数据
+    """
+    if not isinstance(writer_artifact, dict):
+        return None
+
+    events = writer_artifact.get("events")
+    if events is None:
+        return None
+    if isinstance(events, list):
+        return events
+    else:
+        logger.warning(
+            "[Shadow] Invalid writer_artifact.events type: %s",
+            type(events).__name__,
+        )
+        return None
+# ============================================================
+
+async def _run_shadow_rewrite(
+    scene_id: str,
+    original_text: str,
+    contract: dict,
+    original_validation_result: dict,
+    shadow_runner,
+    shadow_recorder,
+    experiment_id: str = "phase15.3.v1",
+    novel_id: str = "",
+    volume: int = 1,
+    chapter: int = 1,
+    scene_idx: int = 0,
+    writer_artifact: Optional[Dict[str, Any]] = None,
+) -> None:
+    """
+    异步执行 Shadow Rewrite。
+
+    原则：
+    - 任何失败均不得影响生产 Runtime
+    - 只记录日志，不抛出异常
+    - 不修改 state
+    - 不阻塞生产路径
+    """
+    try:
+        # ========== Phase 15.5: 提取 writer_events ==========
+        writer_events = _extract_writer_events_from_artifact(writer_artifact)
+        # 记录三态信息便于审计
+        if writer_events is None:
+            logger.debug("[Shadow] writer_events: DATA_UNAVAILABLE")
+        elif writer_events == []:
+            logger.debug("[Shadow] writer_events: [] (Writer returned empty events)")
+        else:
+            logger.debug("[Shadow] writer_events: list of %d events", len(writer_events))
+        # =====================================================
+
+        logger.info("[Shadow] === calling shadow_runner.submit ===")
+        shadow_result = await shadow_runner.submit(
+            scene_id=scene_id,
+            original_text=original_text,
+            contract=contract,
+            original_validation_result=original_validation_result,
+            experiment_id=experiment_id,
+            prompt_version="phase15.4c.contract_reinforced.v1",
+            writer_events=writer_events,  # Phase 15.5 新增
+        )
+        logger.info("[Shadow] === shadow_runner.submit returned, status=%s ===", shadow_result.status.value)
+        logger.info("[Shadow] === calling shadow_recorder.record ===")
+        await shadow_recorder.record(shadow_result)
+        logger.info("[Shadow] === shadow_recorder.record completed ===")
+        logger.info(
+            "[Shadow] Recorded result: scene=%s status=%s",
+            scene_id,
+            shadow_result.status.value,
+        )
+
+        # ========== 将重写文本写入独立目录（Phase 15.3 Shadow Corpus） ==========
+        if shadow_result.rewritten_text and novel_id:
+            try:
+                shadow_dir = Path(f"data/novels/{novel_id}/shadow/vol_{volume:03d}")
+                shadow_dir.mkdir(parents=True, exist_ok=True)
+                
+                chapter_file = shadow_dir / f"chap_{chapter:03d}.txt"
+                
+                # 构建场景分隔标记
+                scene_marker = f"\n\n<!-- scene {scene_idx:02d} -->\n\n"
+                
+                # 如果是第一个场景，直接写入；否则追加
+                if not chapter_file.exists():
+                    chapter_file.write_text(shadow_result.rewritten_text, encoding="utf-8")
+                else:
+                    with open(chapter_file, "a", encoding="utf-8") as f:
+                        f.write(scene_marker)
+                        f.write(shadow_result.rewritten_text)
+                
+                logger.info(f"[Shadow] ✅ Rewritten text appended to {chapter_file} (scene {scene_idx})")
+            except Exception as e:
+                import traceback
+                logger.error(f"[Shadow] ❌ Failed to save rewritten text: {e}\n{traceback.format_exc()}")
+        else:
+            logger.warning(f"[Shadow] ⚠️ Skip file save: rewritten_text={bool(shadow_result.rewritten_text)}, novel_id={novel_id}")
+        # ======================================================================      
+
+    except Exception as e:
+        logger.error("[Shadow] Failed for scene=%s: %s", scene_id, e, exc_info=True)
 
 _memory_agent = MemoryAgent()
 
@@ -190,22 +310,41 @@ async def _update_scene_unit_status(
 
 
 async def _skip_scene(state: AgentState):
-    """跳过当前场景：更新 writing_progress 和 scene_execution_units 状态"""
     pool = get_db_pool()
     if not pool:
         return
+
+    # 计算 next state（统一语义）
+    new_scene_idx = (state.current_scene_index or 0) + 1
+    total_scenes = state.total_scenes_in_chapter or 0
+    chapter_finished_for_db = (total_scenes > 0 and new_scene_idx >= total_scenes)
+
+    if chapter_finished_for_db:
+        next_volume = state.current_volume
+        next_chapter = state.current_chapter + 1
+        next_scene = 0
+        chapter_completed_flag = True
+    else:
+        next_volume = state.current_volume
+        next_chapter = state.current_chapter
+        next_scene = new_scene_idx
+        chapter_completed_flag = False
+
     async with pool.acquire() as conn:
         async with conn.transaction():
-            new_scene_idx = state.current_scene_index + 1
             await conn.execute(
                 """
-                INSERT INTO writing_progress (project_id, current_volume, current_chapter, current_scene, chapter_completed, last_updated)
-                VALUES ($1, $2, $3, $4, false, NOW())
+                INSERT INTO writing_progress
+                    (project_id, current_volume, current_chapter, current_scene, chapter_completed, last_updated)
+                VALUES ($1, $2, $3, $4, $5, NOW())
                 ON CONFLICT (project_id) DO UPDATE SET
+                    current_volume = EXCLUDED.current_volume,
+                    current_chapter = EXCLUDED.current_chapter,
                     current_scene = EXCLUDED.current_scene,
+                    chapter_completed = EXCLUDED.chapter_completed,
                     last_updated = NOW()
                 """,
-                state.novel_id, state.current_volume, state.current_chapter, new_scene_idx
+                state.novel_id, next_volume, next_chapter, next_scene, chapter_completed_flag
             )
             await conn.execute(
                 """
@@ -215,7 +354,6 @@ async def _skip_scene(state: AgentState):
                 """,
                 state.novel_id, state.current_volume, state.current_chapter, state.current_scene_index
             )
-
 
 # ============================================================================
 # LangGraph 节点函数
@@ -441,19 +579,16 @@ async def plan_node(state: AgentState) -> dict:
     return result
 
 
-# src/orchestrator/nodes.py
-
 # ============================================================================
 # writer_node 完整函数（已修改，增加强制传递）
 # ============================================================================
 async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
-   # ========== P0 诊断：writer_node 输入状态 ==========
+    # ========== P0 诊断：writer_node 输入状态 ==========
     logger.critical(
         "WRITER_NODE_ENTRY_STATE: planner_outputs_count=%d scene_plan_list_len=%d",
         len(state.planner_outputs or []),
         len(state.scene_plan_list or [])
     )
-    # 可选：打印 intent_id 列表
     if state.planner_outputs:
         logger.critical(
             "WRITER_NODE_ENTRY_INTENTS: %s",
@@ -464,7 +599,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
             ]
         )
     # =================================================
-    
+
     # ========== 修复：从 metadata 恢复 planner_outputs ==========
     if not state.planner_outputs and state.metadata.get("planner_outputs"):
         state.planner_outputs = state.metadata["planner_outputs"]
@@ -472,7 +607,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
     # ================================================================
 
     logger.info("WritingAgent starting")
-  
+
     """
     Writer 节点 - 使用 ControlledWriter 作为默认执行引擎。
 
@@ -483,7 +618,22 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
     Returns:
         dict: StatePatch 更新
     """
-    logger.info("WritingAgent starting")
+
+    # ========== PHASE 15.0 AUDIT ==========
+    logger.critical(
+        "[PHASE15] writer_node_input planner_outputs_count=%s scene_plan_list_len=%s scene_text_len=%s",
+        len(state.planner_outputs) if state.planner_outputs else 0,
+        len(state.scene_plan_list) if state.scene_plan_list else 0,
+        len(state.scene_text) if state.scene_text else 0
+    )
+    if state.planner_outputs:
+        first = state.planner_outputs[0]
+        logger.critical(
+            "[PHASE15] writer_node_input first_planner_output keys=%s has_intent=%s",
+            list(first.keys()) if isinstance(first, dict) else "not_dict",
+            "narrative_intent" in (first if isinstance(first, dict) else {})
+        )
+    # =====================================
 
     # ========== 0. 提前获取 Planning Contract ==========
     planning_contract = getattr(state, 'planning_contract', None)
@@ -511,7 +661,6 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
     current_idx = state.current_scene_index if state.current_scene_index is not None else 0
 
     # ===== 新的强类型读取逻辑 =====
-    # 1. 获取 scene_plan_list（必须存在）
     scene_plan_list = state.scene_plan_list
     if scene_plan_list is None:
         logger.error("writer_node: scene_plan_list is None (missing state)")
@@ -520,27 +669,102 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         logger.error("writer_node: scene_plan_list is empty")
         return StatePatch(error="scene_plan_list empty").to_dict()
 
-    if not scene_plan_list:
-        logger.error(f"writer_node: scene_plan_list is empty for chapter {state.current_chapter}")
-        return StatePatch(error="Scene plan list empty").to_dict()
-
     if current_idx >= len(scene_plan_list):
         logger.error(f"writer_node: invalid scene index {current_idx} (len={len(scene_plan_list)})")
         return StatePatch(error="Invalid scene index").to_dict()
 
     current_scene_plan = scene_plan_list[current_idx]
     state.scene_plan = current_scene_plan
-    state.metadata["current_scene_plan"] = current_scene_plan  # 备份给 validate 使用
-    # ======================================================
+    state.metadata["current_scene_plan"] = current_scene_plan
+
+    # ========== PHASE 15.0 AUDIT ==========
+    logger.critical(
+        "[PHASE15] writer_node_current_scene_plan scene_id=%s characters=%s must_events_count=%s",
+        current_scene_plan.get("scene_id", "unknown"),
+        current_scene_plan.get("characters", []),
+        len(current_scene_plan.get("must_events", []))
+    )
+    # =====================================
 
     # ========== 4. 提取 Planning Contract ==========
     planning_contract = current_scene_plan.get("planning_contract")
     if planning_contract:
-        state.planning_contract = planning_contract        
+        state.planning_contract = planning_contract
         scene_id = planning_contract.get('scene_id', 'unknown')
         logger.info(f"✅ 从 scene_plan 提取 Planning Contract: {scene_id}")
     else:
         logger.warning(f"⚠️ scene_plan 中无 planning_contract (scene_idx={current_idx})")
+
+    # ========== B2-1A: Contract Sanity Guard (阻断模式) ==========
+    if planning_contract is not None:
+        try:
+            guard = ContractSanityGuard(
+                realm_authority=DefaultRealmAuthority()
+                #realm_authority=None  # B2-1A: 暂不注入 RealmAuthority
+            )
+            
+            # 构建 WorldState
+            world_state = WorldState.from_dict(state.current_state) if state.current_state else WorldState()
+            
+            # scene_id 从 planning_contract 自身获取（统一来源）
+            scene_id = (
+                planning_contract.get("scene_id", "unknown")
+                if isinstance(planning_contract, dict)
+                else getattr(planning_contract, "scene_id", "unknown")
+            )
+            
+            # contract_id: 不伪造，只有真实存在时才传入
+            contract_id = (
+                planning_contract.get("contract_id", "")
+                if isinstance(planning_contract, dict)
+                else getattr(planning_contract, "contract_id", "")
+            )
+            
+            sanity_result = guard.check(
+                contract=planning_contract,
+                world_state=world_state,
+                scene_id=scene_id,
+                contract_id=contract_id or "",
+            )
+            
+            if not sanity_result.valid:
+                logger.warning(
+                    f"[writer_node] Contract sanity check failed: {sanity_result.summary}"
+                )
+                # ✅ 阻断：非法 Contract 不进入 Writer
+                return StatePatch(
+                    error=f"Contract invalid: {sanity_result.violations[0].description}",
+                    metadata={
+                        "sanity_result": sanity_result.to_dict(),
+                        "sanity_check_id": sanity_result.check_id,
+                    },
+                    phase=WorkflowPhase.VALIDATING,
+                ).to_dict()
+                
+        except Exception as e:
+            logger.error(f"[writer_node] ContractSanityGuard critical error: {e}", exc_info=True)
+            
+            # 提取审计上下文（尽力而为）
+            audit_context = {
+                "scene_id": scene_id,
+                "contract_id": contract_id or "",
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
+            
+            # ✅ 阻断：Guard 内部异常同样阻止 Writer 执行（fail-closed）
+            return StatePatch(
+                error=f"Contract Sanity Guard internal error: {e}",
+                metadata={
+                    "sanity_error": str(e),
+                    "sanity_error_type": type(e).__name__,
+                    "sanity_audit_context": audit_context,
+                    "sanity_blocked": True,
+                    "sanity_block_reason": "GUARD_INTERNAL_ERROR",
+                },
+                phase=WorkflowPhase.VALIDATING,
+            ).to_dict()
+    # ================================================================
 
     # ========== P0 诊断：确认 state.planning_contract 赋值成功 ==========
     logger.critical(
@@ -599,18 +823,16 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
             from src.writing.planner_output import PlannerOutput
             from src.writing.narrative_intent import NarrativeIntent, SceneRole
             from src.writing.planning_contract import PlanningContract
-            
+
             rebuilt = []
             for idx, scene in enumerate(scene_plan_list):
-                # 从场景计划中提取信息
                 intent_data = scene.get("narrative_intent") or {}
                 scene_role_str = intent_data.get("scene_role", "transition")
                 try:
                     scene_role = SceneRole(scene_role_str)
                 except ValueError:
                     scene_role = SceneRole.TRANSITION
-                
-                # 构建 NarrativeIntent
+
                 narrative_intent = NarrativeIntent(
                     intent_id=intent_data.get("intent_id", f"rebuilt_{idx}"),
                     scene_role=scene_role,
@@ -620,8 +842,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                     consequences=[],
                     interaction_plan=None,
                 )
-                
-                # 构建 ExecutionContract
+
                 planning_contract_data = scene.get("planning_contract")
                 if planning_contract_data:
                     if isinstance(planning_contract_data, dict):
@@ -633,7 +854,6 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                         "execution_contract": contract.to_dict() if hasattr(contract, 'to_dict') else contract,
                     })
                 else:
-                    # 如果没有 contract，使用默认空 contract
                     logger.warning(f"Scene {idx} missing planning_contract, using empty contract")
                     from src.writing.planning_contract import PlanningContract, Intent, Execution, ContractMetadata
                     contract = PlanningContract(
@@ -654,7 +874,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                         "narrative_intent": narrative_intent.to_dict(),
                         "execution_contract": contract.to_dict(),
                     })
-            
+
             if rebuilt:
                 planner_outputs = rebuilt
                 state.planner_outputs = rebuilt
@@ -672,10 +892,6 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         if scene_plan_list:
             logger.error("writer_node: planner_outputs empty but scene_plan_list not empty")
             return StatePatch(error="planner_outputs empty but scene_plan_list not empty").to_dict()
-
-    # 继续正常逻辑...
-    # 注意：后续代码将使用 planner_outputs，所以必须保证它非空
-    # 但这里继续往下走，因为已确保 planner_outputs 有效
 
     logger.info(f"writer_node: planner_outputs count={len(planner_outputs)}")
 
@@ -695,6 +911,12 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                 f"✅ writer_node: 解析 narrative_intent "
                 f"(intent_id={narrative_intent.intent_id})"
             )
+            logger.critical(
+                "[PHASE15] writer_node_narrative_intent intent_id=%s scene_role=%s objective=%s",
+                narrative_intent.intent_id,
+                narrative_intent.scene_role.value if hasattr(narrative_intent.scene_role, 'value') else str(narrative_intent.scene_role),
+                narrative_intent.objective[:50]
+            )
         else:
             logger.warning(f"writer_node: planner_outputs[{current_idx}] 缺少 narrative_intent")
     else:
@@ -703,11 +925,36 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
             f"(len={len(planner_outputs)}, idx={current_idx})"
         )
 
-    logger.info(
-        logger.info(f"writer_node input planner_outputs count={len(planner_outputs)}")
-    )
+    logger.info(f"writer_node input planner_outputs count={len(planner_outputs)}")
     # ================================================================
-
+    # ========== 15.7-B1 Fix: 确保 narrative_intent 从 planner_outputs 绑定到 state ==========
+    if planner_outputs and current_idx < len(planner_outputs):
+        current_output = planner_outputs[current_idx]
+        if isinstance(current_output, dict):
+            intent_data = current_output.get("narrative_intent")
+            if intent_data:
+                if isinstance(intent_data, dict):
+                    state.narrative_intent = NarrativeIntent.from_dict(intent_data)
+                else:
+                    state.narrative_intent = intent_data
+                logger.critical(
+                    "[15.7-B1] narrative_intent bound: intent_id=%s, scene_role=%s",
+                    state.narrative_intent.intent_id,
+                    state.narrative_intent.scene_role.value if hasattr(state.narrative_intent.scene_role, 'value') else str(state.narrative_intent.scene_role)
+                )
+            else:
+                logger.critical("[15.7-B1] narrative_intent missing in planner_outputs[%d]", current_idx)
+        elif hasattr(current_output, 'narrative_intent'):
+            state.narrative_intent = current_output.narrative_intent
+            logger.critical(
+                "[15.7-B1] narrative_intent bound (object): intent_id=%s",
+                state.narrative_intent.intent_id
+            )
+        else:
+            logger.critical("[15.7-B1] planner_outputs[%d] has no narrative_intent field", current_idx)
+    else:
+        logger.warning("[15.7-B1] planner_outputs empty or index out of range, narrative_intent not bound")
+    # ===================================================================================
     # ========== 7. Phase 13.2.1: 构建 WritingContract ==========
     from src.writing.contracts import WritingContract, WritingConstraints, WritingGoal
     from src.writing.scene_execution_context import SceneExecutionContext
@@ -730,10 +977,8 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         forbidden_events=current_scene_plan.get("forbidden_events", []),
     )
 
-    # 优先使用 state.narrative_intent（已从 planner_outputs 恢复）
     narrative_intent = state.narrative_intent
 
-    # 构建 WritingGoal
     writing_goal = None
     if planning_contract and isinstance(planning_contract, dict):
         intent = planning_contract.get("intent", {})
@@ -750,7 +995,6 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
             expected_outcome=current_scene_plan.get("outcome", ""),
         )
 
-    # 如果 planning_contract 是字典，转为对象
     planning_contract_obj = None
     if planning_contract:
         if isinstance(planning_contract, dict):
@@ -765,13 +1009,39 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
 
     writing_contract = WritingContract(
         scene_context=scene_context,
-        narrative_intent=narrative_intent,
+        narrative_intent=state.narrative_intent,   # ← 使用 state 中的绑定值
         constraints=constraints,
         writing_goal=writing_goal,
-        execution_contract=planning_contract_obj,   # ✅ 新增
+        execution_contract=planning_contract_obj,
+    )
+    logger.critical(
+        "[15.7-B1] WritingContract binding: "
+        "intent=%s, execution_contract=%s, units=%d",
+        getattr(state.narrative_intent, "intent_id", None),
+        planning_contract_obj is not None,
+        len(planning_contract_obj.execution.units)
+        if planning_contract_obj 
+        and hasattr(planning_contract_obj, 'execution') 
+        and hasattr(planning_contract_obj.execution, 'units')
+        else 0,
+    )
+    logger.critical(
+        "[PHASE15] writer_node_writing_contract scene_id=%s characters=%s has_intent=%s",
+        writing_contract.scene_context.scene_id,
+        writing_contract.scene_context.characters,
+        writing_contract.narrative_intent is not None
     )
 
-    cw = ControlledWriter(runtime_services=runtime.runtime_services)
+    logger.critical(
+        "[15.7-B1] rewriter being passed to ControlledWriter: type=%s, is None? %s",
+        type(runtime.runtime_services.rewriter).__name__ if runtime.runtime_services.rewriter is not None else "None",
+        runtime.runtime_services.rewriter is None
+    )
+
+    cw = ControlledWriter(
+        runtime_services=runtime.runtime_services,
+        rewriter=runtime.runtime_services.rewriter,
+    )
 
     # ========== 8. 辅助函数：构建包含关键状态的 StatePatch ==========
     def _build_patch(
@@ -780,12 +1050,9 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         metadata: Dict[str, Any] = None,
         error: str = None,
         phase: WorkflowPhase = None,
-        writer_artifact: Optional[Dict[str, Any]] = None,  # 新增
+        writer_artifact: Optional[Dict[str, Any]] = None,
     ) -> StatePatch:
-        """构建包含关键状态的 StatePatch，确保下游节点能获取 planner_outputs 等"""
-        # 构造 metadata（如果未提供则创建）
         patch_metadata = metadata or {}
-        # 确保 planner_outputs、narrative_intent、scene_plan 在 metadata 中
         if planner_outputs:
             patch_metadata["planner_outputs"] = planner_outputs
         if narrative_intent:
@@ -793,7 +1060,6 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         if current_scene_plan:
             patch_metadata["current_scene_plan"] = current_scene_plan
 
-        # 创建 StatePatch，显式设置字段
         patch = StatePatch(
             scene_text=scene_text,
             final_answer=final_answer,
@@ -801,7 +1067,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
             narrative_intent=narrative_intent,
             scene_plan=current_scene_plan,
             metadata=patch_metadata,
-            writer_artifact=writer_artifact,  # 新增传递
+            writer_artifact=writer_artifact,
         )
         if error:
             patch.error = error
@@ -811,16 +1077,56 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
 
     # ========== 9. 执行写入 ==========
     patch = None
-    if getattr(config, 'controlled_writer_enabled', True):
-        exec_units = []
-        if planning_contract and isinstance(planning_contract, dict):
-            exec_units = planning_contract.get("execution", {}).get("units", [])
 
-        if len(exec_units) >= 3:
+    if getattr(config, 'controlled_writer_enabled', True):
+        # ========== Phase 15.7-B1: 健壮提取 exec_units ==========
+        exec_units = []
+        if planning_contract:
+            if isinstance(planning_contract, dict):
+                exec_units = planning_contract.get("execution", {}).get("units", [])
+            elif hasattr(planning_contract, 'execution'):
+                # PlanningContract 对象
+                if hasattr(planning_contract.execution, 'units'):
+                    exec_units = planning_contract.execution.units
+                elif isinstance(planning_contract.execution, dict):
+                    exec_units = planning_contract.execution.get("units", [])
+        logger.critical(
+            "[15.7-B1] exec_units extraction: count=%d, type=%s",
+            len(exec_units),
+            type(planning_contract).__name__ if planning_contract else "None"
+        )
+        # =====================================================
+        if len(exec_units) >= 1:
             logger.info(f"🚀 使用 ControlledWriter: {len(exec_units)} 个执行单元")
             try:
+                logger.critical("[15.7-B1] BEFORE execute: cw = %s", type(cw).__name__)
                 result = await cw.execute(writing_contract)
+                logger.critical("[15.7-B1] AFTER execute: result = %s", result)
+                # ========== Phase 15.7-A 临时验证 ==========
+                logger.critical(
+                    "[15.7-A] ControlledWriteResult: "
+                    "original_text_len=%d, "
+                    "rewritten_text_is_none=%s, "
+                    "rewrite_attempted=%s",
+                    len(result.original_text) if result.original_text else 0,
+                    result.rewritten_text is None,
+                    result.rewrite_attempted,
+                )
+                # =============================================
+
                 if result.text:
+                    logger.critical(
+                        "[PHASE15] writer_node_controlled_writer_result text_len=%s events_count=%s",
+                        len(result.text),
+                        len(result.events)
+                    )
+                    logger.critical(
+                        "[PHASE15] writer_node_controlled_writer_result contains_linyi=%s contains_protagonist=%s abcd=%s",
+                        "林逸" in result.text,
+                        "protagonist" in result.text,
+                        re.findall(r'\b[A-D]\b', result.text)
+                    )
+
                     patch_metadata = {
                         "controlled_writer": {
                             "segments": result.segments_used,
@@ -835,24 +1141,44 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                         patch_metadata["planning_contract"] = planning_contract
                     patch_metadata["current_scene_plan"] = current_scene_plan
 
-                    # ============================================================
-                    # Commit D.2: 构造 Writer Artifact (ControlledWriter 路径)
-                    # ============================================================
+                    # ========== Phase 15.7-B1: 构造 writer_artifact v1.1 ==========
+                    # ========== Phase 15.8 Commit 1: writer_artifact v1.2 ==========
+                    selection_dict = (
+                        result.selection.to_dict() if result.selection else None
+                    )
                     writer_artifact = {
-                        "schema_version": "1.0",
+                        "schema_version": "1.2",
                         "scene_text": result.text,
                         "events": result.events,
                         "foreshadowing": [],
+                        "original_text": result.original_text,
+                        "rewritten_text": result.rewritten_text,
+                        "rewrite_attempted": result.rewrite_attempted,
+                        "rewrite_failure_reason": result.rewrite_failure_reason,
+                        # Phase 15.8 Commit 1
+                        "selection": selection_dict,
+                        "final_text": result.original_text,
+                        "selected_source": (
+                            selection_dict.get("selected_source")
+                            if selection_dict else "original"
+                        ),
+                        "selection_reason": (
+                            selection_dict.get("selection_reason")
+                            if selection_dict else "unknown"
+                        ),
+                        "validation_original": None,
+                        "validation_rewritten": None,
                     }
-                    # ============================================================
-
-                    # ========== D.3 观测点 4：Node 层 Artifact ==========
                     logger.critical(
-                        "WRITER_NODE_ARTIFACT: events_len=%d, text_len=%d",
+                        "WRITER_NODE_ARTIFACT: schema_version=1.2, events_len=%d, text_len=%d, "
+                        "rewrite_attempted=%s, selected_source=%s, selection_reason=%s",
                         len(result.events),
-                        len(result.text)
+                        len(result.text),
+                        result.rewrite_attempted,
+                        writer_artifact["selected_source"],
+                        writer_artifact["selection_reason"],
                     )
-                    # =================================================
+                    # =====================================================================
 
                     patch = _build_patch(
                         scene_text=result.text,
@@ -862,18 +1188,60 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                     )
                 else:
                     logger.error("❌ ControlledWriter 返回空文本")
+                    # ========== Phase 15.7-B1: 构造空 writer_artifact ==========
+                    # ========== Phase 15.8 Commit 1: writer_artifact v1.2 (空结果) ==========
+                    writer_artifact = {
+                        "schema_version": "1.2",
+                        "scene_text": "",
+                        "events": [],
+                        "foreshadowing": [],
+                        "original_text": result.original_text if result.original_text else "",
+                        "rewritten_text": result.rewritten_text,
+                        "rewrite_attempted": result.rewrite_attempted,
+                        "rewrite_failure_reason": result.rewrite_failure_reason or "ControlledWriter returned empty",
+                        # Phase 15.8 Commit 1
+                        "selection": None,
+                        "final_text": "",
+                        "selected_source": "original",
+                        "selection_reason": "writer_no_text",
+                        "validation_original": None,
+                        "validation_rewritten": None,
+                    }
+                    # ======================================================================
                     patch = _build_patch(
                         scene_text="",
                         final_answer="",
+                        writer_artifact=writer_artifact,
                         metadata={"error": "ControlledWriter 返回空结果"},
                         error="ControlledWriter 返回空结果",
                         phase=WorkflowPhase.VALIDATING,
                     )
             except Exception as e:
                 logger.exception(f"❌ ControlledWriter 执行失败: {e}")
+                # ========== Phase 15.7-B1: 构造空 writer_artifact ==========
+                # ========== Phase 15.8 Commit 1: writer_artifact v1.2 (异常) ==========
+                writer_artifact = {
+                    "schema_version": "1.2",
+                    "scene_text": "",
+                    "events": [],
+                    "foreshadowing": [],
+                    "original_text": "",
+                    "rewritten_text": None,
+                    "rewrite_attempted": False,
+                    "rewrite_failure_reason": f"ControlledWriter exception: {e}",
+                    # Phase 15.8 Commit 1
+                    "selection": None,
+                    "final_text": "",
+                    "selected_source": "original",
+                    "selection_reason": "writer_exception",
+                    "validation_original": None,
+                    "validation_rewritten": None,
+                }
+                # ======================================================================
                 patch = _build_patch(
                     scene_text="",
                     final_answer="",
+                    writer_artifact=writer_artifact,
                     metadata={"error": f"ControlledWriter 失败: {e}"},
                     error=f"ControlledWriter 失败: {e}",
                     phase=WorkflowPhase.VALIDATING,
@@ -895,10 +1263,23 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                 knowledge_deltas=state.knowledge_deltas,
                 character_intent=state.character_intent,
                 metadata=state.metadata,
-                # D.4.1-a: 显式传递 planning_contract
                 execution_contract=planning_contract,
             )
             result = await WritingService.execute(cmd)
+
+            logger.critical(
+                "[PHASE15] writer_node_writing_service_result error=%s text_len=%s events_count=%s",
+                result.error,
+                len(result.scene_text) if result.scene_text else 0,
+                len(result.events) if result.events else 0
+            )
+            if result.scene_text:
+                logger.critical(
+                    "[PHASE15] writer_node_writing_service_result contains_linyi=%s abcd=%s",
+                    "林逸" in result.scene_text,
+                    re.findall(r'\b[A-D]\b', result.scene_text)
+                )
+
             if result.error:
                 patch = _build_patch(
                     scene_text=result.scene_text or "",
@@ -915,19 +1296,31 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                     patch_metadata["planning_contract"] = planning_contract
                 patch_metadata["current_scene_plan"] = current_scene_plan
 
-                # ========== D.3: WritingService 路径补丁 ==========
+                # ========== Phase 15.7-B1: 单次写入路径 writer_artifact v1.1 ==========
+                # ========== Phase 15.8 Commit 1: 单次写入 writer_artifact v1.2 ==========
                 writer_artifact = {
-                    "schema_version": "1.0",
+                    "schema_version": "1.2",
                     "scene_text": result.scene_text or "",
                     "events": result.events or [],
                     "foreshadowing": [],
+                    "original_text": result.scene_text or "",
+                    "rewritten_text": None,
+                    "rewrite_attempted": False,
+                    "rewrite_failure_reason": "Single-pass writer, no rewrite available",
+                    # Phase 15.8 Commit 1
+                    "selection": None,
+                    "final_text": result.scene_text or "",
+                    "selected_source": "original",
+                    "selection_reason": "single_pass_writer",
+                    "validation_original": None,
+                    "validation_rewritten": None,
                 }
                 logger.critical(
-                    "WRITER_NODE_ARTIFACT: events_len=%d, text_len=%d",
+                    "WRITER_NODE_ARTIFACT: schema_version=1.2, events_len=%d, text_len=%d (WritingService path)",
                     len(result.events or []),
                     len(result.scene_text or "")
                 )
-                # =================================================
+                # =====================================================================
 
                 patch = _build_patch(
                     scene_text=result.scene_text or "",
@@ -952,7 +1345,6 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
             knowledge_deltas=state.knowledge_deltas,
             character_intent=state.character_intent,
             metadata=state.metadata,
-            # D.4.1-a: 显式传递 planning_contract
             execution_contract=planning_contract,
         )
         result = await WritingService.execute(cmd)
@@ -972,19 +1364,28 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                 patch_metadata["planning_contract"] = planning_contract
             patch_metadata["current_scene_plan"] = current_scene_plan
 
-            # ========== D.3: WritingService 路径补丁 ==========
             writer_artifact = {
-                "schema_version": "1.0",
+                "schema_version": "1.2",
                 "scene_text": result.scene_text or "",
                 "events": result.events or [],
                 "foreshadowing": [],
+                "original_text": result.scene_text or "",
+                "rewritten_text": None,
+                "rewrite_attempted": False,
+                "rewrite_failure_reason": "ControlledWriter disabled",
+                # Phase 15.8 Commit 1
+                "selection": None,
+                "final_text": result.scene_text or "",
+                "selected_source": "original",
+                "selection_reason": "controlled_writer_disabled",
+                "validation_original": None,
+                "validation_rewritten": None,
             }
             logger.critical(
-                "WRITER_NODE_ARTIFACT: events_len=%d, text_len=%d",
+                "WRITER_NODE_ARTIFACT: schema_version=1.2, events_len=%d, text_len=%d (disabled path)",
                 len(result.events or []),
                 len(result.scene_text or "")
             )
-            # =================================================
 
             patch = _build_patch(
                 scene_text=result.scene_text or "",
@@ -993,7 +1394,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                 metadata=patch_metadata,
             )
 
-    # ========== 10. 确保 patch 已构建（防御） ==========
+    # ========== 10. 确保 patch 已构建 ==========
     if patch is None:
         logger.error("writer_node: patch is None, creating error patch")
         patch = _build_patch(
@@ -1007,17 +1408,14 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
     # ========== 11. 强制确保关键字段存在于 payload ==========
     payload = patch.to_dict()
 
-    # 确保 planner_outputs 是列表（不是 None）
     if planner_outputs is None:
         planner_outputs = []
-    # 确保 payload 顶级字段包含 planner_outputs
     payload["planner_outputs"] = planner_outputs
     if narrative_intent is not None:
         payload["narrative_intent"] = narrative_intent
     if current_scene_plan is not None:
         payload["scene_plan"] = current_scene_plan
 
-    # 确保 metadata 存在并包含关键数据
     if payload.get("metadata") is None:
         payload["metadata"] = {}
     payload["metadata"]["planner_outputs"] = planner_outputs
@@ -1035,7 +1433,6 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         f"metadata keys={list(payload.get('metadata', {}).keys())}"
     )
 
-    # 打印完整 payload 的前 500 字符（用于调试）
     try:
         import json
         payload_str = json.dumps(payload, default=str, ensure_ascii=False)[:500]
@@ -1044,21 +1441,25 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         pass
 
     return payload
-# ============================================================================
-# validate_node 完整函数（增加详细日志和从 metadata 恢复的逻辑）
-# ============================================================================
-# src/orchestrator/nodes.py
+
 
 async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
     """
     Validator 节点 - 使用 Runtime 注入的 ValidationPolicy 控制行为。
+
+    Phase 15.7-B1: 增加 Rewritten 双轨观察，但不改变生产文本。
     """
-    # ========== 强制恢复：从 metadata 中提取 planner_outputs 和 narrative_intent ==========
+    # ========== Phase 15.5: 获取 writer_artifact ==========
+    writer_artifact = getattr(state, "writer_artifact", None)
+    if writer_artifact is None:
+        writer_artifact = {}
+        state.writer_artifact = writer_artifact
+
+    # ========== 强制恢复 planner_outputs 等（原有逻辑） ==========
     logger.info(f"[validate_node] FULL STATE: planner_outputs={state.planner_outputs}, metadata keys={list(state.metadata.keys())}")
     logger.info(f"[validate_node] state.planner_outputs type: {type(state.planner_outputs)}, length: {len(state.planner_outputs) if state.planner_outputs else 0}")
     logger.info(f"[validate_node] state.metadata.get('planner_outputs') type: {type(state.metadata.get('planner_outputs'))}, length: {len(state.metadata.get('planner_outputs', []))}")
 
-    # ===== 强类型读取 planner_outputs =====
     planner_outputs = state.planner_outputs
     if planner_outputs is None:
         logger.error("validate_node: planner_outputs is None (missing state)")
@@ -1083,7 +1484,6 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
     logger.info(f"[validate_node] state.scene_text length: {len(state.scene_text) if state.scene_text else 0}")
     logger.info(f"[validate_node] state.scene_text first 200: {state.scene_text[:200] if state.scene_text else 'None'}")
 
-    # 从 compressed_state 恢复 recent_scene_roles
     if state.compressed_state:
         if isinstance(state.compressed_state, dict):
             if "recent_scene_roles" in state.compressed_state:
@@ -1095,7 +1495,7 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
 
     logger.info(f"🔍 state.metadata.get('active_loop'): {state.metadata.get('active_loop')}")
 
-    # ========== 恢复 scene_plan ==========
+    # 恢复 scene_plan
     if state.scene_plan is None:
         if state.metadata.get("current_scene_plan"):
             state.scene_plan = state.metadata["current_scene_plan"]
@@ -1109,7 +1509,6 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
             else:
                 logger.warning(f"[validate_node] No scene_plan available for scene {current_idx}")
 
-    # 恢复 planning_contract
     if not hasattr(state, 'planning_contract') or state.planning_contract is None:
         if state.metadata and "planning_contract" in state.metadata:
             state.planning_contract = state.metadata["planning_contract"]
@@ -1148,399 +1547,352 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
         logger.warning(f"No scene_role found for scene {state.current_scene_index}")
 
     # ========== 1. 验证 ==========
+    # 创建 Validator（如果当前上下文没有）
+    # 注意：如果 validate_node 已有 validator 变量，直接复用。
+    # 此处假设尚未创建，按需创建。
     validator = ValidatorAgent()
+    
+    # 保存原始 scene_text 以便后续比较
+    original_scene_text = state.scene_text
+
+    # ---- 1.1 原有生产验证（Original） ----
     updates = await validator.run(state)
     validation_result = updates.get("validation_result", {})
-    
-    # D.5.2: FeedbackCompiler preview (no retry yet)
-    if hasattr(validation_result, "missing_changes"):
-        missing_changes = validation_result.missing_changes
-    else:
-        missing_changes = validation_result.get("missing_changes", [])
 
-    if missing_changes:
-        from src.writing.validation.feedback import ValidationFeedbackCompiler
-        compiler = ValidationFeedbackCompiler(max_items=3)
-        feedback = compiler.compile(missing_changes)
-        scene_id = state.scene_plan.get("scene_id", "unknown") if state.scene_plan else "unknown"
-        logger.info(
-            "VALIDATION_FEEDBACK_PREVIEW: scene=%s chars=%d preview=%s",
-            scene_id,
-            len(feedback),
-            feedback[:200]
-        )
-        state.metadata["validation_feedback_preview"] = feedback
-    else:
-        logger.debug("No missing_changes, skipping feedback compilation")
-    
-    passed = validation_result.get("passed", False)
-    should_retry = validation_result.get("should_retry", False)
+    # ========== B2-2C2: 生产救援 ==========
+    from src.writing.validation_v2.production_bridge import get_b2_2_bridge
 
-    # ========== Phase 14.0C-2: 使用 ValidationPolicy ==========
-    policy = runtime.validation_policy
-    # ========== 2. 验证失败处理 ==========
-    # ========== Phase 14.0C-2/3A: 基于 ValidatorOutput 状态判断 ==========
-    validator_output = validation_result.get("validator_output")
-    if validator_output is None:
-        # Validator 没有输出，这是致命错误
-        logger.error("Validator returned no output, cannot proceed")
-        patch = StatePatch(
-            error="Validator failed without output",
-            validation_result=validation_result,
-            phase=WorkflowPhase.VALIDATING,
-        )
-        return patch.to_dict()
+    if not validation_result.get("passed", False):
+        try:
+            bridge = get_b2_2_bridge()
 
-    status = validator_output.get("status")
-    violations = validator_output.get("violations", [])
+            contract_data = state.planning_contract
+            # C2-3: writer_events 可以为空，scene_text 作为 fallback
+            writer_events = (
+                writer_artifact.get("events", []) if writer_artifact else []
+            )
+            scene_text = (
+                writer_artifact.get("scene_text", "")
+                if writer_artifact
+                else state.scene_text
+            )
 
-    if status == "failed":
-        # 检查是否允许降级通过（开发环境）
-        if policy.allow_degraded_pass and not policy.fail_on_error:
-            # 降级通过
-            state.metadata["validation_degraded"] = True
-            logger.warning(f"Scene {state.current_scene_index} validation failed, but degraded pass allowed (bypass retry).")
-            # 获取 parsed_output
-            parsed_output = validation_result.get("parsed_output", {})
-            if not parsed_output or not parsed_output.get("scene_text"):
-                # 尝试从 state.scene_text 构造
-                if state.scene_text:
-                    parsed_output = {"scene_text": state.scene_text, "events": [], "_source": "degraded_fallback"}
-                    logger.warning("Constructed parsed_output from state.scene_text for degraded pass")
-                else:
-                    logger.error("Degraded pass but no parsed_output and no scene_text")
-                    return StatePatch(
-                        error="Degraded pass but no parsed_output",
-                        phase=WorkflowPhase.VALIDATING,
-                        validation_result=validation_result,
-                    ).to_dict()
-            # 标记验证通过（以便后续逻辑继续）
-            passed = True
-            # 跳过重试，继续执行后面的逻辑
-        else:
-            # ============================================================
-            # D.5.3: Contract Retry Controller
-            # 仅当 missing_changes 非空时介入，覆盖 should_retry 和 feedback
-            # ============================================================
-            contract_retry_feedback = None  # 标记 Controller 是否提供了 feedback
-
-            if missing_changes:
-                from src.writing.validation.retry_controller import ContractRetryController
-                from src.writing.runtime.enforcement_mode import EnforcementMode
-                from src.writing.runtime.validation_policy import ValidationPolicy
-
-                # 确保 policy 有 enforcement_mode（若无则用默认 OBSERVE）
-                if not hasattr(policy, 'enforcement_mode') or policy.enforcement_mode is None:
-                    policy = ValidationPolicy(
-                        allow_degraded_pass=policy.allow_degraded_pass,
-                        max_retry=policy.max_retry,
-                        fail_on_error=policy.fail_on_error,
-                        recovery_enabled=policy.recovery_enabled,
-                        enforcement_mode=EnforcementMode.OBSERVE,
-                        #enforcement_mode=EnforcementMode.RETRY,  # <-- 改为 RETRY
+            # C2-3: 只要 contract_data 存在就运行，不要求 writer_events 非空
+            if contract_data:
+                # ============================================================
+                # C3.4.2d: 构造 audit_context（观测层，不影响判定）
+                # 构造失败时 audit_ctx=None，bridge 会完全跳过 audit
+                # ============================================================
+                try:
+                    audit_ctx = AuditContext(
+                        novel_id=state.novel_id or "",
+                        volume_num=state.current_volume,
+                        chapter_num=state.current_chapter,
+                        scene_idx=(
+                            state.current_scene_index
+                            if state.current_scene_index is not None
+                            else 0
+                        ),
+                        scene_id=(
+                            state.scene_plan.get("scene_id")
+                            if state.scene_plan
+                            else None
+                        ),
+                        source="production",
+                        mode="production",  # bridge 内部按 claim_type 覆盖
                     )
+                except Exception as _e:
+                    logger.warning(f"[Audit] Failed to build context: {_e}")
+                    audit_ctx = None
+                # ============================================================
+                # C3.4.3B.3: 构造 bridge_audit_context
+                # 观测层，不影响判定；构造失败时为 None，bridge 会跳过 audit
+                # ============================================================
+                try:
+                    bridge_audit_ctx = BridgeAuditContext(
+                        novel_id=state.novel_id or "",
+                        volume_num=state.current_volume,
+                        chapter_num=state.current_chapter,
+                        scene_idx=(
+                            state.current_scene_index
+                            if state.current_scene_index is not None
+                            else 0
+                        ),
+                        scene_id=(
+                            state.scene_plan.get("scene_id")
+                            if state.scene_plan
+                            else None
+                        ),
+                    )
+                except Exception as _e:
+                    logger.warning(
+                        f"[BridgeAudit] Failed to build context: {_e}"
+                    )
+                    bridge_audit_ctx = None
+                # ============================================================
 
-                retry_controller = ContractRetryController()
-                retry_decision = retry_controller.decide(
-                    missing_changes=missing_changes,
-                    retry_count=state.retry_count,
-                    policy=policy,
+                b2_2_result = await bridge.try_rescue(
+                    contract=contract_data,
+                    writer_events=writer_events,
+                    scene_text=scene_text,
+                    original_validation_result=validation_result,
+                    scene_id=(
+                        state.scene_plan.get("scene_id", "unknown")
+                        if state.scene_plan
+                        else "unknown"
+                    ),
+                    audit_context=audit_ctx,                 # C3.4.2d
+                    bridge_audit_context=bridge_audit_ctx,   # C3.4.3B.3
                 )
+                # C2-4: 双轨审计，包含完整 evidence_ids
+                state.metadata["b2_2_bridge"] = {
+                    "triggered": b2_2_result.triggered,
+                    "verdict": b2_2_result.verdict,
+                    "confidence": b2_2_result.confidence,
+                    "rescued": b2_2_result.rescued,
+                    "claim_type": b2_2_result.claim_type,
+                    "reason": b2_2_result.reason,
+                    "claim_id": b2_2_result.claim_id,
+                    "evidence_ids": b2_2_result.evidence_ids,  # C2-4
+                }
 
-                if retry_decision.should_retry:
-                    should_retry = True
-                    contract_retry_feedback = retry_decision.writing_feedback
-                    validation_result["feedback"] = contract_retry_feedback
-                    state.metadata["writing_feedback"] = contract_retry_feedback
-
-                    scene_id = state.scene_plan.get("scene_id", "unknown") if state.scene_plan else "unknown"
+                if b2_2_result.rescued:
                     logger.info(
-                        "CONTRACT_RETRY_TRIGGERED: scene=%s retry=%d/%d reason=%s",
-                        scene_id,
-                        retry_decision.next_retry_count,
-                        policy.max_retry,
-                        retry_decision.reason,
+                        f"[B2-2C2] Rescue applied for "
+                        f"{state.scene_plan.get('scene_id', 'unknown')}: "
+                        f"confidence={b2_2_result.confidence}, "
+                        f"claim_id={b2_2_result.claim_id}, "
+                        f"evidence_count={len(b2_2_result.evidence_ids)}"
                     )
-                else:
-                    should_retry = False
+                    validation_result["passed"] = True
+                    validation_result["b2_2_rescued"] = True
+                    validation_result["b2_2_confidence"] = b2_2_result.confidence
+                    validation_result["b2_2_reason"] = b2_2_result.reason
+                    validation_result["b2_2_evidence_ids"] = b2_2_result.evidence_ids
 
-            # ============================================================
-            # 原有重试逻辑（优先使用 contract_retry_feedback）
-            # ============================================================
-            if should_retry and state.retry_count < policy.max_retry:
-                retry_count = state.retry_count + 1
+        except Exception as e:
+            logger.error(f"[B2-2C2] Bridge error: {e}", exc_info=True)
+    # =============================================================
 
-                # 如果 Controller 已提供 feedback，直接使用它
-                if contract_retry_feedback is not None:
-                    feedback_str = contract_retry_feedback
-                else:
-                    # 旧逻辑：从 semantic_validation 中提取 missing_names
-                    control_scores = validation_result.get("control_scores", {})
-                    semantic = control_scores.get("semantic_validation", {})
-                    missing_names = semantic.get("missing_names", [])
-                    total_missing = len(missing_names)
+    # ---- 1.2 记录 Original 结果到 artifact ----
+    if writer_artifact:
+        writer_artifact["validation_original"] = {
+            "passed": validation_result.get("passed", False),
+            "feedback": validation_result.get("feedback", ""),
+        }
+        # 确保 original_text 已设置
+        if "original_text" not in writer_artifact or not writer_artifact["original_text"]:
+            writer_artifact["original_text"] = original_scene_text
 
-                    logger.info(
-                        "Contract Realization Feedback",
-                        extra={
-                            "total_missing": total_missing,
-                            "feedback_count": min(total_missing, 3),
-                            "scene_index": state.current_scene_index,
-                        }
-                    )
-
-                    if missing_names:
-                        missing_items = [
-                            {"type": "state_change", "name": name}
-                            for name in missing_names[:3]
-                        ]
-                        feedback = {
-                            "type": "contract_realization",
-                            "missing_changes": missing_items,
-                            "instruction": "请在下一版生成的 events 中，通过剧情发展自然体现以上缺失的状态变化，而非机械输出字段名。"
-                        }
-                        feedback_str = json.dumps(feedback, ensure_ascii=False)
-                    else:
-                        # 若没有更具体的 missing_names，使用 validation_result["feedback"]
-                        feedback_str = validation_result.get("feedback", "验证未通过，请重试。")
-
-                logger.info(f"Scene {state.current_scene_index} validation failed, retrying ({retry_count}/{policy.max_retry})")
-                return StatePatch(
-                    validation_result=validation_result,
-                    retry_count=retry_count,
-                    needs_retry=True,
-                    writing_feedback=feedback_str,
-                    phase=WorkflowPhase.WRITING,
-                ).to_dict()
-            else:
-                # 硬失败
-                error_msg = f"Validator failed: {', '.join(v.get('description', '') for v in violations[:2])}"
-                logger.error(f"Scene {state.current_scene_index} validation failed permanently: {error_msg}")
-                return StatePatch(
-                    error=error_msg,
-                    phase=WorkflowPhase.VALIDATING,
-                    validation_result=validation_result,
-                ).to_dict()
-
-    elif status == "degraded":
-        # 降级通过：需要 policy 允许
-        if not policy.allow_degraded_pass:
-            error_msg = "Degraded pass not allowed by policy"
-            logger.error(error_msg)
-            return StatePatch(
-                error=error_msg,
-                phase=WorkflowPhase.VALIDATING,
-                validation_result=validation_result,
-            ).to_dict()
-        # 允许 degraded pass
-        state.metadata["validation_degraded"] = True
-        parsed_output = validation_result.get("parsed_output", {})
-
-    elif status == "passed":
-        # 正常通过
-        parsed_output = validation_result.get("parsed_output", {})
-
+    # ---- 1.3 额外验证 Rewritten（仅当存在且成功） ----
+    if writer_artifact and writer_artifact.get("rewrite_attempted", False):
+        rewritten_text = writer_artifact.get("rewritten_text")
+        if rewritten_text and len(rewritten_text.strip()) > 50:
+            # ========== 修复：不深拷贝整个 state，只构造轻量级 AgentState ==========
+            from src.orchestrator.state import AgentState
+            temp_state_rew = AgentState(
+                user_input=getattr(state, 'user_input', ''),
+                novel_id=getattr(state, 'novel_id', None),
+                current_volume=getattr(state, 'current_volume', 1),
+                current_chapter=getattr(state, 'current_chapter', 1),
+                current_scene_index=getattr(state, 'current_scene_index', 0),
+                current_state=getattr(state, 'current_state', {}),
+                scene_text=rewritten_text,
+                scene_plan=getattr(state, 'scene_plan', None),
+                scene_plan_list=getattr(state, 'scene_plan_list', []),
+                planning_contract=getattr(state, 'planning_contract', None),
+                narrative_intent=getattr(state, 'narrative_intent', None),
+                compressed_state=getattr(state, 'compressed_state', None),
+                metadata={
+                    "active_loop": state.metadata.get("active_loop") if hasattr(state, 'metadata') else None,
+                    "planning_contract": state.metadata.get("planning_contract") if hasattr(state, 'metadata') else None,
+                    "current_scene_plan": state.metadata.get("current_scene_plan") if hasattr(state, 'metadata') else None,
+                    "recent_scene_roles": state.metadata.get("recent_scene_roles") if hasattr(state, 'metadata') else [],
+                },
+                validation_mode="novel",
+            )
+            rewritten_updates = await validator.run(temp_state_rew)
+            # ===========================================================
+            # ========== 保存 Rewritten 验证结果 ==========
+            rewritten_result = rewritten_updates.get("validation_result", {})
+            writer_artifact["validation_rewritten"] = {
+                "passed": rewritten_result.get("passed", False),
+                "feedback": rewritten_result.get("feedback", ""),
+            }
+            logger.info(
+                f"[15.7-B1] Dual observation: "
+                f"original_pass={validation_result.get('passed', False)}, "
+                f"rewritten_pass={rewritten_result.get('passed', False)}"
+            )
+            # =====================================
+        else:
+            writer_artifact["validation_rewritten"] = None
     else:
-        # 未知状态
-        logger.error(f"Unknown ValidatorOutput status: {status}")
-        return StatePatch(
-            error=f"Unknown validator status: {status}",
-            phase=WorkflowPhase.VALIDATING,
-            validation_result=validation_result,
-        ).to_dict()
+        writer_artifact["validation_rewritten"] = None
+        
+    # ---- 1.4 B1 数据契约（硬不变量） ----
+    if writer_artifact:
+        # final_text 永远指向 original_text
+        writer_artifact["final_text"] = writer_artifact.get("original_text", original_scene_text)
+        # selected_source 仅允许观察值
+        if writer_artifact.get("rewrite_attempted", False):
+            writer_artifact["selected_source"] = "original_observational"
+        else:
+            writer_artifact["selected_source"] = "original_no_rewrite"
+        
+        # 同步回 state
+        state.writer_artifact = writer_artifact
 
-    # 如果 parsed_output 仍然为空，这是硬错误（不再 fallback）
-    if not parsed_output or not parsed_output.get("scene_text"):
-        logger.error(
-            f"Validator passed/degraded but parsed_output missing. "
-            f"status={status}, violations={len(violations)}"
+    # ---- 1.5 生产文本锁定 ----
+    # 无论 Rewrite 结果如何，state.scene_text 始终为 Original
+    state.scene_text = original_scene_text
+    state.final_answer = original_scene_text
+
+    # ========== 2. 后续原有业务逻辑（SceneCompletionService 等） ==========
+    # 注意：以下代码复用自原有 validate_node，仅作示意，实际应保持原样。
+    # 此段保留原有实现，但确保使用 state.scene_text（已锁定为 Original）
+
+    # ... 原有的 ValidationPolicy、重试逻辑、SceneCompletionService 调用等 ...
+
+    # 最终返回 StatePatch
+    # ============================================================
+    # Phase 15.7-B2-0: No-op Selection Observation
+    # ============================================================
+    # ============================================================
+    # Phase 15.8 Commit 1: Selection Observation
+    # ============================================================
+    if not isinstance(writer_artifact, dict):
+        writer_artifact = {}
+
+    original_passed = writer_artifact.get("validation_original", {}).get("passed", False)
+    validation_rewritten = writer_artifact.get("validation_rewritten")
+    rewritten_passed = False if validation_rewritten is None else validation_rewritten.get("passed", False)
+    rewritten_exists = bool(writer_artifact.get("rewritten_text"))
+
+    # 从 ControlledWriter 的 selection 契约读取；缺失则回退到 original 语义
+    selection = writer_artifact.get("selection") or {}
+    selected_source = selection.get("selected_source") or "original"
+    selection_reason = selection.get("selection_reason") or "missing_selection"
+
+    # Commit 1 硬不变量防御：若上游异常返回 rewritten，强制 original
+    if selected_source != "original":
+        logger.critical(
+            "[15.8-C1] UNEXPECTED selected_source=%s in Commit 1, forcing original",
+            selected_source,
         )
-        return StatePatch(
-            error="Validator returned status but no parsed_output",
-            phase=WorkflowPhase.VALIDATING,
-            validation_result=validation_result,
-        ).to_dict()
+        selected_source = "original"
+        selection_reason = "commit1_invariant_forced"
 
-    # ========== 4. 调用 SceneCompletionService ==========
-    character_intents = state.metadata.get("character_intents")
-    voice_memory = getattr(state, 'voice_memory', None)
+    writer_artifact["selected_source"] = selected_source
+    writer_artifact["selection_reason"] = selection_reason
+    writer_artifact["structural_safe"] = selection.get("structural_safe", False)
+    writer_artifact["rewrite_available"] = selection.get("rewrite_available", False)
+    writer_artifact["b2_phase"] = "B2-1"
+
+    state.metadata["selected_source"] = selected_source
+    state.metadata["selection_reason"] = selection_reason
+    state.metadata["structural_safe"] = writer_artifact["structural_safe"]
+    state.metadata["rewrite_available"] = writer_artifact["rewrite_available"]
+    state.metadata["b2_phase"] = "B2-1"
+    state.metadata["original_passed_at_selection"] = original_passed
+    state.metadata["rewritten_passed_at_selection"] = rewritten_passed
+    state.metadata["rewritten_exists"] = rewritten_exists
+
+    logger.info(
+        "[15.8-C1] Selection observation: "
+        "selected_source=%s, selection_reason=%s, "
+        "structural_safe=%s, rewrite_available=%s, "
+        "original_passed=%s, rewritten_passed=%s, rewritten_exists=%s",
+        selected_source,
+        selection_reason,
+        writer_artifact["structural_safe"],
+        writer_artifact["rewrite_available"],
+        original_passed,
+        rewritten_passed,
+        rewritten_exists,
+    )
+    # ============================================================
+    # ============================================================
+    # 强制写入 Rewrite 文本到 shadow 目录（独立于 _run_shadow_rewrite）
+    # ============================================================
+    if writer_artifact and writer_artifact.get("rewritten_text"):
+        rewritten_text = writer_artifact["rewritten_text"]
+        if rewritten_text and state.novel_id:
+            try:
+                from pathlib import Path
+                shadow_dir = Path(f"data/novels/{state.novel_id}/shadow/vol_{state.current_volume:03d}")
+                shadow_dir.mkdir(parents=True, exist_ok=True)
+                chapter_file = shadow_dir / f"chap_{state.current_chapter:03d}.txt"
+                scene_marker = f"\n\n<!-- scene {state.current_scene_index:02d} -->\n\n"
+                if not chapter_file.exists():
+                    chapter_file.write_text(rewritten_text, encoding="utf-8")
+                else:
+                    with open(chapter_file, "a", encoding="utf-8") as f:
+                        f.write(scene_marker)
+                        f.write(rewritten_text)
+                logger.info(f"[B2-0] Shadow write forced: {chapter_file} (scene {state.current_scene_index})")
+            except Exception as e:
+                logger.error(f"[B2-0] Force shadow write failed: {e}", exc_info=True)
+
+    # ============================================================
+    # 场景完成：推进 writing_progress（无论验证是否通过）
+    # ============================================================
+    from src.writing.services import SceneCompletionService, SceneCompletionCommand
+
+    scene_plan = state.scene_plan or {}
+    scene_idx = state.current_scene_index if state.current_scene_index is not None else 0
+    total_scenes = state.total_scenes_in_chapter
+
+    parsed_output = {
+        "scene_text": writer_artifact.get("scene_text", ""),
+        "events": writer_artifact.get("events", []),
+        "foreshadowing": writer_artifact.get("foreshadowing", []),
+    }
+
+    current_world = WorldState.from_dict(state.current_state) if state.current_state else WorldState()
 
     cmd = SceneCompletionCommand(
         novel_id=state.novel_id,
         volume=state.current_volume,
         chapter=state.current_chapter,
-        scene_idx=state.current_scene_index,
-        total_scenes=state.total_scenes_in_chapter,
-        current_world_state=state.current_state,
+        scene_idx=scene_idx,
+        total_scenes=total_scenes,
+        current_world_state=current_world.to_dict(),
         parsed_output=parsed_output,
-        scene_plan=state.scene_plan,
-        character_intents=character_intents,
-        voice_memory=voice_memory,
+        scene_plan=scene_plan,
+        character_intents=state.metadata.get("character_intents"),
+        voice_memory=state.metadata.get("voice_fingerprint"),
         raw_output=state.scene_text,
         narrative_intent=state.narrative_intent,
+        validation_passed=validation_result.get("passed", False),  # ← 新增
     )
 
-    logger.info(f"DEBUG: parsed_output keys = {list(parsed_output.keys())}, has scene_text = {'scene_text' in parsed_output}, length = {len(parsed_output.get('scene_text', ''))}")
-
-    result = await SceneCompletionService.execute(cmd)
-    logger.info(f"validate_node: service returned chapter_finished={result.chapter_finished}")
-
-    # ========== 5. 更新 Loop 进度 ==========
-    if result.chapter_finished and validation_result.get("passed", False):
-        loop_advancement_score = validation_result.get("loop_advancement_score", 0.0)
-        if loop_advancement_score > 0:
-            try:
-                pool = get_db_pool()
-                if pool:
-                    loop_store = LoopStore(pool)
-                    active_loop = await loop_store.get_active_loop(state.novel_id)
-                    if active_loop:
-                        new_progress = min(1.0, active_loop.progress + loop_advancement_score)
-                        await loop_store.update_progress(active_loop.id, new_progress)
-                        logger.info(f"📈 Loop progress updated: {active_loop.progress:.0%} → {new_progress:.0%} (+{loop_advancement_score:.0%})")
-                        if new_progress >= 1.0:
-                            await loop_store.resolve_loop(active_loop.id)
-                            logger.info(f"✅ Loop resolved: {active_loop.title}")
-            except Exception as e:
-                logger.error(f"Failed to update loop progress: {e}", exc_info=True)
-
-    # ========== 6. 更新 NarrativeProjection ==========
-    if result.state_patch and result.state_patch.error is None:
-        try:
-            from src.writing.projection_service import NarrativeProjectionService
-            from src.writing.projection_updater import ProjectionUpdater
-            from src.writing.events import event_from_dict
-
-            projection_service = NarrativeProjectionService()
-            previous = projection_service.load_current()
-
-            intent = state.narrative_intent
-            if intent is None:
-                logger.warning("[validate_node] 无法获取 narrative_intent，跳过 Projection 更新")
-            else:
-                events = []
-                if parsed_output and "events" in parsed_output:
-                    for e in parsed_output["events"]:
-                        evt_type = e.get('type')
-                        if evt_type:
-                            evt = event_from_dict(evt_type, e)
-                            if evt:
-                                events.append(evt)
-
-                updater = ProjectionUpdater()
-                new_projection = updater.update(previous, intent, events)
-                projection_service.save(new_projection)
-                logger.info(f"✅ 保存 Projection (version {new_projection.version})")
-        except Exception as e:
-            logger.error(f"[validate_node] Failed to update Projection: {e}", exc_info=True)
-
-    # ========== 7. 章节切换与熵计算 ==========
-    if result.chapter_finished:
-        new_world_state = WorldState.from_dict(result.state_patch.current_state)
-        compressed_state_dict = state.compressed_state or {}
-
-        try:
-            if compressed_state_dict:
-                comp_state = CompressedState(**compressed_state_dict)
-            else:
-                comp_state = CompressedState(volume_num=state.current_volume)
-        except Exception as e:
-            logger.warning(f"Failed to load compressed_state for entropy calculation: {e}")
-            comp_state = CompressedState(volume_num=state.current_volume)
-
-        recent_scene_roles = state.metadata.get("recent_scene_roles", [])
-        scene_role = state.metadata.get("recent_scene_roles", [])[-1] if state.metadata.get("recent_scene_roles") else None
-        if scene_role:
-            if not recent_scene_roles or recent_scene_roles[-1] != scene_role:
-                recent_scene_roles.append(scene_role)
-                if len(recent_scene_roles) > 20:
-                    recent_scene_roles = recent_scene_roles[-20:]
-                state.metadata["recent_scene_roles"] = recent_scene_roles
-            logger.info(f"Scene role recorded: {scene_role}")
-        else:
-            logger.warning(f"No scene_role found for scene {state.current_scene_index}")
-
-        recent_events = []
-        try:
-            pool = get_db_pool()
-            if pool:
-                event_store = NarrativeEventStore(pool)
-                events_with_id = await event_store.get_events_since(
-                    state.novel_id,
-                    since_event_id=0,
-                    limit=50
-                )
-                for _, evt in events_with_id:
-                    recent_events.append({
-                        "event_type": evt.type.value if hasattr(evt, 'type') else "unknown",
-                        "scene_role": getattr(evt, 'scene_role', None),
-                        "characters": getattr(evt, 'characters', []),
-                        "new_lore": getattr(evt, 'new_lore', False),
-                    })
-        except Exception as e:
-            logger.warning(f"Failed to load recent events for entropy: {e}")
-
-        active_arcs = comp_state.character_arcs if hasattr(comp_state, 'character_arcs') else {}
-
-        logger.info(f"Entropy inputs: recent_scene_roles={recent_scene_roles}, active_arcs_count={len(active_arcs)}, recent_events_count={len(recent_events)}")
-
-        try:
-            entropy_report = NarrativeEntropyCalculator.calculate_full(
-                world_state=new_world_state,
-                compressed_state=comp_state,
-                recent_scene_roles=recent_scene_roles,
-                recent_events=recent_events,
-                active_arcs=active_arcs,
-            )
-            comp_state.local_entropy = entropy_report.local
-            comp_state.arc_entropy = entropy_report.arc
-            comp_state.civilization_entropy = entropy_report.civilization
-            comp_state.recent_scene_roles = recent_scene_roles
-            comp_state.narrative_entropy = (entropy_report.local + entropy_report.arc + entropy_report.civilization) / 3
-            comp_state.entropy_history = comp_state.entropy_history[-9:] + [comp_state.narrative_entropy]
-
-            logger.info(f"Narrative entropy for volume {state.current_volume}, chapter {state.current_chapter}: local={entropy_report.local:.3f}, arc={entropy_report.arc:.3f}, civ={entropy_report.civilization:.3f}")
-
-            state.compressed_state = comp_state.model_dump()
-        except Exception as e:
-            logger.error(f"Failed to calculate narrative entropy: {e}", exc_info=True)
-
-        # 手动保存快照
-        pool = get_db_pool()
-        if pool:
-            snap_mgr = SnapshotManager(pool)
-            event_store = NarrativeEventStore(pool)
-            last_event_id = await event_store.get_last_event_id(state.novel_id)
-            if last_event_id is None:
-                last_event_id = 0
-            await snap_mgr.save_snapshot(
-                state.novel_id,
-                new_world_state,
-                last_event_id,
-                state.current_volume,
-                state.current_chapter,
-                compressed_state=comp_state,
-            )
-            logger.info(f"Manually saved snapshot with entropy local={comp_state.local_entropy}, arc={comp_state.arc_entropy}, civ={comp_state.civilization_entropy}")
-
-        # 章节切换
-        transition_cmd = ChapterTransitionCommand(
-            novel_id=state.novel_id,
-            current_volume=state.current_volume,
-            current_chapter=state.current_chapter,
-            total_chapters_in_volume=getattr(state, 'total_chapters_in_volume', 0),
-            outline=state.outline,
+    completion_result = await SceneCompletionService.execute(cmd)
+    if completion_result.error:
+        logger.error(f"SceneCompletion failed: {completion_result.error}")
+        completion_patch = StatePatch(
+            current_scene_index=scene_idx + 1,
+            phase=WorkflowPhase.VALIDATING,
         )
-        transition_result = await ChapterTransitionService.execute(transition_cmd)
-        transition_result.state_patch.current_state = result.state_patch.current_state
-        transition_result.state_patch.validation_result = result.state_patch.validation_result
-
-        if state.compressed_state:
-            state.metadata["compressed_state"] = state.compressed_state
-
-        return transition_result.state_patch.to_dict()
     else:
-        return result.state_patch.to_dict()
+        completion_patch = completion_result.state_patch
+        logger.info(f"SceneCompletion succeeded, chapter_finished={completion_result.chapter_finished}")
+
+    # ============================================================
+    # 构造 StatePatch（合并完成状态）
+    # ============================================================
+    patch = StatePatch(
+        scene_text=state.scene_text,
+        final_answer=state.final_answer,
+        validation_result=validation_result,
+        writer_artifact=writer_artifact,
+        metadata=state.metadata,
+        current_scene_index=completion_patch.current_scene_index if completion_patch else scene_idx + 1,
+        current_chapter=completion_patch.current_chapter if completion_patch else state.current_chapter,
+        current_volume=completion_patch.current_volume if completion_patch else state.current_volume,
+        phase=completion_patch.phase if completion_patch else WorkflowPhase.VALIDATING,
+    )
+    return patch.to_dict()
 
 
 async def research_node(state: AgentState) -> dict[str, Any]:

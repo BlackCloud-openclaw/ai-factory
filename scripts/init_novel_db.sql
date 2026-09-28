@@ -372,3 +372,217 @@ CREATE TABLE IF NOT EXISTS loop_store (
     resolved_at TIMESTAMPTZ
 );
 CREATE INDEX idx_loop_novel_status ON loop_store(novel_id, status);
+
+-- Phase 15.3 — Shadow Rewrite Log
+-- 用于记录 Shadow Rewrite 实验数据
+
+CREATE TABLE IF NOT EXISTS shadow_rewrite_log (
+    id BIGSERIAL PRIMARY KEY,
+
+    -- 场景标识
+    scene_id VARCHAR(64) NOT NULL,
+
+    -- 原始文本（用于人工复核）
+    original_text TEXT,
+    rewritten_text TEXT,
+
+    -- 长度统计
+    original_length INT,
+    rewritten_length INT,
+
+    -- Validator 结果
+    original_passed BOOLEAN,
+    rewritten_passed BOOLEAN,
+    original_violations JSONB,
+    rewritten_violations JSONB,
+
+    -- 执行状态
+    status VARCHAR(32) NOT NULL,  -- success / validation_failed / llm_error / validator_error / timeout / skipped
+    error_message TEXT,
+
+    -- 实验元数据
+    experiment_id VARCHAR(64),
+    prompt_version VARCHAR(32) DEFAULT 'phase15.3.v1',
+    contract_id VARCHAR(64),       -- 关联的 Contract ID
+    model VARCHAR(64),             -- 使用的模型
+
+    -- ========== A-1: 新增 contract_data ==========
+    contract_data JSONB,           -- 完整的 PlanningContract，用于离线重放
+    -- ============================================
+
+    -- ========== Phase 15.5: 新增 writer_events ==========
+    writer_events JSONB,           -- Writer 产生的结构化 events (List[Dict])，用于 Contract Compliance 诊断
+    -- ====================================================
+
+    -- 时间戳
+    executed_at TIMESTAMP DEFAULT NOW()
+);
+-- 索引保持不变
+CREATE INDEX IF NOT EXISTS idx_shadow_log_scene_id ON shadow_rewrite_log(scene_id);
+CREATE INDEX IF NOT EXISTS idx_shadow_log_experiment_id ON shadow_rewrite_log(experiment_id);
+CREATE INDEX IF NOT EXISTS idx_shadow_log_status ON shadow_rewrite_log(status);
+CREATE INDEX IF NOT EXISTS idx_shadow_log_contract_id ON shadow_rewrite_log(contract_id);
+CREATE INDEX IF NOT EXISTS idx_shadow_log_executed_at ON shadow_rewrite_log(executed_at DESC);
+
+
+
+-- ============================================================
+-- Phase 15.7-C3.4.2 — Validator V2 Audit Persistence
+-- 记录每次 ValidationV2 的完整判定链：
+--   Structural → Retrieval → LLM → Final
+-- 设计原则：
+--   1. 只追加，不更新
+--   2. 每个 claim 一行
+--   3. 完整保留 LLM 原始 verdict（审计"降级"关键）
+--   4. Retriever / LLM 证据分层存储
+--   5. 三态语义（None / [] / [N]）严格保留
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS validator_v2_audit (
+    id BIGSERIAL PRIMARY KEY,
+
+    -- ---------- 上下文 ----------
+    novel_id        VARCHAR(64) NOT NULL,
+    volume_num      INT,
+    chapter_num     INT,
+    scene_idx       INT,
+    scene_id        VARCHAR(64),
+
+    -- source = 调用入口: production | c3_3b_eval | b2_2_bridge
+    source          VARCHAR(32) NOT NULL DEFAULT 'production',
+    -- mode   = 语义模式: production | shadow_only
+    mode            VARCHAR(16) NOT NULL DEFAULT 'production',
+
+    -- ---------- Claim 标识 ----------
+    claim_id                 VARCHAR(64) NOT NULL,
+    state_change_type        VARCHAR(32) NOT NULL,
+    raw_state_change_type    VARCHAR(32),
+
+    -- ---------- 结构层（realm_change 专用） ----------
+    -- 取值: exact_match | mismatch | no_event | NULL
+    structural_check         VARCHAR(16),
+
+    -- ---------- 证据层（Retriever） ----------
+    evidence_candidates_found BOOLEAN NOT NULL DEFAULT FALSE,
+    retrieved_evidence_count  INT     NOT NULL DEFAULT 0,
+    retrieved_evidence_ids    JSONB,     -- 三态: NULL | [] | [...]
+
+    -- ---------- LLM 层（原始输出，不降级） ----------
+    llm_invoked              BOOLEAN NOT NULL DEFAULT FALSE,
+    llm_raw_verdict          VARCHAR(16),    -- SUPPORTED | CONTRADICTED | INSUFFICIENT
+    llm_raw_confidence       FLOAT,
+    llm_raw_reason           TEXT,
+    llm_evidence_ids         JSONB,
+
+    -- ---------- 最终层（对外契约） ----------
+    final_verdict            VARCHAR(16) NOT NULL,
+    matched_layer            VARCHAR(16) NOT NULL,
+    final_confidence         FLOAT       NOT NULL,
+    fallback_applied         BOOLEAN     NOT NULL DEFAULT FALSE,
+    final_reason             TEXT,
+
+    -- ---------- 时间与版本 ----------
+    executed_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    validator_version        VARCHAR(16) NOT NULL DEFAULT 'v2.0',
+    contract_hash            VARCHAR(64)
+);
+
+-- 索引
+CREATE INDEX IF NOT EXISTS idx_vva_novel_chapter
+    ON validator_v2_audit(novel_id, volume_num, chapter_num, scene_idx);
+CREATE INDEX IF NOT EXISTS idx_vva_claim
+    ON validator_v2_audit(claim_id);
+CREATE INDEX IF NOT EXISTS idx_vva_final_verdict
+    ON validator_v2_audit(final_verdict);
+CREATE INDEX IF NOT EXISTS idx_vva_fallback
+    ON validator_v2_audit(fallback_applied) WHERE fallback_applied = TRUE;
+CREATE INDEX IF NOT EXISTS idx_vva_executed
+    ON validator_v2_audit(executed_at DESC);
+-- 双轨观测索引：快速定位"LLM 判定与最终判定背离"的样本
+CREATE INDEX IF NOT EXISTS idx_vva_llm_final_divergence
+    ON validator_v2_audit(llm_raw_verdict, final_verdict)
+    WHERE llm_invoked = TRUE;
+
+
+
+-- ============================================================
+-- C3.4.3B — Bridge Outcome Audit
+--
+-- 记录 B2-2 Production Bridge 的每次调用结果。
+-- 与 validator_v2_audit 严格分离：
+--   - validator_v2_audit：claim-level validation
+--   - bridge_outcome_audit：bridge-level outcome
+--
+-- 职责边界：
+--   trigger_status    = 有没有进入 B2-2 rescue 逻辑
+--   execution_status  = 进入后有没有正常完成
+--   rescued           = 正常完成后是否救援
+--
+-- 不覆盖：
+--   False Rescue / Rescue Precision（需要独立 correctness oracle）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS bridge_outcome_audit (
+    id BIGSERIAL PRIMARY KEY,
+
+    -- ---------- 上下文 ----------
+    novel_id        VARCHAR(64) NOT NULL,
+    volume_num      INT,
+    chapter_num     INT,
+    scene_idx       INT,
+    scene_id        VARCHAR(64),
+
+    -- ---------- 输入快照 ----------
+    claim_types             JSONB NOT NULL,   -- 契约中全部 state_change 类型
+    production_claim_types  JSONB NOT NULL,   -- 白名单过滤后的类型
+
+    -- ---------- 触发判定 ----------
+    -- 取值：
+    --   original_passed      原 Validator 已通过，未进入 rescue
+    --   no_state_changes     contract 无 state_changes
+    --   no_production_types  白名单过滤后无 production 类型
+    --   triggered            实际进入 try_rescue
+    trigger_status          VARCHAR(32) NOT NULL,
+    triggered               BOOLEAN     NOT NULL DEFAULT FALSE,
+
+    -- ---------- 执行判定（仅 trigger_status='triggered' 时有意义） ----------
+    -- 取值：
+    --   completed  try 块正常返回 results
+    --   error      try 块抛异常，返回 verdict="ERROR"
+    execution_status        VARCHAR(16) NOT NULL DEFAULT 'completed',
+    error_reason            TEXT,
+
+    -- ---------- rescue 判定（仅 triggered + completed 时有值） ----------
+    all_supported           BOOLEAN,
+    min_confidence          FLOAT,
+    confidence_threshold    FLOAT,
+    confidence_ok           BOOLEAN,
+    rescued                 BOOLEAN,
+
+    -- ---------- 代表 claim（审计展示用） ----------
+    representative_claim_id     VARCHAR(64),
+    representative_claim_type   VARCHAR(32),
+    representative_reason       TEXT,
+    representative_evidence_ids JSONB,
+
+    -- ---------- 版本与时间 ----------
+    executed_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    bridge_version          VARCHAR(16) NOT NULL DEFAULT 'b2_2c2.v1'
+);
+
+-- 索引
+CREATE INDEX IF NOT EXISTS idx_boa_novel_chapter
+    ON bridge_outcome_audit(novel_id, volume_num, chapter_num, scene_idx);
+CREATE INDEX IF NOT EXISTS idx_boa_trigger_status
+    ON bridge_outcome_audit(trigger_status);
+CREATE INDEX IF NOT EXISTS idx_boa_triggered
+    ON bridge_outcome_audit(triggered) WHERE triggered = TRUE;
+CREATE INDEX IF NOT EXISTS idx_boa_rescued
+    ON bridge_outcome_audit(rescued) WHERE rescued = TRUE;
+CREATE INDEX IF NOT EXISTS idx_boa_execution_status
+    ON bridge_outcome_audit(execution_status) WHERE execution_status = 'error';
+CREATE INDEX IF NOT EXISTS idx_boa_executed
+    ON bridge_outcome_audit(executed_at DESC);
+-- 核心 KPI 索引：Rescue Rate = rescued / triggered_completed
+CREATE INDEX IF NOT EXISTS idx_boa_rescue_rate
+    ON bridge_outcome_audit(triggered, execution_status, rescued);

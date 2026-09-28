@@ -23,6 +23,7 @@ class SceneCompletionCommand:
     voice_memory: Optional[Dict[str, Any]] = None
     raw_output: Optional[str] = None
     narrative_intent: Optional[NarrativeIntent] = None
+    validation_passed: bool = False   # ← 新增
 
 
 @dataclass

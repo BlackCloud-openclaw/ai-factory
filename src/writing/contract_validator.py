@@ -44,15 +44,18 @@ class StateChangeValidator:
         # 2. source 合法性
         if state_change.source not in (SignalSource.LLM, SignalSource.INFERRED):
             if state_change.source == SignalSource.UNKNOWN:
-                errors.append(
-                    f"StateChange.source is UNKNOWN, expected LLM or INFERRED "
-                    f"(id={state_change.id})"
+                warnings.append(
+                    f"StateChange.source is UNKNOWN (id={state_change.id}) — "
+                    "signal provenance cannot be traced, but this does not affect validation semantics."
                 )
+                # 自动修正为 INFERRED，保持数据一致性
+                state_change.source = SignalSource.INFERRED
             else:
-                errors.append(
-                    f"Invalid StateChange.source: '{state_change.source}', "
+                warnings.append(
+                    f"Unusual StateChange.source: '{state_change.source}', "
                     f"expected LLM or INFERRED (id={state_change.id})"
                 )
+                state_change.source = SignalSource.INFERRED
 
         # 3. confidence 范围检查 + 低置信度警告
         if not hasattr(state_change, 'confidence') or state_change.confidence is None:

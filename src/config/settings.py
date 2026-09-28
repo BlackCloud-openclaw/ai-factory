@@ -119,6 +119,20 @@ class Settings(BaseSettings):
     adaptive_runtime_enabled: bool = True   # 是否启用自适应（默认开启，测试时可改 False）
     adaptive_rollout_percentage: int = 100   # 灰度百分比，0-100，默认 10%
 
+    # Phase 15.3 — Shadow Rewrite
+    shadow_rewrite_enabled: bool = True   # 改为 True
+    shadow_rewrite_sample_ratio: float = 1.0  # 改为 1.0（全部触发）
+    shadow_rewrite_experiment_id: str = "phase15.3.v1"
+
+    # Shadow 模型配置
+    shadow_llm_api_base: str = ""  # 留空则复用 llm_api_url
+    shadow_llm_model: str = ""     # 留空则复用 llm_model_name
+    shadow_llm_temperature: float = 0.3
+    shadow_llm_max_tokens: int = 8192
+    shadow_llm_timeout: float = 1800
+    
+    literary_rewrite_enabled: bool = True
+
     @property
     def postgres_dsn(self) -> str:
         if not all([self.postgres_user, self.postgres_password, self.postgres_db]):
