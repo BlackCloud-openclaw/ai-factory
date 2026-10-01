@@ -309,12 +309,32 @@ class PlannerAgent(BaseAgent):
                                         if stage in stage_map:
                                             sc["to_minor_stage"] = stage_map[stage]
                                         else:
-                                            try:
-                                                sc["to_minor_stage"] = int(stage)
-                                            except ValueError:
+                                            # P0-14-fix3: 无法解析的叙述性字段 → 关键词匹配
+                                            import re as _re
+                                            m = _re.search(r'(\d+)', stage)
+                                            if m:
+                                                sc["to_minor_stage"] = int(m.group(1))
+                                            elif "初" in stage:
                                                 sc["to_minor_stage"] = 1
+                                            elif "中" in stage:
+                                                sc["to_minor_stage"] = 5
+                                            elif "后" in stage:
+                                                sc["to_minor_stage"] = 9
+                                            elif "巅" in stage or "峰" in stage:
+                                                sc["to_minor_stage"] = 9
+                                            else:
+                                                # 完全不认识 → 丢弃这个 state_change（避免 sanity 拒绝）
+                                                logger.warning(
+                                                    "[P0-14-fix3] Dropping unparseable realm_change: "
+                                                    f"to_minor_stage={stage!r}"
+                                                )
+                                                continue   # ← 跳过添加到 cleaned_changes
                                     elif stage is None:
-                                        sc["to_minor_stage"] = 1
+                                        # P0-14-fix3: None 也丢弃（避免强转 1 导致误判倒退）
+                                        logger.warning(
+                                            "[P0-14-fix3] Dropping realm_change with to_minor_stage=None"
+                                        )
+                                        continue
                                 
                                 # 处理 hp_change -> plot_flag（避免 Pydantic 验证错误）
                                 if sc.get("type") == "hp_change":

@@ -27,6 +27,8 @@ from src.writing.shadow import (
     ShadowPromptBuilder,
 )
 from src.writing.validation.semantic_validator import SemanticValidator
+from src.writing.validation.local_embedding_provider import LocalHttpEmbeddingProvider
+from src.config import config as _config
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,11 @@ class WriterRuntime:
     runtime_capabilities: FrozenRuntimeCapabilityRegistry
     runtime_services: RuntimeServices
     validation_policy: ValidationPolicy
+
+    # Phase 15.8-fix P0-12: 共享 SemanticValidator（带 embedding）
+    # 由 build_writer_runtime 单次构建，Writer / ControlledWriter 共用，
+    # 避免各自 new 一个 NoOp 版本导致 QualityGate 恒为 0.00
+    semantic_validator: Optional[Any] = None
 
     # Phase 15.3 — Shadow
     shadow_enabled: bool = False
@@ -106,6 +113,39 @@ def build_writer_runtime() -> WriterRuntime:
     sys.stderr.flush()
     services = RuntimeServices(capabilities, rewriter=production_rewriter)
     logger.critical("[15.7-A] RuntimeServices created, rewriter attribute: type=%s", type(services.rewriter).__name__ if services.rewriter else "None")
+
+    # ========== Phase 15.8-fix P0-12: 构建共享 SemanticValidator ==========
+    # 与 ValidatorAgent._get_validator() 采用相同的构造参数
+    # 目标：让 ControlledWriter 的 _validate_segment 走 embedding 匹配，
+    #       避免 QualityGate.score 恒为 0.00 → 3 次重试 → force_pass
+    semantic_validator = None
+    try:
+        _provider = LocalHttpEmbeddingProvider(
+            endpoint=_config.embedding_endpoint,
+            dim=_config.embedding_dim,
+        )
+        semantic_validator = SemanticValidator(
+            embedding_provider=_provider,
+            keyword_threshold=0.6,
+            embedding_threshold=0.30,
+            embedding_min_confidence=0.6,
+            enable_embedding=getattr(_config, 'enable_embedding_validator', True),
+        )
+        logger.info(
+            "[SharedValidator] built SemanticValidator (endpoint=%s, dim=%s)",
+            _config.embedding_endpoint,
+            _config.embedding_dim,
+        )
+    except Exception as _e:
+        logger.error(
+            "[SharedValidator] build failed, ControlledWriter will fall back to NoOp: %s",
+            _e,
+            exc_info=True,
+        )
+        semantic_validator = None
+    # =====================================================================
+
+    # ========== 3. 构建 Validation Policy ==========
 
     # ========== 3. 构建 Validation Policy ==========
     env = os.getenv("ENVIRONMENT", "development")
@@ -191,6 +231,7 @@ def build_writer_runtime() -> WriterRuntime:
         runtime_capabilities=capabilities,
         runtime_services=services,
         validation_policy=validation_policy,
+        semantic_validator=semantic_validator,   # ← 新增
         shadow_enabled=shadow_enabled,
         shadow_sample_ratio=shadow_sample_ratio,
         shadow_experiment_id=shadow_experiment_id,

@@ -731,12 +731,15 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                 logger.warning(
                     f"[writer_node] Contract sanity check failed: {sanity_result.summary}"
                 )
-                # ✅ 阻断：非法 Contract 不进入 Writer
+                # P0-14-fix: 阻断时清空 scene_text，防止 validate_node 用上一场景残留
                 return StatePatch(
+                    scene_text="",           # ← 新增：清空残留
+                    final_answer="",         # ← 新增
                     error=f"Contract invalid: {sanity_result.violations[0].description}",
                     metadata={
                         "sanity_result": sanity_result.to_dict(),
                         "sanity_check_id": sanity_result.check_id,
+                        "sanity_blocked": True,   # ← 新增：显式标记
                     },
                     phase=WorkflowPhase.VALIDATING,
                 ).to_dict()
@@ -1060,9 +1063,18 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         runtime.runtime_services.rewriter is None
     )
 
+    # P0-12: 从 WriterRuntime 透传共享 SemanticValidator
+    # 使用 getattr 保持向后兼容（旧 WriterRuntime 无此字段时返回 None）
+    _shared_semantic_validator = getattr(runtime, "semantic_validator", None)
+    logger.critical(
+        "[P0-12] ControlledWriter semantic_validator: type=%s (has_embedding=%s)",
+        type(_shared_semantic_validator).__name__ if _shared_semantic_validator else "None",
+        hasattr(getattr(_shared_semantic_validator, "_embedding_matcher", None), "provider") if _shared_semantic_validator else False,
+    )
     cw = ControlledWriter(
         runtime_services=runtime.runtime_services,
         rewriter=runtime.runtime_services.rewriter,
+        semantic_validator=_shared_semantic_validator,   # ← 新增
     )
 
     # ========== 8. 辅助函数：构建包含关键状态的 StatePatch ==========
@@ -1471,7 +1483,23 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
     Validator 节点 - 使用 Runtime 注入的 ValidationPolicy 控制行为。
 
     Phase 15.7-B1: 增加 Rewritten 双轨观察，但不改变生产文本。
+    Phase 15.8-P0-14: sanity 阻断时，跳过一切正常流程，禁止写文件/推 DB。
     """
+    # ========== P0-14-fix: Sanity 阻断守卫（必须最先执行） ==========
+    if state.metadata and state.metadata.get("sanity_blocked"):
+        logger.error(
+            "[P0-14-fix] validate_node: sanity_blocked=True, "
+            "跳过验证和写文件，直接返回错误"
+        )
+        return StatePatch(
+            scene_text="",
+            final_answer="",
+            error="Blocked by ContractSanityGuard: contract invalid (no scene text to validate)",
+            metadata=state.metadata,
+            phase=WorkflowPhase.TRANSITIONING,
+        ).to_dict()
+    # ===================================================================
+
     # ========== Phase 15.5: 获取 writer_artifact ==========
     writer_artifact = getattr(state, "writer_artifact", None)
     if writer_artifact is None:

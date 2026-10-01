@@ -630,13 +630,13 @@ class WritingAgent(BaseAgent):
                     except Exception as e:
                         logger.warning(f"Primary model failed in revision: {e}, trying fallback")
                         return await pool.call(fallback_model, self._call_llm, prompt, agent="writer")
-
+                    
                 workflow = RevisionWorkflow(
                     llm_executor=llm_adapter,
                     layer_targets=None,
                     max_rounds=2,
                     compliance_threshold=0.7,
-                    enable_revision=True,
+                    enable_revision=False,   # ← P0-17: 禁用（Phase 6 老代码，edit_plan 生成有 bug）
                 )
 
                 result = await workflow.execute(scene_text)

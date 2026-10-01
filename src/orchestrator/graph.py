@@ -31,6 +31,7 @@ from src.config import config
 from src.common.logging import setup_logging
 from src.orchestrator.state_patch import WorkflowPhase
 
+
 logger = setup_logging("orchestrator.graph")
 
 # 全局 checkpointer
@@ -117,6 +118,13 @@ def route_after_code(state: AgentState) -> str:
 
 
 def route_after_validate(state: AgentState) -> str:
+    # P0-14-fix2: sanity_blocked 时禁止回到 planning，避免死循环
+    if state.metadata and state.metadata.get("sanity_blocked"):
+        logger.error(
+            "[P0-14-fix2] route_after_validate: sanity_blocked=True, "
+            "aborting workflow to prevent infinite replanning loop"
+        )
+        return END
     phase = WorkflowPhaseResolver.resolve(state)
     logger.info(f"route_after_validate: phase={phase}, current_chapter={state.current_chapter}, "
                 f"current_scene_index={state.current_scene_index}, total_scenes={state.total_scenes_in_chapter}")
@@ -240,6 +248,7 @@ def create_workflow(runtime: Optional[WriterRuntime] = None) -> StateGraph:
             "research": "research",
             "advance_subtask": "advance_subtask",
             "code": "code",
+            END: END,   # ← P0-14-fix2: 允许 route_after_validate 返回 END
         },
     )
 

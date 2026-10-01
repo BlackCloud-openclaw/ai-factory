@@ -10,6 +10,7 @@ import re
 import json
 import time
 import asyncio
+import pathlib                                    # ← 新增
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from pydantic import BaseModel, Field, ValidationError
@@ -136,7 +137,51 @@ class ControlledWriter:
     支持通过 runtime_services 注入 Runtime 服务。
     Phase 13.2.3C: 注入 SemanticValidator 和 QualityGate 实现控制闭环。
     Phase 15.7-A: 注入 Rewriter 依赖（暂不执行）。
+    Phase 15.8-fix: 加载 GBNF grammar 强制 JSON 输出。
     """
+
+    # ========== Phase 15.8-fix: Grammar 缓存（类级） ==========
+    _grammar: Optional[str] = None
+
+    @classmethod
+    def _get_grammar(cls) -> Optional[str]:
+        """
+        加载 GBNF grammar 文件，用于强制 LLM 输出合法 JSON。
+
+        与 WritingAgent._get_grammar 行为一致：
+        - 成功 → 返回 grammar 字符串
+        - 文件不存在或读取失败 → 返回 None（不影响正常运行）
+        - 空字符串表示"已尝试但失败"，避免重复 IO
+        """
+        if cls._grammar is not None:
+            return cls._grammar if cls._grammar else None
+
+        grammar_path = (
+            pathlib.Path(__file__).parent.parent.parent
+            / "grammars" / "json_writer.gbnf"
+        )
+        if grammar_path.exists():
+            try:
+                cls._grammar = grammar_path.read_text(encoding="utf-8")
+                logger.info(
+                    "ControlledWriter: loaded grammar from %s", grammar_path
+                )
+                return cls._grammar
+            except Exception as e:
+                logger.error(
+                    "ControlledWriter: failed to load grammar: %s", e
+                )
+                cls._grammar = ""
+                return None
+        else:
+            logger.warning(
+                "ControlledWriter: grammar not found at %s, "
+                "JSON enforcement will rely on model only",
+                grammar_path,
+            )
+            cls._grammar = ""
+            return None
+    # ============================================================
 
     def __init__(
         self,
@@ -393,7 +438,7 @@ class ControlledWriter:
         logger.critical("[15.7-B1] _call_llm: primary_model=%s, fallback_model=%s", primary_model, fallback_model)
         
         # 定义实际调用函数
-        async def _do_call(model_name: str, **kwargs) -> str:
+        async def _do_call(model_name: str, **kwargs) -> tuple[str, dict]:
             logger.critical("[15.7-B1] _do_call: model=%s", model_name)
             base_url = kwargs.get('base_url') or self.api_base
             logger.critical("[15.7-B1] _do_call: base_url=%s", base_url)
@@ -405,13 +450,30 @@ class ControlledWriter:
                     base_url=base_url,
                     http_client=client,
                 )
+
+                # ========== Phase 15.8-fix: 附加 GBNF grammar ==========
+                extra_body = {}
+                grammar_str = self._get_grammar()
+                if grammar_str:
+                    extra_body["grammar"] = grammar_str
+                    logger.critical(
+                        "[15.7-B1] _do_call: grammar attached (len=%d)",
+                        len(grammar_str),
+                    )
+                else:
+                    logger.critical(
+                        "[15.7-B1] _do_call: grammar NOT attached (fallback to response_format only)"
+                    )
+                # ========================================================
+
                 logger.critical("[15.7-B1] _do_call: sending request to OpenAI...")
                 response = await openai_client.chat.completions.create(
                     model=model_name,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                     max_tokens=max_tokens,
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
+                    extra_body=extra_body if extra_body else None,   # ← 新增
                 )
                 content = response.choices[0].message.content or ""
                 usage = response.usage.model_dump() if response.usage else {"total_tokens": 0}
