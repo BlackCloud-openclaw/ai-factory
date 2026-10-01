@@ -1,2 +1,0 @@
-{'scene_text': '', 'events': [], 'foreshadowing': []}
-

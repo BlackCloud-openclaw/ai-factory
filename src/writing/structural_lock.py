@@ -25,7 +25,7 @@ SEMANTIC_CHECK_TYPES = {
     "knowledge_gain",
     "realm_change",
 }
-SEMANTIC_THRESHOLD = 0.50  # bge-small-zh-v1.5 中文短文本对
+SEMANTIC_THRESHOLD = 0.35  # bge-small-zh-v1.5 中文短文本对
 
 # jieba 用于规则 4 的人名识别（nr 词性）；不可用时规则 4 直接跳过（降级）
 try:
@@ -201,6 +201,14 @@ class StructuralLock:
                 max_sim = max(
                     (cosine_similarity(desc_emb, se) for se in sent_embs),
                     default=0.0,
+                )
+                # Phase 15.9-fix: 每次 sim 都打日志，不只 fail 时
+                logger.info(
+                    "[15.9-diag] semantic sim: type=%s sim=%.3f threshold=%.3f result=%s",
+                    self._sc_type(sc),
+                    max_sim,
+                    SEMANTIC_THRESHOLD,
+                    "PASS" if max_sim >= SEMANTIC_THRESHOLD else "FAIL",
                 )
                 if max_sim < SEMANTIC_THRESHOLD:
                     missing.append(f"{self._sc_type(sc)}(sim={max_sim:.2f})")

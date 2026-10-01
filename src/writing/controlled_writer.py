@@ -9,6 +9,7 @@ Phase 15.7-A: 注入 Rewriter 依赖（暂不执行）
 import re
 import json
 import time
+import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from pydantic import BaseModel, Field, ValidationError
@@ -236,7 +237,17 @@ class ControlledWriter:
             if goal.expected_outcome:
                 lines.append(f"预期结果：{goal.expected_outcome}")
             lines.append("")
-        
+
+        # ========== 2.5 Phase 15.8 Commit 2: 上一场景结尾（仅第 0 段） ==========
+        if segment_idx == 0 and not previous_text:
+            prev_tail = getattr(writing_contract, 'previous_scene_tail', None)
+            if prev_tail:
+                lines.append("【上一场景结尾（供自然衔接参考）】")
+                lines.append(prev_tail[-300:])
+                lines.append("请自然衔接上一场景结尾的剧情与动作，避免重复已发生的情节。")
+                lines.append("")
+        # ========================================================================
+
         # ========== 3. 分段说明 ==========
         if is_fallback:
             lines.append("⚠️ 降级模式：一次性生成完整场景，约 800-1200 字。")
@@ -650,20 +661,57 @@ class ControlledWriter:
                 False, False, "Missing execution_contract",
             )
 
-        # 4. 尝试 rewrite（异常/空返回收敛）
+        # 4. 尝试 rewrite，最多 3 次（1 原始 + 2 重试）
+        #    Phase 15.8-fix5: 超时/空返回 → 重试；其他异常 → 不重试
+        MAX_REWRITE_ATTEMPTS = 3
+        RETRY_BACKOFF_SEC = 1.0
+
         rewritten_text: Optional[str] = None
         failure_reason: Optional[str] = None
-        try:
-            candidate = await self._rewriter.rewrite(original_text, execution_contract)
-            if candidate and len(candidate.strip()) >= 50:
-                rewritten_text = candidate
-            else:
-                failure_reason = "Rewriter returned empty or too short"
-        except Exception as e:
-            failure_reason = f"{type(e).__name__}: {e}"
-            logger.error("[15.8-C1] Rewriter exception: %s", e, exc_info=True)
+
+        for attempt in range(MAX_REWRITE_ATTEMPTS):
+            should_retry = False
+            try:
+                candidate = await self._rewriter.rewrite(original_text, execution_contract)
+                if candidate and len(candidate.strip()) >= 50:
+                    rewritten_text = candidate
+                    if attempt > 0:
+                        logger.info(
+                            "[15.8-C1] Rewriter succeeded on attempt %d/%d",
+                            attempt + 1, MAX_REWRITE_ATTEMPTS,
+                        )
+                    break
+                else:
+                    failure_reason = "Rewriter returned empty or too short"
+                    should_retry = True
+            except (TimeoutError, asyncio.TimeoutError) as e:
+                failure_reason = f"timeout: {type(e).__name__}: {e}"
+                should_retry = True
+                logger.warning(
+                    "[15.8-C1] Rewriter timeout (attempt %d/%d): %s",
+                    attempt + 1, MAX_REWRITE_ATTEMPTS, e,
+                )
+            except Exception as e:
+                # 非超时异常：不重试，直接 fallback
+                failure_reason = f"{type(e).__name__}: {e}"
+                logger.error(
+                    "[15.8-C1] Rewriter exception (attempt %d/%d, no retry): %s",
+                    attempt + 1, MAX_REWRITE_ATTEMPTS, e, exc_info=True,
+                )
+                break
+
+            if should_retry and attempt < MAX_REWRITE_ATTEMPTS - 1:
+                logger.warning(
+                    "[15.8-C1] Rewriter attempt %d/%d failed (%s), retrying in %.1fs...",
+                    attempt + 1, MAX_REWRITE_ATTEMPTS, failure_reason, RETRY_BACKOFF_SEC,
+                )
+                await asyncio.sleep(RETRY_BACKOFF_SEC)
 
         if rewritten_text is None:
+            logger.warning(
+                "[15.8-C1] Rewriter failed after %d attempts, fallback to original: %s",
+                MAX_REWRITE_ATTEMPTS, failure_reason,
+            )
             return _mk_original(
                 RewriteSelectionReason.REWRITE_UNAVAILABLE,
                 False, True, failure_reason,

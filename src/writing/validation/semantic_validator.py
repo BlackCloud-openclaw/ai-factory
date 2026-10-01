@@ -255,20 +255,41 @@ class SemanticValidator:
         )
 
     def _get_event_text(self, state_change: StateChange) -> str:
-        # 优先使用业务字段
+        """
+        Phase 15.8-fix: 生成自然语言描述，供 matcher 匹配。
+
+        原来的字面字段名（"禁地入口"）在散文里不会出现，
+        必须转成自然语言句子才能被 embedding 匹配。
+        """
+        t = self._contract_type_value(state_change)
+        actor = getattr(state_change, 'actor', None) or "主角"
+
+        if t == "location_change":
+            loc = getattr(state_change, 'location', None) or "目的地"
+            return f"{actor}到达了{loc}"
+        if t == "inventory_acquire":
+            item = getattr(state_change, 'item', None) or "物品"
+            return f"{actor}获得了{item}"
+        if t == "knowledge_gain":
+            name = getattr(state_change, 'name', None) or "某种知识"
+            return f"得知了{name}"
+        if t == "plot_flag":
+            name = getattr(state_change, 'name', None) or "某事件"
+            return f"{name}发生了"
+        if t == "relationship_change":
+            from_char = getattr(state_change, 'from_char', None) or "某人"
+            to_char = getattr(state_change, 'to_char', None) or "某人"
+            return f"{from_char}与{to_char}关系发生了变化"
+        if t == "realm_change":
+            realm = getattr(state_change, 'to_major_realm', None) or "新的境界"
+            return f"{actor}突破到了{realm}"
+
+        # 回退
         if state_change.name:
             return state_change.name
-        if state_change.item:
-            return state_change.item
         if state_change.location:
             return state_change.location
-        if state_change.to_char:
-            # 组合 from_char 和 to_char 用于匹配
-            return f"{state_change.from_char}_{state_change.to_char}"
-        # 最后回退到类型字符串（保留可观测性）
-        if hasattr(state_change.type, "value"):
-            return state_change.type.value
-        return str(state_change.type)
+        return t
     
     @staticmethod
     def _contract_type_value(state_change: StateChange) -> str:

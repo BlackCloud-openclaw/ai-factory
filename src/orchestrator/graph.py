@@ -262,19 +262,8 @@ def create_workflow(runtime: Optional[WriterRuntime] = None) -> StateGraph:
 
 
 def compile_workflow(runtime: Optional[WriterRuntime] = None) -> Any:
-    """
-    编译工作流。
-
-    Args:
-        runtime: WriterRuntime，如果未提供则使用默认构建
-
-    Returns:
-        CompiledGraph: 编译后的工作流
-    """
-    
-    print(">>> [Shadow] compile_workflow called, runtime is None:", runtime is None)
     if runtime is None:
-        print(">>> [Shadow] Creating new runtime via build_writer_runtime()")
+        logger.debug("compile_workflow: building default runtime")
         runtime = build_writer_runtime()
         
     workflow = create_workflow(runtime)

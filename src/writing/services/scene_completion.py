@@ -169,8 +169,7 @@ class SceneCompletionService:
                 if scene_text_to_save and len(scene_text_to_save.strip()) >= 10:
                     await SceneCompletionService._save_scene_to_file(cmd, scene_text_to_save)
                 else:
-                    logger.error(f"[SAVE_DEBUG] Cannot save scene: scene_text missing or too short (len={len(scene_text_to_save) if scene_text_to_save else 0})")
-                    # 可选：保存调试信息
+                    # 尽力保存调试信息
                     try:
                         debug_dir = Path(f"data/novels/{cmd.novel_id}/debug")
                         debug_dir.mkdir(parents=True, exist_ok=True)
@@ -180,6 +179,14 @@ class SceneCompletionService:
                         logger.info(f"[SAVE_DEBUG] Saved raw output to {debug_file} for debugging")
                     except Exception as e:
                         logger.error(f"[SAVE_DEBUG] Failed to save debug output: {e}")
+
+                    # Phase 15.8-fix: scene_text 缺失 → 硬失败 → 事务回滚
+                    # 避免"主文件缺 scene N 但 DB 已推进"的死锁（chap_067 缺 scene 0 的根因）
+                    from src.writing.exceptions import SceneCompletionFailed
+                    raise SceneCompletionFailed(
+                        f"scene_text unavailable for v{cmd.volume}c{cmd.chapter}s{cmd.scene_idx}: "
+                        f"len={len(scene_text_to_save) if scene_text_to_save else 0}"
+                    )
                 # =========================================================
                     
                 # ========== 相变检测与处理（放在事件应用之后、快照保存之前） ==========
@@ -320,22 +327,51 @@ class SceneCompletionService:
 
     @staticmethod
     async def _save_scene_to_file(cmd: SceneCompletionCommand, scene_text: str):
-        """保存场景正文到章节文件，只在验证通过时写入"""
-        # 检查验证是否通过
+        """保存场景正文到章节文件。含去重保护。"""
         if not cmd.validation_passed:
-            logger.debug(f"跳过保存场景 {cmd.scene_idx} (验证未通过)")
-            return
+            logger.warning(
+                f"Scene {cmd.scene_idx} validation_passed=False，"
+                f"仍保存以避免章节断片（chapter={cmd.chapter}）"
+            )
 
-        logger.info(f"_save_scene_to_file called for chapter {cmd.chapter}, scene {cmd.scene_idx}, text length={len(scene_text)}")
+        logger.info(
+            f"_save_scene_to_file called for chapter {cmd.chapter}, "
+            f"scene {cmd.scene_idx}, text length={len(scene_text) if scene_text else 0}"
+        )
+
         if not scene_text or len(scene_text.strip()) < 50:
-            logger.warning(f"Scene text too short ({len(scene_text)} chars), skip saving")
-            return
+            from src.writing.exceptions import SceneCompletionFailed
+            raise SceneCompletionFailed(
+                f"scene text too short ({len(scene_text) if scene_text else 0} chars) "
+                f"for v{cmd.volume}c{cmd.chapter}s{cmd.scene_idx}"
+            )
+
         try:
             novel_data_dir = Path(f"data/novels/{cmd.novel_id}")
             volumes_dir = novel_data_dir / f"vol_{cmd.volume:03d}"
             volumes_dir.mkdir(parents=True, exist_ok=True)
             chapter_file = volumes_dir / f"chap_{cmd.chapter:03d}.txt"
-            mode = "a" if chapter_file.exists() else "w"
+
+            # ========== Phase 15.8-fix3: 去重保护（仅对 scene_idx > 0） ==========
+            # scene 0 强制覆写，不做去重（避免章首被误判为重复）
+            if cmd.scene_idx > 0 and chapter_file.exists():
+                existing = chapter_file.read_text(encoding="utf-8")
+                normalized = scene_text.strip()
+                # 段落级匹配（前后加换行），避免短句被子串误判
+                if normalized and f"\n\n{normalized}\n\n" in f"\n\n{existing}\n\n":
+                    logger.error(
+                        f"DUPLICATE_SCENE_DETECTED: scene {cmd.scene_idx} "
+                        f"chapter {cmd.chapter} text already exists in file, "
+                        f"skipping write (len={len(normalized)})"
+                    )
+                    return
+            # ====================================================================
+
+            # Phase 15.9-fix: scene 0 时强制覆盖，避免历史残留
+            if cmd.scene_idx == 0:
+                mode = "w"
+            else:
+                mode = "a" if chapter_file.exists() else "w"
             with open(chapter_file, mode, encoding="utf-8") as f:
                 if mode == "a":
                     f.write("\n\n<!-- scene break -->\n\n")
@@ -343,3 +379,10 @@ class SceneCompletionService:
             logger.info(f"✅ Saved scene to {chapter_file} (mode={mode}, length={len(scene_text)})")
         except Exception as e:
             logger.error(f"Failed to save scene: {e}", exc_info=True)
+            # Phase 15.8-fix: 文件写入失败 → 硬失败 → 事务回滚
+            # 避免"DB 推进但文件未写入"的死锁
+            from src.writing.exceptions import SceneCompletionFailed
+            raise SceneCompletionFailed(
+                f"failed to write scene file for v{cmd.volume}c{cmd.chapter}s{cmd.scene_idx}: "
+                f"{type(e).__name__}: {e}"
+            ) from e

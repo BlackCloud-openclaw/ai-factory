@@ -1007,12 +1007,34 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         else:
             planning_contract_obj = planning_contract
 
+    # Phase 15.8 Commit 2: 跨场景衔接
+    previous_scene_tail = state.metadata.get("previous_scene_tail") if state.metadata else None
+    if previous_scene_tail:
+        logger.info(
+            "[15.8-C2] Injecting previous_scene_tail (len=%d, preview=%r)",
+            len(previous_scene_tail),
+            previous_scene_tail[-50:],
+        )
+
+    # ========== TEMP DIAG (Commit 2) ==========
+    import sys as _sys
+    _mod = _sys.modules.get("src.writing.contracts.contracts")
+    print(
+        f"=== [DIAG-C2] WritingContract.__module__={WritingContract.__module__}\n"
+        f"=== [DIAG-C2] contracts file={getattr(_mod, '__file__', 'N/A')}\n"
+        f"=== [DIAG-C2] has previous_scene_tail="
+        f"{'previous_scene_tail' in WritingContract.__dataclass_fields__}\n"
+        f"=== [DIAG-C2] fields={list(WritingContract.__dataclass_fields__.keys())}"
+    )
+    # =========================================
+
     writing_contract = WritingContract(
         scene_context=scene_context,
         narrative_intent=state.narrative_intent,   # ← 使用 state 中的绑定值
         constraints=constraints,
         writing_goal=writing_goal,
         execution_contract=planning_contract_obj,
+        previous_scene_tail=previous_scene_tail,
     )
     logger.critical(
         "[15.7-B1] WritingContract binding: "
@@ -1068,6 +1090,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
             scene_plan=current_scene_plan,
             metadata=patch_metadata,
             writer_artifact=writer_artifact,
+            planning_contract=planning_contract,  # Phase 15.8-fix
         )
         if error:
             patch.error = error
@@ -1509,20 +1532,23 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
             else:
                 logger.warning(f"[validate_node] No scene_plan available for scene {current_idx}")
 
-    if not hasattr(state, 'planning_contract') or state.planning_contract is None:
-        if state.metadata and "planning_contract" in state.metadata:
-            state.planning_contract = state.metadata["planning_contract"]
-            scene_id = state.planning_contract.get('scene_id') if state.planning_contract else 'None'
-            logger.info(f"✅ Restored Planning Contract from metadata: {scene_id}")
-
+    # Phase 15.8-fix: 强制从 scene_plan 刷新 contract（防旧值残留）
     scene_plan = state.scene_plan
-    if state.planning_contract is None:
-        if scene_plan and "planning_contract" in scene_plan:
-            state.planning_contract = scene_plan["planning_contract"]
-            scene_id = state.planning_contract.get('scene_id') if state.planning_contract else 'None'
-            logger.info(f"✅ Loaded Planning Contract for validation: {scene_id}")
-        else:
-            logger.warning("⚠️ No planning_contract found in scene_plan")
+    _scene_id_before = (
+        state.planning_contract.get('scene_id')
+        if isinstance(state.planning_contract, dict) else None
+    )
+    if scene_plan and "planning_contract" in scene_plan:
+        state.planning_contract = scene_plan["planning_contract"]
+        _scene_id_after = state.planning_contract.get('scene_id')
+        logger.info(
+            f"✅ Refreshed Planning Contract: {_scene_id_before} → {_scene_id_after}"
+        )
+    elif state.metadata and "planning_contract" in state.metadata:
+        state.planning_contract = state.metadata["planning_contract"]
+        logger.info(f"✅ Restored Planning Contract from metadata")
+    else:
+        logger.warning("⚠️ No planning_contract found in scene_plan")
 
     # ========== 获取 scene_role ==========
     scene_role = None
@@ -1812,27 +1838,74 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
         rewritten_exists,
     )
     # ============================================================
+    # Shadow 写入（Phase 15.8-fix4: 始终 3 场景，rewrite 失败回退 original）
     # ============================================================
-    # 强制写入 Rewrite 文本到 shadow 目录（独立于 _run_shadow_rewrite）
-    # ============================================================
-    if writer_artifact and writer_artifact.get("rewritten_text"):
-        rewritten_text = writer_artifact["rewritten_text"]
-        if rewritten_text and state.novel_id:
+    # ========== TEMP DIAG ==========
+    logger.critical(
+        "[DIAG-SHADOW] scene_idx=%s has_artifact=%s has_novel_id=%s "
+        "rewritten_len=%s original_len=%s state_scene_text_len=%s",
+        state.current_scene_index,
+        bool(writer_artifact),
+        bool(state.novel_id),
+        len(writer_artifact.get("rewritten_text") or "") if writer_artifact else -1,
+        len(writer_artifact.get("original_text") or "") if writer_artifact else -1,
+        len(state.scene_text or ""),
+    )
+    # ================================
+
+    if writer_artifact and state.novel_id:
+        rewritten_text = writer_artifact.get("rewritten_text")
+        original_text = writer_artifact.get("original_text")
+        text_to_write = rewritten_text or original_text
+
+        # Phase 15.9-fix: 兜底到 state.scene_text
+        if not text_to_write:
+            text_to_write = state.scene_text or ""
+            tag = "state_scene_text_fallback"
+            logger.warning(
+                "[B2-0] Shadow fallback to state.scene_text (len=%d)",
+                len(text_to_write),
+            )
+        else:
+            tag = "rewritten" if rewritten_text else "original_fallback"
+
+        # Phase 15.9-fix2: 无论 text_to_write 是否为空都打日志
+        if not text_to_write:
+            logger.warning(
+                "[B2-0] Shadow SKIP (empty text_to_write): "
+                "scene_idx=%s, has_artifact=%s, has_novel_id=%s, "
+                "rewritten_len=%s, original_len=%s, state_scene_text_len=%s",
+                state.current_scene_index,
+                bool(writer_artifact),
+                bool(state.novel_id),
+                len(writer_artifact.get("rewritten_text") or "") if writer_artifact else -1,
+                len(writer_artifact.get("original_text") or "") if writer_artifact else -1,
+                len(state.scene_text or ""),
+            )
+
+        if text_to_write:
             try:
                 from pathlib import Path
                 shadow_dir = Path(f"data/novels/{state.novel_id}/shadow/vol_{state.current_volume:03d}")
                 shadow_dir.mkdir(parents=True, exist_ok=True)
                 chapter_file = shadow_dir / f"chap_{state.current_chapter:03d}.txt"
-                scene_marker = f"\n\n<!-- scene {state.current_scene_index:02d} -->\n\n"
-                if not chapter_file.exists():
-                    chapter_file.write_text(rewritten_text, encoding="utf-8")
+                scene_marker = f"\n\n<!-- scene {state.current_scene_index:02d} ({tag}) -->\n\n"
+                # Phase 15.9-fix2: scene 0 时强制覆盖，避免历史残留
+                if state.current_scene_index == 0 or not chapter_file.exists():
+                    chapter_file.write_text(
+                        f"<!-- scene {state.current_scene_index:02d} ({tag}) -->\n\n{text_to_write}",
+                        encoding="utf-8",
+                    )
                 else:
                     with open(chapter_file, "a", encoding="utf-8") as f:
                         f.write(scene_marker)
-                        f.write(rewritten_text)
-                logger.info(f"[B2-0] Shadow write forced: {chapter_file} (scene {state.current_scene_index})")
+                        f.write(text_to_write)
+                logger.info(
+                    f"[B2-0] Shadow write: {chapter_file} "
+                    f"(scene {state.current_scene_index}, tag={tag}, len={len(text_to_write)})"
+                )
             except Exception as e:
-                logger.error(f"[B2-0] Force shadow write failed: {e}", exc_info=True)
+                logger.error(f"[B2-0] Shadow write failed: {e}", exc_info=True)
 
     # ============================================================
     # 场景完成：推进 writing_progress（无论验证是否通过）
@@ -1878,6 +1951,44 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
         completion_patch = completion_result.state_patch
         logger.info(f"SceneCompletion succeeded, chapter_finished={completion_result.chapter_finished}")
 
+    # ============================================================
+    # Phase 15.8 Commit 2: 保存本场景结尾，供下一场景衔接
+    # ============================================================
+    # Phase 15.8-fix3: 章节结束时清空 previous_scene_tail
+    # 修复：chap_035 场景 1 = chap_036 场景 0 逐字重复
+    # 根因：章末仍设置 tail，下一章 scene_0 把"衔接参考"当成"要写的内容"
+    _is_chapter_end = (
+        completion_patch is not None
+        and completion_patch.current_chapter is not None
+        and state.current_chapter is not None
+        and completion_patch.current_chapter > state.current_chapter
+    )
+
+    _tail_source = ""
+    if isinstance(writer_artifact, dict):
+        _tail_source = writer_artifact.get("scene_text") or ""
+    if not _tail_source:
+        _tail_source = state.scene_text or ""
+
+    if _is_chapter_end:
+        state.metadata.pop("previous_scene_tail", None)
+        logger.info(
+            "[15.8-C2-fix] chapter %s -> %s ended: cleared previous_scene_tail",
+            state.current_chapter,
+            completion_patch.current_chapter,
+        )
+    elif _tail_source and len(_tail_source.strip()) >= 50:
+        state.metadata["previous_scene_tail"] = _tail_source[-300:]
+        logger.info(
+            "[15.8-C2] Saved previous_scene_tail (len=%d, preview=%r)",
+            len(_tail_source),
+            _tail_source[-50:],
+        )
+    else:
+        logger.warning(
+            "[15.8-C2] Skip saving tail (len=%d, too short)",
+            len(_tail_source) if _tail_source else 0,
+        )
     # ============================================================
     # 构造 StatePatch（合并完成状态）
     # ============================================================

@@ -58,10 +58,11 @@ class StatePatch:
     writer_artifact: Optional[Dict[str, Any]] = None
     # ============================================================
     
-    # 在 StatePatch 类中添加
     narrative_intent: Optional[NarrativeIntent] = None
-    
-    planner_outputs: Optional[List[Dict[str, Any]]] = None  # 新增
+    planner_outputs: Optional[List[Dict[str, Any]]] = None
+
+    # Phase 15.8-fix: 跨节点传递当前场景的 PlanningContract
+    planning_contract: Optional[Dict[str, Any]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为 LangGraph 可合并的字典，过滤掉值为 None 的字段"""

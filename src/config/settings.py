@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     # Embedding
     embedding_api_url: str = "http://localhost:8087"
     embedding_model: str = "BAAI/bge-small-zh-v1.5"
-    embedding_dim: int = 384
+    embedding_dim: int = 512
     embedding_mode: str = "api"  # api or local
 
     # PostgreSQL

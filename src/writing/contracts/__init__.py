@@ -36,3 +36,4 @@ class WritingContract:
     constraints: Optional[WritingConstraints] = None
     writing_goal: Optional[WritingGoal] = None
     execution_contract: Optional[PlanningContract] = None   # ✅ 已添加
+    previous_scene_tail: Optional[str] = None               # Phase 15.8 Commit 2

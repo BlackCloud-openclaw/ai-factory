@@ -54,8 +54,14 @@ async def generate_chapter_summary(novel_id: str, volume_num: int, chapter_num: 
         logger.error(f"Failed to generate summary: {e}")
         return None
 
+MAX_EMBEDDING_CHARS = 400  # embedding 服务 batch_size=512 的安全上限
+
+
 async def generate_embedding(text: str) -> str:
     """使用配置的 embedding 服务，返回 pgvector 格式的向量字符串。"""
+    # Phase 15.8-fix: 防止 token 超限（HTTP 500）
+    if text and len(text) > MAX_EMBEDDING_CHARS:
+        text = text[:MAX_EMBEDDING_CHARS]
     endpoint = config.embedding_endpoint
     timeout = aiohttp.ClientTimeout(total=10)
     async with aiohttp.ClientSession() as session:

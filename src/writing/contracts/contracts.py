@@ -31,4 +31,6 @@ class WritingContract:
     narrative_intent: Optional[NarrativeIntent] = None
     constraints: Optional[WritingConstraints] = None
     writing_goal: Optional[WritingGoal] = None
-    execution_contract: Optional[PlanningContract] = None   # 🔥 新增
+    execution_contract: Optional[PlanningContract] = None
+    # Phase 15.8 Commit 2: 上一场景结尾（跨场景衔接）
+    previous_scene_tail: Optional[str] = None

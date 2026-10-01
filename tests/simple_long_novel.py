@@ -357,32 +357,24 @@ def main():
                 log("🎉 所有500章已生成完毕！🎉")
                 break
 
-            # 检查章节文件是否存在
+            # 检查章节文件是否存在（仅用于诊断，不做进度判断）
             exists, size = chapter_file_exists(vol, ch)
-            
-            if exists and size > 500:
-                # 检查章节是否实际已完成（场景数 >= 3 或者文件足够大）
+            if exists:
                 scene_count = count_scenes_in_chapter(vol, ch)
                 log(f"📄 章节 {vol}:{ch} 文件已存在 (size={size} 字节, scenes={scene_count})")
-                
-                if scene_count >= 3 or size > 3000:
-                    log(f"🔧 章节 {vol}:{ch} 内容完整，自动修复进度...")
-                    if force_advance_chapter(vol, ch):
-                        # 重置失败计数
-                        consecutive_failures = 0
-                        continue
-                    else:
-                        log(f"❌ 自动修复失败，请手动处理", "ERROR")
-                        break
-                else:
-                    log(f"⚠️ 章节 {vol}:{ch} 文件不完整 (scenes={scene_count})，尝试重新生成...")
-                    # 删除不完整的文件，重新生成
-                    try:
-                        os.remove(f"data/novels/{NOVEL_ID}/vol_{vol:03d}/chap_{ch:03d}.txt")
-                        log(f"🗑️ 已删除不完整文件，重新生成")
-                    except Exception as e:
-                        log(f"删除文件失败: {e}", "WARNING")
-                    # 继续执行生成逻辑
+
+            # ============================================================
+            # 进度完全由 DB 的 writing_progress 决定。
+            #
+            # 重要：scene_completion.py 在章节完成时会把 current_chapter 设为 chapter+1，
+            #       并设置 chapter_completed=True。因此 completed=True 时 current_chapter
+            #       已经指向下一章了，不需要（也不能）force_advance。
+            #
+            # 脚本只做一件事：轮询触发 API resume。不做任何猜测性推进。
+            # ============================================================
+            if completed:
+                log(f"ℹ️ DB chapter_completed=True (当前指针={vol}:{ch})，继续走 resume")
+            # ============================================================
 
             log(f"🚀 开始生成第{vol}卷第{ch}章...")
             payload = {

@@ -24,8 +24,9 @@ A-3 修改：
 - 其他类型返回 None 并记录警告
 """
 
-from typing import Protocol, Any, Optional, Dict, List, runtime_checkable
+import json
 import logging
+from typing import Protocol, Any, Optional, Dict, List, runtime_checkable
 
 from .result import ShadowRewriteResult, ShadowRewriteStatus
 
