@@ -557,7 +557,7 @@ async def plan_node(state: AgentState) -> dict:
         logger.info(f"plan_node payload audit: planner_outputs count={len(payload.get('planner_outputs', []))}, has_narrative_intent={'narrative_intent' in payload}")
         
         # ========== P0 诊断：plan_node 返回载荷 ==========
-        logger.critical(
+        logger.debug(
             "PLAN_NODE_RETURN_PAYLOAD: planner_outputs_count=%d ids=%s keys=%s",
             len(payload.get("planner_outputs", [])),
             [
@@ -584,13 +584,13 @@ async def plan_node(state: AgentState) -> dict:
 # ============================================================================
 async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
     # ========== P0 诊断：writer_node 输入状态 ==========
-    logger.critical(
+    logger.debug(
         "WRITER_NODE_ENTRY_STATE: planner_outputs_count=%d scene_plan_list_len=%d",
         len(state.planner_outputs or []),
         len(state.scene_plan_list or [])
     )
     if state.planner_outputs:
-        logger.critical(
+        logger.debug(
             "WRITER_NODE_ENTRY_INTENTS: %s",
             [
                 p.get("narrative_intent", {}).get("intent_id")
@@ -620,7 +620,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
     """
 
     # ========== PHASE 15.0 AUDIT ==========
-    logger.critical(
+    logger.debug(
         "[PHASE15] writer_node_input planner_outputs_count=%s scene_plan_list_len=%s scene_text_len=%s",
         len(state.planner_outputs) if state.planner_outputs else 0,
         len(state.scene_plan_list) if state.scene_plan_list else 0,
@@ -628,7 +628,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
     )
     if state.planner_outputs:
         first = state.planner_outputs[0]
-        logger.critical(
+        logger.debug(
             "[PHASE15] writer_node_input first_planner_output keys=%s has_intent=%s",
             list(first.keys()) if isinstance(first, dict) else "not_dict",
             "narrative_intent" in (first if isinstance(first, dict) else {})
@@ -678,7 +678,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
     state.metadata["current_scene_plan"] = current_scene_plan
 
     # ========== PHASE 15.0 AUDIT ==========
-    logger.critical(
+    logger.debug(
         "[PHASE15] writer_node_current_scene_plan scene_id=%s characters=%s must_events_count=%s",
         current_scene_plan.get("scene_id", "unknown"),
         current_scene_plan.get("characters", []),
@@ -770,7 +770,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
     # ================================================================
 
     # ========== P0 诊断：确认 state.planning_contract 赋值成功 ==========
-    logger.critical(
+    logger.debug(
         "WRITER_NODE_SET_PLANNING_CONTRACT: scene_id=%s, type=%s, value_type=%s",
         planning_contract.get('scene_id', 'unknown') if planning_contract else 'None',
         type(planning_contract).__name__ if planning_contract else 'None',
@@ -914,7 +914,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                 f"✅ writer_node: 解析 narrative_intent "
                 f"(intent_id={narrative_intent.intent_id})"
             )
-            logger.critical(
+            logger.debug(
                 "[PHASE15] writer_node_narrative_intent intent_id=%s scene_role=%s objective=%s",
                 narrative_intent.intent_id,
                 narrative_intent.scene_role.value if hasattr(narrative_intent.scene_role, 'value') else str(narrative_intent.scene_role),
@@ -940,21 +940,21 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                     state.narrative_intent = NarrativeIntent.from_dict(intent_data)
                 else:
                     state.narrative_intent = intent_data
-                logger.critical(
+                logger.debug(
                     "[15.7-B1] narrative_intent bound: intent_id=%s, scene_role=%s",
                     state.narrative_intent.intent_id,
                     state.narrative_intent.scene_role.value if hasattr(state.narrative_intent.scene_role, 'value') else str(state.narrative_intent.scene_role)
                 )
             else:
-                logger.critical("[15.7-B1] narrative_intent missing in planner_outputs[%d]", current_idx)
+                logger.debug("[15.7-B1] narrative_intent missing in planner_outputs[%d]", current_idx)
         elif hasattr(current_output, 'narrative_intent'):
             state.narrative_intent = current_output.narrative_intent
-            logger.critical(
+            logger.debug(
                 "[15.7-B1] narrative_intent bound (object): intent_id=%s",
                 state.narrative_intent.intent_id
             )
         else:
-            logger.critical("[15.7-B1] planner_outputs[%d] has no narrative_intent field", current_idx)
+            logger.debug("[15.7-B1] planner_outputs[%d] has no narrative_intent field", current_idx)
     else:
         logger.warning("[15.7-B1] planner_outputs empty or index out of range, narrative_intent not bound")
     # ===================================================================================
@@ -1019,18 +1019,6 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
             previous_scene_tail[-50:],
         )
 
-    # ========== TEMP DIAG (Commit 2) ==========
-    import sys as _sys
-    _mod = _sys.modules.get("src.writing.contracts.contracts")
-    print(
-        f"=== [DIAG-C2] WritingContract.__module__={WritingContract.__module__}\n"
-        f"=== [DIAG-C2] contracts file={getattr(_mod, '__file__', 'N/A')}\n"
-        f"=== [DIAG-C2] has previous_scene_tail="
-        f"{'previous_scene_tail' in WritingContract.__dataclass_fields__}\n"
-        f"=== [DIAG-C2] fields={list(WritingContract.__dataclass_fields__.keys())}"
-    )
-    # =========================================
-
     writing_contract = WritingContract(
         scene_context=scene_context,
         narrative_intent=state.narrative_intent,   # ← 使用 state 中的绑定值
@@ -1039,7 +1027,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         execution_contract=planning_contract_obj,
         previous_scene_tail=previous_scene_tail,
     )
-    logger.critical(
+    logger.debug(
         "[15.7-B1] WritingContract binding: "
         "intent=%s, execution_contract=%s, units=%d",
         getattr(state.narrative_intent, "intent_id", None),
@@ -1050,14 +1038,14 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         and hasattr(planning_contract_obj.execution, 'units')
         else 0,
     )
-    logger.critical(
+    logger.debug(
         "[PHASE15] writer_node_writing_contract scene_id=%s characters=%s has_intent=%s",
         writing_contract.scene_context.scene_id,
         writing_contract.scene_context.characters,
         writing_contract.narrative_intent is not None
     )
 
-    logger.critical(
+    logger.debug(
         "[15.7-B1] rewriter being passed to ControlledWriter: type=%s, is None? %s",
         type(runtime.runtime_services.rewriter).__name__ if runtime.runtime_services.rewriter is not None else "None",
         runtime.runtime_services.rewriter is None
@@ -1066,7 +1054,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
     # P0-12: 从 WriterRuntime 透传共享 SemanticValidator
     # 使用 getattr 保持向后兼容（旧 WriterRuntime 无此字段时返回 None）
     _shared_semantic_validator = getattr(runtime, "semantic_validator", None)
-    logger.critical(
+    logger.debug(
         "[P0-12] ControlledWriter semantic_validator: type=%s (has_embedding=%s)",
         type(_shared_semantic_validator).__name__ if _shared_semantic_validator else "None",
         hasattr(getattr(_shared_semantic_validator, "_embedding_matcher", None), "provider") if _shared_semantic_validator else False,
@@ -1125,7 +1113,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                     exec_units = planning_contract.execution.units
                 elif isinstance(planning_contract.execution, dict):
                     exec_units = planning_contract.execution.get("units", [])
-        logger.critical(
+        logger.debug(
             "[15.7-B1] exec_units extraction: count=%d, type=%s",
             len(exec_units),
             type(planning_contract).__name__ if planning_contract else "None"
@@ -1134,11 +1122,11 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         if len(exec_units) >= 1:
             logger.info(f"🚀 使用 ControlledWriter: {len(exec_units)} 个执行单元")
             try:
-                logger.critical("[15.7-B1] BEFORE execute: cw = %s", type(cw).__name__)
+                logger.debug("[15.7-B1] BEFORE execute: cw = %s", type(cw).__name__)
                 result = await cw.execute(writing_contract)
-                logger.critical("[15.7-B1] AFTER execute: result = %s", result)
+                logger.debug("[15.7-B1] AFTER execute: result = %s", result)
                 # ========== Phase 15.7-A 临时验证 ==========
-                logger.critical(
+                logger.debug(
                     "[15.7-A] ControlledWriteResult: "
                     "original_text_len=%d, "
                     "rewritten_text_is_none=%s, "
@@ -1150,12 +1138,12 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                 # =============================================
 
                 if result.text:
-                    logger.critical(
+                    logger.debug(
                         "[PHASE15] writer_node_controlled_writer_result text_len=%s events_count=%s",
                         len(result.text),
                         len(result.events)
                     )
-                    logger.critical(
+                    logger.debug(
                         "[PHASE15] writer_node_controlled_writer_result contains_linyi=%s contains_protagonist=%s abcd=%s",
                         "林逸" in result.text,
                         "protagonist" in result.text,
@@ -1204,7 +1192,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                         "validation_original": None,
                         "validation_rewritten": None,
                     }
-                    logger.critical(
+                    logger.debug(
                         "WRITER_NODE_ARTIFACT: schema_version=1.2, events_len=%d, text_len=%d, "
                         "rewrite_attempted=%s, selected_source=%s, selection_reason=%s",
                         len(result.events),
@@ -1302,14 +1290,14 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
             )
             result = await WritingService.execute(cmd)
 
-            logger.critical(
+            logger.debug(
                 "[PHASE15] writer_node_writing_service_result error=%s text_len=%s events_count=%s",
                 result.error,
                 len(result.scene_text) if result.scene_text else 0,
                 len(result.events) if result.events else 0
             )
             if result.scene_text:
-                logger.critical(
+                logger.debug(
                     "[PHASE15] writer_node_writing_service_result contains_linyi=%s abcd=%s",
                     "林逸" in result.scene_text,
                     re.findall(r'\b[A-D]\b', result.scene_text)
@@ -1350,7 +1338,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                     "validation_original": None,
                     "validation_rewritten": None,
                 }
-                logger.critical(
+                logger.debug(
                     "WRITER_NODE_ARTIFACT: schema_version=1.2, events_len=%d, text_len=%d (WritingService path)",
                     len(result.events or []),
                     len(result.scene_text or "")
@@ -1416,7 +1404,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                 "validation_original": None,
                 "validation_rewritten": None,
             }
-            logger.critical(
+            logger.debug(
                 "WRITER_NODE_ARTIFACT: schema_version=1.2, events_len=%d, text_len=%d (disabled path)",
                 len(result.events or []),
                 len(result.scene_text or "")
@@ -1869,7 +1857,7 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
     # Shadow 写入（Phase 15.8-fix4: 始终 3 场景，rewrite 失败回退 original）
     # ============================================================
     # ========== TEMP DIAG ==========
-    logger.critical(
+    logger.debug(
         "[DIAG-SHADOW] scene_idx=%s has_artifact=%s has_novel_id=%s "
         "rewritten_len=%s original_len=%s state_scene_text_len=%s",
         state.current_scene_index,

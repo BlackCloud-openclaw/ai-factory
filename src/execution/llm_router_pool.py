@@ -319,7 +319,7 @@ class LLMRouterPool:
                                         messages_str = args[0]
                                     elif len(args) >= 1 and isinstance(args[0], list):
                                         messages_str = json.dumps(args[0], ensure_ascii=False)
-                                logger.critical(
+                                logger.debug(
                                     "[PHASE15] llm_router_call model=%s contains_linyi=%s contains_protagonist=%s abcd=%s",
                                     model_name,
                                     "林逸" in messages_str,
@@ -343,7 +343,7 @@ class LLMRouterPool:
                                     messages_str = args[0]
                                 elif len(args) >= 1 and isinstance(args[0], list):
                                     messages_str = json.dumps(args[0], ensure_ascii=False)
-                            logger.critical(
+                            logger.debug(
                                 "[PHASE15] llm_router_call model=%s contains_linyi=%s contains_protagonist=%s abcd=%s",
                                 model_name,
                                 "林逸" in messages_str,

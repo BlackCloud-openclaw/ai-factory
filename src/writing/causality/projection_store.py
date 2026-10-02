@@ -144,7 +144,7 @@ class ProjectionStore:
             if retry == 1:
                 logger.error(f"[DEAD_LETTER] New dead letter for novel {novel_id}, event {event_id}: {error[:200]}")
             elif retry >= 3:
-                logger.critical(f"[DEAD_LETTER] Persistent dead letter (retry {retry}) for novel {novel_id}, event {event_id}: {error[:200]}")
+                logger.debug(f"[DEAD_LETTER] Persistent dead letter (retry {retry}) for novel {novel_id}, event {event_id}: {error[:200]}")
 
     @staticmethod
     def _make_delta_id(novel_id: str, event_id: int, version: int) -> str:

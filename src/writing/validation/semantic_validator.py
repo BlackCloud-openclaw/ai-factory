@@ -27,7 +27,7 @@ from .models import MissingContractChange, ContractSeverity
 
 logger = logging.getLogger(__name__)
 
-logger.critical("D5.1 SemanticValidator module loaded (with missing_changes support)")
+logger.debug("D5.1 SemanticValidator module loaded (with missing_changes support)")
 
 class SemanticValidator:
     def __init__(
@@ -39,7 +39,7 @@ class SemanticValidator:
         embedding_min_confidence: float = 0.6,
         enable_embedding: bool = True,
     ):
-        logger.critical("D5.1 SemanticValidator instance created")
+        logger.debug("D5.1 SemanticValidator instance created")
         self._weight_policy = signal_weight_policy or SignalWeightPolicy()
         self._keyword_threshold = keyword_threshold
         self._embedding_threshold = embedding_threshold
@@ -67,7 +67,7 @@ class SemanticValidator:
         """
         执行验证，返回包含 blocking_missing 的 ValidationResult。
         """
-        logger.critical("D5.1 SemanticValidator validate called with missing_changes support")
+        logger.debug("D5.1 SemanticValidator validate called with missing_changes support")
         missing_changes = []   # 新增
         
         state_changes = contract.observables.state_changes
@@ -177,7 +177,7 @@ class SemanticValidator:
             result.missing_count,
             result.blocking_missing_count
         )
-        logger.critical("D5.1 ValidationResult missing_changes count=%d", len(missing_changes))
+        logger.debug("D5.1 ValidationResult missing_changes count=%d", len(missing_changes))
         return result
 
 

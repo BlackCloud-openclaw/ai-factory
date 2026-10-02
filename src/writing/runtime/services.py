@@ -58,7 +58,7 @@ class RuntimeServices:
         """获取 Rewriter 实例（Phase 15.7-A）。"""
         import logging
         logger = logging.getLogger(__name__)
-        logger.critical(
+        logger.debug(
             "[15.7-A] RuntimeServices.rewriter property called, returning type=%s",
             type(self._rewriter).__name__ if self._rewriter is not None else "None"
         )

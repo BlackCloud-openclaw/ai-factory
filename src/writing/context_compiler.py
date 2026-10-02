@@ -358,7 +358,7 @@ class ContextCompiler:
         
         # ========== PHASE 15.0 AUDIT ==========
         import re
-        logger.critical(
+        logger.debug(
             "[PHASE15] context_compiler_prompt contains_linyi=%s contains_protagonist=%s abcd=%s prompt_len=%s",
             "林逸" in full_prompt,
             "protagonist" in full_prompt,

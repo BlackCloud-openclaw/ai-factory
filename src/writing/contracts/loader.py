@@ -32,13 +32,13 @@ class PlanningContractLoader:
             raise ContractRecoveryError("PlanningContract data is None")
 
         if isinstance(data, PlanningContract):
-            logger.critical(
+            logger.debug(
                 "PLANNING_CONTRACT_RECOVERY: input=PlanningContract (already object)"
             )
             return data
 
         if isinstance(data, dict):
-            logger.critical(
+            logger.debug(
                 "PLANNING_CONTRACT_RECOVERY: input=dict, keys=%s, scene_id=%s",
                 list(data.keys()),
                 data.get("scene_id", "unknown")
@@ -46,7 +46,7 @@ class PlanningContractLoader:
 
             try:
                 contract = PlanningContract.model_validate(data)
-                logger.critical(
+                logger.debug(
                     "PLANNING_CONTRACT_RECOVERY: output=PlanningContract (success), scene_id=%s",
                     contract.scene_id
                 )

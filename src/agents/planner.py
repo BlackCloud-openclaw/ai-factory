@@ -255,11 +255,11 @@ class PlannerAgent(BaseAgent):
 
             # ========== 🔍 诊断日志插入点 3 ==========
             if task_type == "scene_plan" and result and "scenes" in result:
-                logger.critical(f"🔍 PLANNER_RAW_RESPONSE scenes_count={len(result['scenes'])}")
+                logger.debug(f"🔍 PLANNER_RAW_RESPONSE scenes_count={len(result['scenes'])}")
                 for idx, scene in enumerate(result["scenes"]):
                     obs = scene.get("observables", {})
                     scs = obs.get("state_changes", [])
-                    logger.critical(f"🔍 PLANNER_RAW_RESPONSE scene[{idx}].state_changes: {scs}")
+                    logger.debug(f"🔍 PLANNER_RAW_RESPONSE scene[{idx}].state_changes: {scs}")
             # ========================================
 
             # ========== 生成 Planning Contract + NarrativeIntent ==========
@@ -268,12 +268,12 @@ class PlannerAgent(BaseAgent):
                 planner_outputs = []  # 重新初始化，确保清空
 
                 # ========== PHASE 15.0 AUDIT ==========
-                logger.critical(
+                logger.debug(
                     "[PHASE15] planner scenes_count=%s",
                     len(scenes)
                 )
                 for idx, scene in enumerate(scenes):
-                    logger.critical(
+                    logger.debug(
                         "[PHASE15] planner scene_idx=%s scene_id=%s characters=%s must_events=%s",
                         idx,
                         scene.get("scene_id", "unknown"),
@@ -294,8 +294,8 @@ class PlannerAgent(BaseAgent):
                         # ========== 直接构造 PlanningContract，保留 observables ==========
                         obs_data = scene.get("observables", {})
                         # 🔍 诊断日志：在清洗前记录原始 state_changes
-                        logger.critical(f"🔍 PLANNER_PRE_CLEAN scene_idx={idx}")
-                        logger.critical(f"🔍 PLANNER_PRE_CLEAN raw_state_changes: {obs_data.get('state_changes', [])}")
+                        logger.debug(f"🔍 PLANNER_PRE_CLEAN scene_idx={idx}")
+                        logger.debug(f"🔍 PLANNER_PRE_CLEAN raw_state_changes: {obs_data.get('state_changes', [])}")
 
                         # 🔥 清洗 state_changes 中的数据（转换 to_minor_stage 字符串、处理 hp_change）
                         if "state_changes" in obs_data:
@@ -353,9 +353,9 @@ class PlannerAgent(BaseAgent):
                         state_changes = []
                         for sc in obs_data.get("state_changes", []):
                             # 🔍 诊断日志：记录每个 sc 的原始内容
-                            logger.critical(f"🔍 PLANNER_RAW_STATE_CHANGE scene_idx={idx}")
-                            logger.critical(f"🔍 PLANNER_RAW_STATE_CHANGE raw: {sc}")
-                            logger.critical(f"🔍 PLANNER_RAW_STATE_CHANGE type: {sc.get('type', 'MISSING_TYPE')}")
+                            logger.debug(f"🔍 PLANNER_RAW_STATE_CHANGE scene_idx={idx}")
+                            logger.debug(f"🔍 PLANNER_RAW_STATE_CHANGE raw: {sc}")
+                            logger.debug(f"🔍 PLANNER_RAW_STATE_CHANGE type: {sc.get('type', 'MISSING_TYPE')}")
 
                             # 如果没有 id，生成一个稳定的 id
                             if not sc.get("id"):

@@ -363,7 +363,6 @@ class ValidatorAgent(BaseAgent):
         Phase 14.0C-3 Commit D.2:
         - 优先从 writer_artifact 读取结构化数据
         """
-        logger.critical("!!! NEW VALIDATOR CODE IS RUNNING !!!")
         
         total_missing_changes = []  # 新增
         
@@ -387,9 +386,9 @@ class ValidatorAgent(BaseAgent):
             logger.info(f"Validator: text type={type(text)}, length={len(text) if text else 0}")
 
             # 1. 解析 JSON (原有逻辑保持不变)
-            logger.critical(f"RAW_TEXT_SAMPLE: {text[:1000]}")
-            logger.critical(f"FULL_TEXT_SAMPLE: {text}")
-            logger.critical("DEBUG-POINT-1: after RAW_TEXT_SAMPLE")
+            logger.debug(f"RAW_TEXT_SAMPLE: {text[:1000]}")
+            logger.debug(f"FULL_TEXT_SAMPLE: {text}")
+            logger.debug("DEBUG-POINT-1: after RAW_TEXT_SAMPLE")
 
             # ============================================================
             # Commit D.2: 优先从 writer_artifact 读取结构化数据
@@ -423,7 +422,7 @@ class ValidatorAgent(BaseAgent):
                         f"foreshadowing={len(artifact_foreshadowing)})"
                     )
                     # ========== D.3 观测点 5 ==========
-                    logger.critical(
+                    logger.debug(
                         "VALIDATOR_RECEIVED_ARTIFACT: has_scene_text=%s, events_len=%d, foreshadowing_len=%d",
                         bool(artifact_scene_text),
                         len(artifact_events),
@@ -439,9 +438,9 @@ class ValidatorAgent(BaseAgent):
             # 如果未使用 artifact，执行原有的 JSON 提取
             if not used_writer_artifact:
                 parsed_data = self._extract_json(text)
-                logger.critical(f"DEBUG-POINT-2: parsed_data is None? {parsed_data is None}")
+                logger.debug(f"DEBUG-POINT-2: parsed_data is None? {parsed_data is None}")
                 if parsed_data:
-                    logger.critical(f"DEBUG-POINT-2: parsed_data keys = {list(parsed_data.keys())}")
+                    logger.debug(f"DEBUG-POINT-2: parsed_data keys = {list(parsed_data.keys())}")
 
                 # 初始化 scene_text 变量
                 scene_text = None
@@ -449,7 +448,7 @@ class ValidatorAgent(BaseAgent):
                 if not parsed_data or not parsed_data.get("scene_text"):
                     # 如果 text 是纯文本（长度足够），直接使用
                     if text and len(text.strip()) >= 50:
-                        logger.critical(f"DEBUG-POINT-3: using raw text as scene_text (length={len(text)})")
+                        logger.debug(f"DEBUG-POINT-3: using raw text as scene_text (length={len(text)})")
                         scene_text = text.strip()
                         parsed_data = {
                             "scene_text": scene_text,
@@ -477,9 +476,9 @@ class ValidatorAgent(BaseAgent):
                             _event_count = 0
                             _fallback_reason = "regex_extraction"
                             logger.warning("Validator: extracted scene_text via regex fallback")
-                            logger.critical(f"DEBUG-POINT-4: regex fallback succeeded, scene_text length = {len(scene_text)}")
+                            logger.debug(f"DEBUG-POINT-4: regex fallback succeeded, scene_text length = {len(scene_text)}")
                         else:
-                            logger.critical("DEBUG-POINT-5: all fallbacks FAILED, returning early")
+                            logger.debug("DEBUG-POINT-5: all fallbacks FAILED, returning early")
                             return {
                                 "passed": False,
                                 "feedback": "无法解析生成的 JSON，且无法通过任何 fallback 提取 scene_text",
@@ -504,7 +503,7 @@ class ValidatorAgent(BaseAgent):
 
             # 再次检查 scene_text 的有效性
             if not scene_text or len(scene_text.strip()) < 50:
-                logger.critical("DEBUG-POINT-6: scene_text too short, returning early")
+                logger.debug("DEBUG-POINT-6: scene_text too short, returning early")
                 return {
                     "passed": False,
                     "feedback": f"scene_text 字段缺失或过短（{len(scene_text) if scene_text else 0}字符，需要至少50字符）",
@@ -514,7 +513,7 @@ class ValidatorAgent(BaseAgent):
                     "parsed_output": parsed_data or {},
                 }
 
-            logger.critical("DEBUG-POINT-7: passed length check, continuing")
+            logger.debug("DEBUG-POINT-7: passed length check, continuing")
 
             control_scores = {}
             must_events_threshold = getattr(config, 'must_events_similarity_threshold', 0.30)
@@ -545,15 +544,15 @@ class ValidatorAgent(BaseAgent):
 
             # ===== 修复点 1：移除提前返回，设置 embedding_available 标志 =====
             scene_sample = scene_text[:1000]
-            logger.critical("DEBUG-POINT-8: about to call safe_embedding")
+            logger.debug("DEBUG-POINT-8: about to call safe_embedding")
             scene_emb = await safe_embedding(scene_sample, "scene_text")
-            logger.critical(f"DEBUG-POINT-9: safe_embedding returned, type={type(scene_emb)}")
+            logger.debug(f"DEBUG-POINT-9: safe_embedding returned, type={type(scene_emb)}")
             embedding_available = scene_emb is not None
             if not embedding_available:
                 logger.warning("Scene embedding failed, falling back to keyword-based validation")
 
             # ===== 强制日志：确认到达 DIAG-VAL-2 之前 =====
-            logger.critical("DEBUG-POINT-10: reached DIAG-VAL-2 section")
+            logger.debug("DEBUG-POINT-10: reached DIAG-VAL-2 section")
 
             # ========== 新增调试日志：检查 planning_contract 进入分支前的状态 ==========
             logger.info(f"Validator: planning_contract exists = {planning_contract is not None}")
@@ -580,7 +579,7 @@ class ValidatorAgent(BaseAgent):
                     else:
                         logger.warning("[DIAG-VAL-2] observables is None! This will cause SemanticValidator to be skipped.")
                 except Exception as e:
-                    logger.critical(f"[DIAG-VAL-2] LOGGING EXCEPTION: {type(e).__name__}: {e}")
+                    logger.debug(f"[DIAG-VAL-2] LOGGING EXCEPTION: {type(e).__name__}: {e}")
                     raise  # 让异常传播到外层 try
             else:
                 logger.warning("[DIAG-VAL-2] planning_contract is None!")
@@ -1041,7 +1040,7 @@ class ValidatorAgent(BaseAgent):
             # ============================================================
             # Commit D.1: 强制 DEBUG 日志（临时观测）
             # ============================================================
-            logger.critical(
+            logger.debug(
                 "CONTRACT_REALIZATION_DEBUG: contract=%s parser=%s events=%d keys=%s",
                 json.dumps(contract_realization, ensure_ascii=False),
                 json.dumps(parser_realization, ensure_ascii=False),
@@ -1263,65 +1262,65 @@ class ValidatorAgent(BaseAgent):
             logger.warning(f"Validation debug: scene_text too short ({len(scene_text)} chars)")
 
     # ==================== 新增：Loop 推进检查 ====================
-async def _check_loop_advancement(self, scene_text: str, loop: dict) -> tuple[bool, float, str]:
+    async def _check_loop_advancement(self, scene_text: str, loop: dict) -> tuple[bool, float, str]:
+        """
+        检查场景是否实质推进了叙事环路
+        返回: (是否推进, 推进分数 0-1, 理由)
+        """
+        if not loop or not loop.get("description"):
+            return True, 0.0, "无激活 Loop，跳过检查"
+
+        try:
+            prompt = f"""
+    你是一位叙事分析专家。判断以下场景对指定叙事环路的推进程度。
+
+    环路描述：{loop['description']}
+    当前进度：{loop.get('progress', 0)*100:.0f}%
+
+    场景文本：
+    {scene_text[:2000]}
+
+    请评估本章对环路的推进程度（0-1），并输出 JSON：
+    {{
+        "advanced": true/false,      // 是否有实质推进
+        "score": 0.0-1.0,            // 推进程度（0=无，0.1=轻微，0.5=中等，1.0=重大突破）
+        "reason": "简短理由"
+    }}
     """
-    检查场景是否实质推进了叙事环路
-    返回: (是否推进, 推进分数 0-1, 理由)
-    """
-    if not loop or not loop.get("description"):
-        return True, 0.0, "无激活 Loop，跳过检查"
+            from src.model_router import get_router
+            from src.execution.llm_router_pool import get_llm_router_pool
 
-    try:
-        prompt = f"""
-你是一位叙事分析专家。判断以下场景对指定叙事环路的推进程度。
+            router = get_router()
+            pool = get_llm_router_pool()
+            model = router.get_model_for_task("validate")
 
-环路描述：{loop['description']}
-当前进度：{loop.get('progress', 0)*100:.0f}%
+            async def _do_call(model_name: str, **kwargs) -> str:
+                base_url = kwargs.get("base_url") or pool.get_base_url(model_name)
+                client = AsyncOpenAI(api_key="not-needed", base_url=base_url)
+                response = await client.chat.completions.create(
+                    model=model_name,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2,
+                    max_tokens=256,
+                    response_format={"type": "json_object"},
+                )
+                return response.choices[0].message.content or ""
 
-场景文本：
-{scene_text[:2000]}
-
-请评估本章对环路的推进程度（0-1），并输出 JSON：
-{{
-    "advanced": true/false,      // 是否有实质推进
-    "score": 0.0-1.0,            // 推进程度（0=无，0.1=轻微，0.5=中等，1.0=重大突破）
-    "reason": "简短理由"
-}}
-"""
-        from src.model_router import get_router
-        from src.execution.llm_router_pool import get_llm_router_pool
-
-        router = get_router()
-        pool = get_llm_router_pool()
-        model = router.get_model_for_task("validate")
-
-        async def _do_call(model_name: str, **kwargs) -> str:
-            base_url = kwargs.get("base_url") or pool.get_base_url(model_name)
-            client = AsyncOpenAI(api_key="not-needed", base_url=base_url)
-            response = await client.chat.completions.create(
-                model=model_name,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=256,
-                response_format={"type": "json_object"},
+            response_text = await pool.call(
+                model, _do_call, timeout=60, agent="loop_advancement_check"
             )
-            return response.choices[0].message.content or ""
-
-        response_text = await pool.call(
-            model, _do_call, timeout=60, agent="loop_advancement_check"
-        )
-        result = json.loads(response_text)
-        advanced = result.get("advanced", False)
-        score = result.get("score", 0.0)
-        reason = result.get("reason", "未提供理由")
-        logger.info(
-            f"🔍 Loop advancement check result: advanced={advanced}, "
-            f"score={score:.3f}, reason={reason[:60]}"
-        )
-        return advanced, score, reason
-    except Exception as e:
-        logger.warning(f"Loop advancement check failed (fallback: pass with 0.05): {e}")
-        return True, 0.05, f"检查异常，默认推进 5%: {e}"
+            result = json.loads(response_text)
+            advanced = result.get("advanced", False)
+            score = result.get("score", 0.0)
+            reason = result.get("reason", "未提供理由")
+            logger.info(
+                f"🔍 Loop advancement check result: advanced={advanced}, "
+                f"score={score:.3f}, reason={reason[:60]}"
+            )
+            return advanced, score, reason
+        except Exception as e:
+            logger.warning(f"Loop advancement check failed (fallback: pass with 0.05): {e}")
+            return True, 0.05, f"检查异常，默认推进 5%: {e}"
 
     # ============================================================
     # Phase 15.9-fix: Writer 自由 type → Contract 枚举 type 的宽松映射
@@ -1598,7 +1597,7 @@ async def _check_loop_advancement(self, scene_text: str, loop: dict) -> tuple[bo
                     actual_type in expected_values
                     or self._type_alias_match(expected_values, actual_type)
                 )
-                logger.critical(
+                logger.debug(
                     "[DIAG-MATCH] change_type=%s expected=%s evt_type=%s type_hit=%s",
                     change.type, expected_values, actual_type, type_hit,
                 )
@@ -1610,7 +1609,7 @@ async def _check_loop_advancement(self, scene_text: str, loop: dict) -> tuple[bo
                         str(v) for k, v in evt.items()
                         if isinstance(v, str) and k != "type"
                     )[:60]
-                    logger.critical(
+                    logger.debug(
                         "[DIAG-MATCH] field_match=%s change.name=%s desc_preview=%s",
                         field_hit, getattr(change, "name", None), _desc_preview,
                     )

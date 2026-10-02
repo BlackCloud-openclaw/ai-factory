@@ -424,24 +424,24 @@ class ControlledWriter:
         return state
 
     async def _call_llm(self, prompt: str, max_tokens: int = 2048) -> tuple[str, dict]:
-        logger.critical("[15.7-B1] === _call_llm ENTERED ===")
-        logger.critical("[15.7-B1] _call_llm: prompt_len=%d, max_tokens=%d", len(prompt), max_tokens)
+        logger.debug("[15.7-B1] === _call_llm ENTERED ===")
+        logger.debug("[15.7-B1] _call_llm: prompt_len=%d, max_tokens=%d", len(prompt), max_tokens)
         
         # 检查配置
-        logger.critical("[15.7-B1] _call_llm: self.api_base=%s, self.model=%s", self.api_base, self.model)
+        logger.debug("[15.7-B1] _call_llm: self.api_base=%s, self.model=%s", self.api_base, self.model)
         
         router = get_router()
         primary_model = router.get_model_for_task("writing")
         fallback_model = "Qwen3-32B-Q5_K_M"
         pool = get_llm_router_pool()
         
-        logger.critical("[15.7-B1] _call_llm: primary_model=%s, fallback_model=%s", primary_model, fallback_model)
+        logger.debug("[15.7-B1] _call_llm: primary_model=%s, fallback_model=%s", primary_model, fallback_model)
         
         # 定义实际调用函数
         async def _do_call(model_name: str, **kwargs) -> tuple[str, dict]:
-            logger.critical("[15.7-B1] _do_call: model=%s", model_name)
+            logger.debug("[15.7-B1] _do_call: model=%s", model_name)
             base_url = kwargs.get('base_url') or self.api_base
-            logger.critical("[15.7-B1] _do_call: base_url=%s", base_url)
+            logger.debug("[15.7-B1] _do_call: base_url=%s", base_url)
             
             transport = httpx.AsyncHTTPTransport(proxy=None)
             async with httpx.AsyncClient(transport=transport, timeout=httpx.Timeout(600.0, connect=30.0)) as client:
@@ -456,17 +456,17 @@ class ControlledWriter:
                 grammar_str = self._get_grammar()
                 if grammar_str:
                     extra_body["grammar"] = grammar_str
-                    logger.critical(
+                    logger.debug(
                         "[15.7-B1] _do_call: grammar attached (len=%d)",
                         len(grammar_str),
                     )
                 else:
-                    logger.critical(
+                    logger.debug(
                         "[15.7-B1] _do_call: grammar NOT attached (fallback to response_format only)"
                     )
                 # ========================================================
 
-                logger.critical("[15.7-B1] _do_call: sending request to OpenAI...")
+                logger.debug("[15.7-B1] _do_call: sending request to OpenAI...")
                 response = await openai_client.chat.completions.create(
                     model=model_name,
                     messages=[{"role": "user", "content": prompt}],
@@ -477,23 +477,23 @@ class ControlledWriter:
                 )
                 content = response.choices[0].message.content or ""
                 usage = response.usage.model_dump() if response.usage else {"total_tokens": 0}
-                logger.critical("[15.7-B1] _do_call: response_len=%d, usage=%s", len(content), usage)
+                logger.debug("[15.7-B1] _do_call: response_len=%d, usage=%s", len(content), usage)
                 return content, usage
         
-        logger.critical("[15.7-B1] _call_llm: calling pool.call with primary_model=%s", primary_model)
+        logger.debug("[15.7-B1] _call_llm: calling pool.call with primary_model=%s", primary_model)
         try:
             result = await pool.call(primary_model, _do_call, timeout=getattr(config, 'llm_timeout_writing', 600), agent="writer")
-            logger.critical("[15.7-B1] _call_llm: pool.call returned, result_len=%d", len(result))
+            logger.debug("[15.7-B1] _call_llm: pool.call returned, result_len=%d", len(result))
             return result
         except Exception as e:
-            logger.critical("[15.7-B1] _call_llm: primary_model failed: %s", e, exc_info=True)
+            logger.debug("[15.7-B1] _call_llm: primary_model failed: %s", e, exc_info=True)
             try:
-                logger.critical("[15.7-B1] _call_llm: trying fallback_model=%s", fallback_model)
+                logger.debug("[15.7-B1] _call_llm: trying fallback_model=%s", fallback_model)
                 result = await pool.call(fallback_model, _do_call, timeout=getattr(config, 'llm_timeout_writing', 600), agent="writer")
-                logger.critical("[15.7-B1] _call_llm: fallback succeeded, result_len=%d", len(result))
+                logger.debug("[15.7-B1] _call_llm: fallback succeeded, result_len=%d", len(result))
                 return result
             except Exception as e2:
-                logger.critical("[15.7-B1] _call_llm: fallback also failed: %s", e2, exc_info=True)
+                logger.debug("[15.7-B1] _call_llm: fallback also failed: %s", e2, exc_info=True)
                 raise
     # ========================================================================
     # Phase 13.2.3C: 核心 segment 执行 (集成 QualityGate)
@@ -517,7 +517,7 @@ class ControlledWriter:
             - feedback 注入下一轮 prompt
             - 安全返回 fallback
         """
-        logger.critical("[15.7-B1] === _execute_segment ENTERED ===")
+        logger.debug("[15.7-B1] === _execute_segment ENTERED ===")
         text = ""
         events = []
         error_hint = ""  # ✅ 在循环外初始化，跨 attempt 保留
@@ -541,7 +541,7 @@ class ControlledWriter:
                 max_tokens = 4096 if attempt > 1 else 2048
                 response_content, usage = await self._call_llm(prompt, max_tokens=max_tokens)
                 # ========== D.3 观测点 1：LLM 原始响应 ==========
-                logger.critical(
+                logger.debug(
                     "WRITER_LLM_RAW: len=%d has_events_key=%s preview=%s",
                     len(response_content),
                     '"events"' in response_content,
@@ -551,7 +551,7 @@ class ControlledWriter:
                 validated = self._parse_and_validate(response_content)
                 # ========== D.3 观测点 2：解析后 Artifact ==========
                 if validated:
-                    logger.critical(
+                    logger.debug(
                         "WRITER_SEGMENT_PARSED: scene_text_len=%d events_len=%d events_type=%s",
                         len(validated.scene_text),
                         len(validated.events),
@@ -559,7 +559,7 @@ class ControlledWriter:
                     )
                     # ========== PHASE 15.0 AUDIT ==========
                     import re
-                    logger.critical(
+                    logger.debug(
                         "[PHASE15] controlled_writer_segment parsed contains_linyi=%s abcd=%s text_len=%s",
                         "林逸" in validated.scene_text,
                         re.findall(r'\b[A-D]\b', validated.scene_text),
@@ -577,7 +577,7 @@ class ControlledWriter:
                         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                         fname = debug_dir / f"writer_parse_failed_{timestamp}.json"
                         fname.write_text(response_content, encoding="utf-8")
-                        logger.critical(
+                        logger.debug(
                             "WRITER_PARSE_FAILED_LENGTH=%d saved_to=%s",
                             len(response_content),
                             fname
@@ -862,20 +862,20 @@ class ControlledWriter:
         start = time.time()
 
         # ========== Phase 15.7-B1: 诊断日志 ==========
-        logger.critical("[15.7-B1] === ControlledWriter.execute ENTERED ===")
-        logger.critical(
+        logger.debug("[15.7-B1] === ControlledWriter.execute ENTERED ===")
+        logger.debug(
             "[15.7-B1] contract type: %s, has execution_contract: %s, has narrative_intent: %s",
             type(contract).__name__,
             hasattr(contract, 'execution_contract'),
             hasattr(contract, 'narrative_intent'),
         )
         if hasattr(contract, 'execution_contract'):
-            logger.critical(
+            logger.debug(
                 "[15.7-B1] execution_contract is None? %s",
                 contract.execution_contract is None
             )
         if hasattr(contract, 'narrative_intent'):
-            logger.critical(
+            logger.debug(
                 "[15.7-B1] narrative_intent is None? %s",
                 contract.narrative_intent is None
             )
@@ -889,7 +889,7 @@ class ControlledWriter:
             elif isinstance(contract.execution_contract, dict):
                 units = contract.execution_contract.get("execution", {}).get("units", [])
 
-        logger.critical("[15.7-B1] units count: %d", len(units))
+        logger.debug("[15.7-B1] units count: %d", len(units))
 
         if not units:
             logger.error("[15.7-B1] No execution units found, returning empty (Contract incomplete)")
@@ -912,7 +912,7 @@ class ControlledWriter:
         scene_id_str = scene_id.scene_id if scene_id else "unknown"
         chars = getattr(contract, 'scene_context', None)
         chars_list = chars.characters if chars else []
-        logger.critical(
+        logger.debug(
             "[PHASE15] controlled_writer_execute scene_id=%s characters=%s units_count=%s has_intent=%s",
             scene_id_str,
             chars_list,

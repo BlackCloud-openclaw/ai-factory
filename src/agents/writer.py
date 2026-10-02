@@ -121,14 +121,14 @@ class WritingAgent(BaseAgent):
         start_time = time.time()
 
         # ========== P0 诊断：检查 state.planning_contract 传入状态 ==========
-        logger.critical(
+        logger.debug(
             "WRITER_AGENT_STATE_PLANNING_CONTRACT: exists=%s, type=%s",
             state.planning_contract is not None,
             type(state.planning_contract).__name__ if state.planning_contract else "None"
         )
         # 如果为 None，检查 metadata 中是否有
         if state.planning_contract is None:
-            logger.critical(
+            logger.debug(
                 "WRITER_AGENT_METADATA_PLANNING_CONTRACT: exists=%s",
                 "planning_contract" in state.metadata
             )
@@ -153,7 +153,7 @@ class WritingAgent(BaseAgent):
             logger.warning("WRITER_CONTRACT_NOT_FOUND_IN_STATE")
                 
         # ========== 诊断：planning_contract 解析状态 ==========
-        logger.critical(
+        logger.debug(
             "WRITER_CONTRACT_PLANNING_VAR: planning_contract is None? %s, type=%s",
             planning_contract is None,
             type(planning_contract).__name__ if planning_contract else "None"
@@ -242,7 +242,7 @@ class WritingAgent(BaseAgent):
             else:
                 scs = diagnostic_contract.observables.state_changes if hasattr(diagnostic_contract, 'observables') else []
             
-            logger.critical(
+            logger.debug(
                 "WRITER_AGENT_CONTRACT: type=%s contract_id=%s state_changes=%s",
                 type(diagnostic_contract).__name__,
                 contract_id,
@@ -252,7 +252,7 @@ class WritingAgent(BaseAgent):
                 ]
             )
         else:
-            logger.critical("WRITER_AGENT_CONTRACT: planning_contract is None")
+            logger.debug("WRITER_AGENT_CONTRACT: planning_contract is None")
 
         # 2. 检查 Prompt 中是否包含具体事件类型信号
         expected_types = []
@@ -273,7 +273,7 @@ class WritingAgent(BaseAgent):
             if et:
                 signal_status[et] = et in prompt
         
-        logger.critical(
+        logger.debug(
             "WRITER_PROMPT_CONTRACT_SIGNAL: expected_types=%s signal_status=%s",
             expected_types,
             signal_status
@@ -323,13 +323,13 @@ class WritingAgent(BaseAgent):
             contract_prompt = self._build_contract_prompt(planning_contract)
             prompt += "\n\n" + contract_prompt
 
-            logger.critical(
+            logger.debug(
                 "WRITER_FINAL_PROMPT_HAS_CONTRACT=True, scene_id=%s, state_changes=%d",
                 planning_contract.scene_id,
                 len(planning_contract.observables.state_changes)
             )
         else:
-            logger.critical("WRITER_FINAL_PROMPT_HAS_CONTRACT=False (planning_contract is None)")
+            logger.debug("WRITER_FINAL_PROMPT_HAS_CONTRACT=False (planning_contract is None)")
         # ===================================================
         
         # ====== 注入戏剧结构（来自 Drama Planner） ======
@@ -516,7 +516,7 @@ class WritingAgent(BaseAgent):
         # ========== PHASE 15.0 AUDIT ==========
         scene_text = data.get("scene_text", "")
         raw_events = data.get("events", [])
-        logger.critical(
+        logger.debug(
             "[PHASE15] writer_parse_result contains_linyi=%s contains_protagonist=%s abcd=%s text_len=%s events_count=%s",
             "林逸" in scene_text,
             "protagonist" in scene_text,
@@ -752,7 +752,7 @@ class WritingAgent(BaseAgent):
         # ========== PHASE 15.0 AUDIT ==========
         import re
         # 直接检查 prompt 中是否包含角色名（因为 messages 就是 [{"role": "user", "content": prompt}]）
-        logger.critical(
+        logger.debug(
             "[PHASE15] writer_llm_request model=%s contains_linyi=%s contains_protagonist=%s abcd=%s",
             actual_model,
             "林逸" in prompt,

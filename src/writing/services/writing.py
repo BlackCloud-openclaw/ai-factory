@@ -52,7 +52,7 @@ class WritingService:
             planning_contract=cmd.execution_contract,   # D.4.1-a
         )
         # ========== D.4.1-a 边界日志 ==========
-        logger.critical(
+        logger.debug(
             "WRITING_SERVICE_AGENT_STATE_CONTRACT: exists=%s type=%s",
             cmd.execution_contract is not None,
             type(cmd.execution_contract).__name__ if cmd.execution_contract is not None else "None"
@@ -77,7 +77,7 @@ class WritingService:
             else:
                 scs = planning_contract.observables.state_changes if hasattr(planning_contract, 'observables') else []
             
-            logger.critical(
+            logger.debug(
                 "WRITER_CONTRACT_INPUT: type=%s contract_id=%s state_changes=%s",
                 type(planning_contract).__name__,
                 contract_id,
@@ -87,7 +87,7 @@ class WritingService:
                 ]
             )
         else:
-            logger.critical("WRITER_CONTRACT_INPUT: planning_contract is None")
+            logger.debug("WRITER_CONTRACT_INPUT: planning_contract is None")
         # ===========================================================
 
         writer = WritingAgent()

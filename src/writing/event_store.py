@@ -19,7 +19,6 @@ from src.writing.causality.projector import DeltaEngine
 from src.writing.causality.scheduler import ProjectionScheduler
 from src.writing.causality.predicate import Predicate
 from src.writing.causality.upcaster import LATEST_EVENT_SCHEMA_VERSION, upcast_event_envelope
-from src.writing.narrative_projection import NarrativeProjector
 from src.db import get_db_pool
 
 logger = setup_logging("writing.event_store")
@@ -108,8 +107,6 @@ class NarrativeEventStore:
             logger.error(f"Projection failed for event {event.event_id}: {e}", exc_info=True)
 
         import sys
-        sys.stderr.write(f"type(NarrativeProjector) = {type(NarrativeProjector)}\n")
-        sys.stderr.flush()       
 
         return event.event_id
 
