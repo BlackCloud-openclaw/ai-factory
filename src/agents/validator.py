@@ -1263,16 +1263,16 @@ class ValidatorAgent(BaseAgent):
             logger.warning(f"Validation debug: scene_text too short ({len(scene_text)} chars)")
 
     # ==================== 新增：Loop 推进检查 ====================
-    async def _check_loop_advancement(self, scene_text: str, loop: dict) -> tuple[bool, float, str]:
-        """
-        检查场景是否实质推进了叙事环路
-        返回: (是否推进, 推进分数 0-1, 理由)
-        """
-        if not loop or not loop.get("description"):
-            return True, 0.0, "无激活 Loop，跳过检查"
+async def _check_loop_advancement(self, scene_text: str, loop: dict) -> tuple[bool, float, str]:
+    """
+    检查场景是否实质推进了叙事环路
+    返回: (是否推进, 推进分数 0-1, 理由)
+    """
+    if not loop or not loop.get("description"):
+        return True, 0.0, "无激活 Loop，跳过检查"
 
-        try:
-            prompt = f"""
+    try:
+        prompt = f"""
 你是一位叙事分析专家。判断以下场景对指定叙事环路的推进程度。
 
 环路描述：{loop['description']}
@@ -1288,25 +1288,40 @@ class ValidatorAgent(BaseAgent):
     "reason": "简短理由"
 }}
 """
-            client = AsyncOpenAI(api_key="not-needed", base_url=self.llm_api_url)
+        from src.model_router import get_router
+        from src.execution.llm_router_pool import get_llm_router_pool
+
+        router = get_router()
+        pool = get_llm_router_pool()
+        model = router.get_model_for_task("validate")
+
+        async def _do_call(model_name: str, **kwargs) -> str:
+            base_url = kwargs.get("base_url") or pool.get_base_url(model_name)
+            client = AsyncOpenAI(api_key="not-needed", base_url=base_url)
             response = await client.chat.completions.create(
-                model="Qwen3-32B-Q5_K_M",
+                model=model_name,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
                 max_tokens=256,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
-            result = json.loads(response.choices[0].message.content)
-            advanced = result.get("advanced", False)
-            score = result.get("score", 0.0)
-            reason = result.get("reason", "未提供理由")
-            logger.info(f"🔍 Loop advancement check result: advanced={advanced}, score={score:.3f}, reason={reason[:60]}")            
+            return response.choices[0].message.content or ""
 
-            #return advanced, min(1.0, max(0.0, score)), reason
-            return advanced, score, reason        
-        except Exception as e:
-            logger.warning(f"Loop advancement check failed (fallback: pass with 0.05): {e}")
-            return True, 0.05, f"检查异常，默认推进 5%: {e}"
+        response_text = await pool.call(
+            model, _do_call, timeout=60, agent="loop_advancement_check"
+        )
+        result = json.loads(response_text)
+        advanced = result.get("advanced", False)
+        score = result.get("score", 0.0)
+        reason = result.get("reason", "未提供理由")
+        logger.info(
+            f"🔍 Loop advancement check result: advanced={advanced}, "
+            f"score={score:.3f}, reason={reason[:60]}"
+        )
+        return advanced, score, reason
+    except Exception as e:
+        logger.warning(f"Loop advancement check failed (fallback: pass with 0.05): {e}")
+        return True, 0.05, f"检查异常，默认推进 5%: {e}"
 
     # ============================================================
     # Phase 15.9-fix: Writer 自由 type → Contract 枚举 type 的宽松映射

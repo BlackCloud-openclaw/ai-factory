@@ -98,6 +98,39 @@ curl -X POST "http://localhost:8000/api/v1/execute" \
   -H "Content-Type: application/json" \
   -d '{"user_input": "开始写作，自动完成所有章节", "task_type": "scene_plan", "novel_id": "my_novel"}'
 
+### 重跑指定章节
+
+当某章生成质量不达标、场景缺失或内容污染时，可通过 `rerun_chapter` API 安全回滚并重新生成。
+
+**特性**：
+- 自动回滚 `writing_progress` 到目标章 scene 0
+- 清空该章的 `scene_execution_units` 记录
+- 备份并删除该章的主文件 / shadow 文件（可关闭）
+- 支持 `dry_run` 预演，不实际改动
+
+**前置校验**：
+- 只允许回滚到**已生成过**的章节（不能跳过未来章节）
+- 目标 `(volume, chapter)` 必须 `<=` 当前进度指针
+
+#### 预演（推荐先执行）
+curl -X POST "http://localhost:8000/api/v1/novel/rerun_chapter" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "novel_id": "simple_long_novel_001",
+    "volume_num": 2,
+    "chapter_num": 74,
+    "dry_run": true
+  }'
+
+#### 预演（真正执行）
+curl -X POST "http://localhost:8000/api/v1/novel/rerun_chapter" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "novel_id": "simple_long_novel_001",
+    "volume_num": 2,
+    "chapter_num": 74
+  }'
+
 ```
 
 ## 项目结构（简略）

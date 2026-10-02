@@ -2,6 +2,7 @@
 import json
 import uuid
 import logging
+from pathlib import Path          # ← 新增
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
@@ -559,3 +560,184 @@ async def _generate_chapters_for_volume(volume_num: int, volume_title: str, targ
         ch["chapter_num"] = i + 1
 
     return chapters
+
+
+# ============================================================
+# 重跑章节 API（Phase 15.9 运维工具）
+# ============================================================
+
+class RerunChapterRequest(BaseModel):
+    novel_id: str
+    volume_num: int
+    chapter_num: int
+    dry_run: bool = False           # True 只打印将做什么，不实际改
+    keep_files: bool = False        # True 保留主/shadow 文件（仅清 DB）
+    max_progress_check: bool = True # True 时禁止回滚到已生成章节之后
+
+
+@router.post("/novel/rerun_chapter")
+async def rerun_chapter(request: RerunChapterRequest, background_tasks: BackgroundTasks):
+    """
+    重跑指定章节。
+
+    步骤：
+    1. 校验 novel_id 存在
+    2. 校验目标章节 <= 当前进度
+    3. 回滚 writing_progress 到目标章 scene 0
+    4. 删除 scene_execution_units 中该章所有行
+    5. 备份并删除该章主文件 / shadow 文件（keep_files=False 时）
+    6. 后台触发 resume workflow
+    """
+    pool = get_db_pool()
+    if not pool:
+        raise HTTPException(status_code=500, detail="Database pool not initialized")
+
+    novel_id = request.novel_id
+    volume_num = request.volume_num
+    chapter_num = request.chapter_num
+
+    # ---------- 1. 校验进度 ----------
+    progress = await load_writing_progress(novel_id)
+    if not progress:
+        raise HTTPException(status_code=404, detail="writing_progress not found for novel")
+
+    cur_vol = progress["current_volume"]
+    cur_ch = progress["current_chapter"]
+
+    if request.max_progress_check:
+        if (volume_num, chapter_num) > (cur_vol, cur_ch):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot rerun future chapter. Current progress: vol={cur_vol}, ch={cur_ch}"
+            )
+
+    logger.info(
+        f"[RerunChapter] requested: novel={novel_id}, target=v{volume_num}c{chapter_num}, "
+        f"current=v{cur_vol}c{cur_ch}, dry_run={request.dry_run}, keep_files={request.keep_files}"
+    )
+
+    # ---------- 2. 查 DB 有多少条 scene_execution_units ----------
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT scene_index, status FROM scene_execution_units
+            WHERE novel_id=$1 AND volume_num=$2 AND chapter_num=$3
+            ORDER BY scene_index
+            """,
+            novel_id, volume_num, chapter_num
+        )
+
+    existing_scenes = [(r["scene_index"], r["status"]) for r in rows]
+    logger.info(f"[RerunChapter] scene_execution_units has {len(existing_scenes)} rows: {existing_scenes}")
+
+    # ---------- 3. 目标文件路径 ----------
+    main_file = Path(f"data/novels/{novel_id}/vol_{volume_num:03d}/chap_{chapter_num:03d}.txt")
+    shadow_file = Path(f"data/novels/{novel_id}/shadow/vol_{volume_num:03d}/chap_{chapter_num:03d}.txt")
+
+    main_exists = main_file.exists()
+    shadow_exists = shadow_file.exists()
+
+    # ---------- 4. dry_run ----------
+    if request.dry_run:
+        return {
+            "dry_run": True,
+            "novel_id": novel_id,
+            "target": {"volume_num": volume_num, "chapter_num": chapter_num},
+            "current_progress": {"volume_num": cur_vol, "chapter_num": cur_ch},
+            "would_delete": {
+                "scene_execution_units_rows": len(existing_scenes),
+                "main_file": str(main_file) if main_exists else None,
+                "shadow_file": str(shadow_file) if shadow_exists else None,
+            },
+            "would_set_progress_to": {
+                "volume_num": volume_num,
+                "chapter_num": chapter_num,
+                "scene": 0,
+                "chapter_completed": False,
+            },
+            "keep_files": request.keep_files,
+        }
+
+    # ---------- 5. 备份文件 ----------
+    backup_files = []
+    if not request.keep_files:
+        for fp in (main_file, shadow_file):
+            if fp.exists():
+                bak = fp.with_suffix(fp.suffix + ".bak_rerun")
+                # 若 bak 已存在，加时间戳
+                if bak.exists():
+                    from datetime import datetime as _dt
+                    ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+                    bak = fp.with_suffix(fp.suffix + f".bak_rerun.{ts}")
+                fp.rename(bak)
+                backup_files.append(str(bak))
+                logger.info(f"[RerunChapter] backed up {fp} -> {bak}")
+
+    # ---------- 6. 事务：清 DB + 回滚进度 ----------
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # 6.1 删除 scene_execution_units
+            del_result = await conn.execute(
+                """
+                DELETE FROM scene_execution_units
+                WHERE novel_id=$1 AND volume_num=$2 AND chapter_num=$3
+                """,
+                novel_id, volume_num, chapter_num
+            )
+
+            # 6.2 更新 writing_progress
+            await conn.execute(
+                """
+                INSERT INTO writing_progress
+                    (project_id, current_volume, current_chapter, current_scene, chapter_completed, last_updated)
+                VALUES ($1, $2, $3, 0, FALSE, NOW())
+                ON CONFLICT (project_id) DO UPDATE SET
+                    current_volume = EXCLUDED.current_volume,
+                    current_chapter = EXCLUDED.current_chapter,
+                    current_scene = 0,
+                    chapter_completed = FALSE,
+                    last_updated = NOW()
+                """,
+                novel_id, volume_num, chapter_num
+            )
+
+            # 6.3 更新 novels 表（可选，保持一致性）
+            await conn.execute(
+                """
+                UPDATE novels
+                SET current_volume=$1, current_chapter=$2, current_scene_index=0
+                WHERE novel_id=$3
+                """,
+                volume_num, chapter_num, novel_id
+            )
+
+    logger.info(
+        f"[RerunChapter] DB cleaned: {del_result}, "
+        f"progress rolled back to v{volume_num}c{chapter_num}s0"
+    )
+
+    # ---------- 7. 后台触发 resume ----------
+    initial_state = AgentState(
+        user_input="继续写作",
+        novel_id=novel_id,
+        task_type="scene_plan",
+        resume=True,
+    )
+    # 从 DB 加载必要状态（复用 resume_novel 的逻辑，或直接调用它）
+    # 这里采用最简：走 HTTP 内部逻辑
+    # 为了不重复大量代码，构造一个最小 resume 触发
+
+    # 复用 resume_novel 的逻辑：直接调用它自己的后台任务
+    # 或者更简单：让客户端再调一次 /resume
+
+    # 这里返回 task_id = None，让客户端调 /resume
+    return {
+        "status": "rerun_ready",
+        "novel_id": novel_id,
+        "volume_num": volume_num,
+        "chapter_num": chapter_num,
+        "deleted_rows": len(existing_scenes),
+        "backup_files": backup_files,
+        "next_action": f"POST /api/v1/novel/resume with {{'novel_id': '{novel_id}'}}",
+        "message": "DB and files cleared. Call /resume to regenerate this chapter."
+    }

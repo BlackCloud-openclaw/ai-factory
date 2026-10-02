@@ -588,8 +588,9 @@ class ControlledWriter:
                     text = validated.scene_text
                     events = validated.events
 
-                    # 获取 ValidationResult
-                    validation_result = await self._validate_segment(text, contract)
+                    # P0-13: 段级只做结构验证（长度 + 单元匹配），
+                    # 不做场景级契约匹配（契约需要所有段拼接后才满足）
+                    validation_result = await self._validate_segment(text, contract, units)
 
                     # QualityGate 决策
                     gate_result = self.quality_gate.evaluate(
@@ -648,23 +649,53 @@ class ControlledWriter:
     # Phase 13.2.3C: 验证辅助方法
     # ========================================================================
 
-    async def _validate_segment(self, text: str, contract: WritingContract) -> ValidationResult:
+    async def _validate_segment(
+        self,
+        text: str,
+        contract: WritingContract,
+        units: List[ExecutionUnit],
+    ) -> ValidationResult:
         """
-        验证单个 segment 的文本，使用注入的 SemanticValidator。
+        P0-13: 段级结构验证。
+
+        不对段级中间态做场景级契约验证——因为 contract 是场景级的
+        （所有段拼接完成才满足），段级验证必然 matched=0，
+        会导致 QualityGate 恒为 0.00 → 每段 3 次 retry。
+
+        段级只做：
+        - 文本长度合理（>= 200 字）
+        - 分配的执行单元关键词出现（复用 _verify_segment 逻辑）
+
+        场景级契约验证交给 ValidatorAgent（validate_node 中）。
         """
-        # 从 contract 中提取 PlanningContract
-        planning_contract = getattr(contract, 'execution_contract', None)
-        if planning_contract is None:
-            # 无 contract 时返回空结果（视为通过）
+        if not text or len(text.strip()) < 200:
             return ValidationResult(
-                passed=True,
-                missing=[],
+                passed=False,
+                missing=["segment_too_short"],
                 matched=[],
-                blocking_missing=[],
-                overall_confidence=1.0,
-                weight_applied=1.0,
+                blocking_missing=["segment_too_short"],
+                overall_confidence=0.0,
+                weight_applied=0.0,
             )
-        return self._semantic_validator.validate(planning_contract, text)
+
+        if not self._verify_segment(text, units):
+            return ValidationResult(
+                passed=False,
+                missing=["segment_units_not_covered"],
+                matched=[],
+                blocking_missing=["segment_units_not_covered"],
+                overall_confidence=0.3,
+                weight_applied=0.3,
+            )
+
+        return ValidationResult(
+            passed=True,
+            missing=[],
+            matched=[],
+            blocking_missing=[],
+            overall_confidence=1.0,
+            weight_applied=1.0,
+        )
 
     # ========================================================================
     # Phase 15.8 Commit 1: Rewrite Selection
