@@ -283,6 +283,36 @@ class ControlledWriter:
                 lines.append(f"预期结果：{goal.expected_outcome}")
             lines.append("")
 
+        # ========== 2.2 Phase 16.0: SceneSpec 渲染指导 ==========
+        scene_spec = getattr(writing_contract, "scene_spec", None)
+        if scene_spec:
+            lines.append("【场景渲染指导（SceneSpec，非硬约束）】")
+            lines.append("以下内容用于「如何写」，与 Planning Contract 的「写什么」职责不同。")
+            lines.append("")
+            world = scene_spec.get("world", {}) or {}
+            if world:
+                lines.append("## World")
+                for k in ("location", "time", "atmosphere"):
+                    if world.get(k):
+                        lines.append(f"- {k}: {world[k]}")
+                if world.get("sensory"):
+                    s = world["sensory"]
+                    if isinstance(s, list):
+                        lines.append(f"- sensory: {', '.join(s)}")
+                lines.append("")
+            emo = scene_spec.get("reader_emotion", {}) or {}
+            if emo:
+                lines.append("## Reader Emotion")
+                for k in ("begin", "middle", "end"):
+                    if emo.get(k):
+                        lines.append(f"- {k}: {emo[k]}")
+                lines.append("")
+            if scene_spec.get("narrative_function"):
+                lines.append(f"## Narrative Function\n- {scene_spec['narrative_function']}\n")
+            if scene_spec.get("pov"):
+                lines.append(f"## POV\n- {scene_spec['pov']}\n")
+        # ==========================================================
+
         # ========== 2.5 Phase 15.8 Commit 2: 上一场景结尾（仅第 0 段） ==========
         if segment_idx == 0 and not previous_text:
             prev_tail = getattr(writing_contract, 'previous_scene_tail', None)
@@ -541,7 +571,7 @@ class ControlledWriter:
                 max_tokens = 4096 if attempt > 1 else 2048
                 response_content, usage = await self._call_llm(prompt, max_tokens=max_tokens)
                 # ========== D.3 观测点 1：LLM 原始响应 ==========
-                logger.debug(
+                logger.info(
                     "WRITER_LLM_RAW: len=%d has_events_key=%s preview=%s",
                     len(response_content),
                     '"events"' in response_content,
@@ -551,7 +581,7 @@ class ControlledWriter:
                 validated = self._parse_and_validate(response_content)
                 # ========== D.3 观测点 2：解析后 Artifact ==========
                 if validated:
-                    logger.debug(
+                    logger.info(
                         "WRITER_SEGMENT_PARSED: scene_text_len=%d events_len=%d events_type=%s",
                         len(validated.scene_text),
                         len(validated.events),
@@ -559,7 +589,7 @@ class ControlledWriter:
                     )
                     # ========== PHASE 15.0 AUDIT ==========
                     import re
-                    logger.debug(
+                    logger.info(
                         "[PHASE15] controlled_writer_segment parsed contains_linyi=%s abcd=%s text_len=%s",
                         "林逸" in validated.scene_text,
                         re.findall(r'\b[A-D]\b', validated.scene_text),

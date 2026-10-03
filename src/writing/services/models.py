@@ -50,6 +50,7 @@ class ScenePlanningCommand:
     total_chapters_in_volume: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
     intent_resolver: Optional[IntentResolver] = None
+    projection: Optional[Any] = None       # ← 新增
 
 
 @dataclass

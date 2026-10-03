@@ -220,8 +220,53 @@ def event_to_dict(event: NarrativeEvent) -> dict:
     return event.model_dump(mode='json')
 
 
+# Phase 16.0: LLM 自由 type → 已知 type 的宽松映射
+_FREEFORM_TYPE_MAP = {
+    "conflict": "plot_flag_set",
+    "conflict_escalation": "plot_flag_set",
+    "encounter": "plot_flag_set",
+    "meeting": "plot_flag_set",
+    "activation": "plot_flag_set",
+    "trigger": "plot_flag_set",
+    "revelation": "plot_flag_set",
+    "discovery_reveal": "plot_flag_set",
+    "clue_reveal": "plot_flag_set",
+    "clue": "plot_flag_set",
+    "power_shift": "plot_flag_set",
+    "antagonist_appearance": "plot_flag_set",
+    "foreshadowing": "plot_flag_set",
+    "danger": "plot_flag_set",
+    "environmental_trap": "plot_flag_set",
+    "biological_trap": "plot_flag_set",
+    "situation_escalation": "plot_flag_set",
+    "plot_twist": "plot_flag_set",
+    "event_trigger": "plot_flag_set",
+    "location_change": "location_enter",
+    "arrival": "location_enter",
+    "escape": "location_enter",
+    "departure": "location_enter",
+    "enter": "location_enter",
+    "breakthrough": "realm_upgrade",
+    "realm_change": "realm_upgrade",
+    "realm_advance": "realm_upgrade",
+    "cultivation_breakthrough": "realm_upgrade",
+    "inventory_acquire": "item_acquire",
+    "acquisition": "item_acquire",
+    "inventory_added": "item_acquire",
+    "relation_change": "relationship_change",
+    "relationship_shift": "relationship_change",
+    "knowledge_discovery": "discovery",
+    "knowledge_gain": "discovery",
+    "information_retrieval": "discovery",
+    "insight": "discovery",
+    "comprehension": "discovery",
+}
+
+
 def event_from_dict(event_type: str, data: dict) -> Optional[NarrativeEvent]:
-    """从字典恢复事件，带容错处理"""
+    """从字典恢复事件，带容错处理（Phase 16.0 宽松版）"""
+    _log = logging.getLogger("writing.events")
+
     event_map = {
         "realm_upgrade": RealmUpgradeEvent,
         "item_acquire": ItemAcquireEvent,
@@ -240,19 +285,85 @@ def event_from_dict(event_type: str, data: dict) -> Optional[NarrativeEvent]:
         "item_discovery": DiscoveryEvent,
         "perception_update": PerceptionUpdateEvent,
     }
-    
-    cls = event_map.get(event_type)
+
+    # 1. 自由 type 归一化
+    normalized_type = _FREEFORM_TYPE_MAP.get(event_type, event_type)
+
+    cls = event_map.get(normalized_type)
+
+    # 2. 未知 type → fallback 到 plot_flag_set
     if cls is None:
-        # 未知事件类型，记录警告并返回 None
-        logger = logging.getLogger("writing.events")
-        logger.warning(f"Unknown event type: {event_type}, data: {data}")
-        return None
-    
+        _log.info(
+            "[16.0] event_from_dict fallback: unknown type '%s' → plot_flag_set",
+            event_type,
+        )
+        flag_name = str(event_type or "unknown")[:30]
+        return PlotFlagSetEvent(flag=flag_name, value=True)
+
+    # 3. 补齐 plot_flag_set 的 flag 字段（LLM 常用 name / target）
+    if normalized_type == "plot_flag_set":
+        if "flag" not in data:
+            for k in ("name", "target", "description", "event"):
+                if isinstance(data.get(k), str) and data[k]:
+                    data = {**data, "flag": data[k][:40]}
+                    break
+            else:
+                data = {**data, "flag": f"auto_{abs(hash(str(data))) % 10000}"}
+
+    # 4. 补齐 discovery 的 discoverer / discovery 字段
+    if normalized_type == "discovery":
+        if "discoverer" not in data:
+            data = {**data, "discoverer": data.get("actor", "林逸")}
+        if "discovery" not in data:
+            for k in ("target", "name", "description", "content"):
+                if isinstance(data.get(k), str) and data[k]:
+                    data = {**data, "discovery": data[k][:80]}
+                    break
+            else:
+                data = {**data, "discovery": f"发现_{abs(hash(str(data))) % 10000}"}
+
+    # 5. 补齐 location_enter 的 location / actor
+    if normalized_type == "location_enter":
+        if "actor" not in data:
+            data = {**data, "actor": data.get("discoverer", "林逸")}
+        if "location" not in data:
+            data = {**data, "location": data.get("target", "未知地点")[:40]}
+
+    # 6. 补齐 relationship_change
+    if normalized_type == "relationship_change":
+        if "from_char" not in data:
+            data = {**data, "from_char": data.get("actor", "林逸")}
+        if "to_char" not in data:
+            data = {**data, "to_char": data.get("target", "未知")[:20]}
+        if "delta" not in data:
+            data = {**data, "delta": -10}
+        if "new_value" not in data:
+            data = {**data, "new_value": 0}
+
+    # 7. 补齐 realm_upgrade
+    if normalized_type == "realm_upgrade":
+        if "actor" not in data:
+            data = {**data, "actor": data.get("discoverer", "林逸")}
+        if "to_major_realm" not in data:
+            data = {**data, "to_major_realm": "金丹"}
+        if "to_minor_stage" not in data:
+            data = {**data, "to_minor_stage": 1}
+
+    # 8. 补齐 item_acquire
+    if normalized_type == "item_acquire":
+        if "actor" not in data:
+            data = {**data, "actor": "林逸"}
+        if "item" not in data:
+            data = {**data, "item": data.get("target", "未知物品")[:40]}
+
     try:
         return cls.model_validate(data)
     except Exception as e:
-        # 解析失败，记录警告并返回 None
-        logger = logging.getLogger("writing.events")
-        logger.warning(f"Failed to parse event {event_type}: {e}")
-        logger.debug(f"Event data: {data}")
-        return None
+        _log.info(
+            "[16.0] event_from_dict fallback: parse failed for '%s' (%s) → plot_flag_set",
+            event_type, type(e).__name__,
+        )
+        return PlotFlagSetEvent(
+            flag=f"fallback_{event_type or 'unknown'}_{abs(hash(str(data))) % 10000}",
+            value=True,
+        )

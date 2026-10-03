@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Dict, Any
 from src.writing.narrative_intent import NarrativeIntent
 from src.writing.scene_execution_context import SceneExecutionContext
 from src.writing.planning_contract import PlanningContract  # 新增导入
@@ -34,3 +34,4 @@ class WritingContract:
     execution_contract: Optional[PlanningContract] = None
     # Phase 15.8 Commit 2: 上一场景结尾（跨场景衔接）
     previous_scene_tail: Optional[str] = None
+    scene_spec: Optional[Dict[str, Any]] = None       # ← 新增

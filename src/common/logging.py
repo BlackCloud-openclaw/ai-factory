@@ -165,6 +165,37 @@ def setup_logging(
 
     logger = logging.getLogger(name)
 
+    # Phase 16.0: 确保 root logger 也有 file handler。
+    # 项目中 53 个模块直接用 logging.getLogger(__name__) 而没有调用 setup_logging，
+    # 它们的 logger.info/error 因 root logger 无 handler 而全部丢失。
+    _log_file = log_file or config.log_file
+    _log_max_bytes = log_max_bytes or config.log_max_bytes
+    _log_backup_count = log_backup_count or config.log_backup_count
+    _log_path = Path(_log_file)
+    _log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    root = logging.getLogger()
+    if not getattr(root, "_ai_factory_handler_installed", False):
+        root._ai_factory_handler_installed = True
+        root.setLevel(logging.DEBUG)
+        _root_fh = CompressedRotatingFileHandler(
+            filename=str(_log_path),
+            maxBytes=_log_max_bytes,
+            backupCount=_log_backup_count,
+            encoding="utf-8",
+        )
+        _root_fh.setLevel(logging.DEBUG)
+        _root_fh.setFormatter(JsonFormatter())
+
+        # Phase 16.0: 过滤第三方库 DEBUG 噪音
+        class _ThirdPartyFilter(logging.Filter):
+            _BLOCK = ("httpcore", "httpx", "urllib3", "asyncio", "openai", "aiohttp", "charset_normalizer")
+            def filter(self, record: logging.LogRecord) -> bool:
+                return not any(record.name.startswith(p) for p in self._BLOCK)
+
+        _root_fh.addFilter(_ThirdPartyFilter())
+        root.addHandler(_root_fh)
+
     if logger.handlers:
         return logger
 
@@ -194,6 +225,7 @@ def setup_logging(
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(JsonFormatter())
     logger.addHandler(file_handler)
+    logger.propagate = False  # 避免与 root handler 重复写
 
     logger.info(f"Logging initialized: level={config.log_level}, file={log_file}")
 

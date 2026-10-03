@@ -217,6 +217,36 @@ class WritingAgent(BaseAgent):
             voice_memory=voice_memory,
         )
         
+        # ========== Phase 16.0: SceneSpec 渲染指导 ==========
+        scene_spec_from_plan = scene_plan.get("scene_spec") if scene_plan else None
+        if scene_spec_from_plan:
+            _ss_lines = ["【场景渲染指导（SceneSpec，非硬约束）】",
+                         "以下内容用于「如何写」，与 Planning Contract 的「写什么」职责不同。", ""]
+            _world = scene_spec_from_plan.get("world", {}) or {}
+            if _world:
+                _ss_lines.append("## World")
+                for _k in ("location", "time", "atmosphere"):
+                    if _world.get(_k):
+                        _ss_lines.append(f"- {_k}: {_world[_k]}")
+                if _world.get("sensory"):
+                    _s = _world["sensory"]
+                    if isinstance(_s, list):
+                        _ss_lines.append(f"- sensory: {', '.join(_s)}")
+                _ss_lines.append("")
+            _emo = scene_spec_from_plan.get("reader_emotion", {}) or {}
+            if _emo:
+                _ss_lines.append("## Reader Emotion")
+                for _k in ("begin", "middle", "end"):
+                    if _emo.get(_k):
+                        _ss_lines.append(f"- {_k}: {_emo[_k]}")
+                _ss_lines.append("")
+            if scene_spec_from_plan.get("narrative_function"):
+                _ss_lines.append(f"## Narrative Function\n- {scene_spec_from_plan['narrative_function']}\n")
+            if scene_spec_from_plan.get("pov"):
+                _ss_lines.append(f"## POV\n- {scene_spec_from_plan['pov']}\n")
+            prompt += "\n" + "\n".join(_ss_lines)
+        # =====================================================
+        
         # ========== 在这之后插入 ==========
         # 注入 NarrativeIntent 指令
         if state.narrative_intent:

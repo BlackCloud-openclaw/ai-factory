@@ -21,7 +21,8 @@ from src.writing.phase_transition import (
 )
 from src.writing.attractor import NarrativeAttractorField, Attractor, AttractorType
 
-logger = logging.getLogger(__name__)
+from src.common.logging import setup_logging
+logger = setup_logging("writing.services.scene_completion")
 
 
 class SceneCompletionService:
@@ -124,6 +125,12 @@ class SceneCompletionService:
                     await ensure_core_predicates(cmd.novel_id, new_world)
                     
                 # ========== Phase 13.2.1: Projection 更新（事务内） ==========
+                logger.info(
+                    "[16.0-diag] scene_completion: narrative_intent_is_none=%s, intent_type=%s, events_count=%d",
+                    cmd.narrative_intent is None,
+                    type(cmd.narrative_intent).__name__ if cmd.narrative_intent else "None",
+                    len(events) if events else 0,
+                )
                 if cmd.narrative_intent and events:
                     try:
                         from src.writing.projection_service import NarrativeProjectionService

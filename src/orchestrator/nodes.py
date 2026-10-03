@@ -518,6 +518,36 @@ async def plan_node(state: AgentState) -> dict:
             resolver = IntentResolver()
             logger.info("Adaptive runtime disabled, using rule selector")
 
+        # Phase 16.0: 加载最新 Narrative Projection → Planner（直接从 Postgres 读）
+        if state.novel_id and state.projection is None:
+            try:
+                import json
+                from src.db import get_db_pool
+                from src.writing.narrative_projection import NarrativeProjection
+                _pool = get_db_pool()
+                if _pool:
+                    async with _pool.acquire() as _conn:
+                        _row = await _conn.fetchrow("""
+                            SELECT projection_data
+                            FROM narrative_projection_snapshots
+                            ORDER BY created_at DESC LIMIT 1
+                        """)
+                    if _row:
+                        _data = _row["projection_data"]
+                        if isinstance(_data, str):
+                            _data = json.loads(_data)
+                        state.projection = NarrativeProjection.from_dict(_data)
+                        logger.info(
+                            "[16.0] Loaded projection v%d: threads=%d, conflict=%r",
+                            state.projection.version,
+                            len(state.projection.unresolved_threads or []),
+                            (state.projection.active_conflict or "")[:40],
+                        )
+                    else:
+                        logger.info("[16.0] No projection row in DB")
+            except Exception as _e:
+                logger.warning("[16.0] Load projection failed (non-blocking): %s", _e)
+
         cmd = ScenePlanningCommand(
             novel_id=state.novel_id,
             volume=state.current_volume,
@@ -530,6 +560,7 @@ async def plan_node(state: AgentState) -> dict:
             total_chapters_in_volume=getattr(state, 'total_chapters_in_volume', 0),
             metadata=state.metadata,
             intent_resolver=resolver,
+            projection=state.projection,        # ← 新增
         )
 
         result = await ScenePlanningService.execute(cmd)
@@ -1026,6 +1057,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
         writing_goal=writing_goal,
         execution_contract=planning_contract_obj,
         previous_scene_tail=previous_scene_tail,
+        scene_spec=current_scene_plan.get("scene_spec"),    # ← 新增
     )
     logger.debug(
         "[15.7-B1] WritingContract binding: "
@@ -1192,7 +1224,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                         "validation_original": None,
                         "validation_rewritten": None,
                     }
-                    logger.debug(
+                    logger.info(
                         "WRITER_NODE_ARTIFACT: schema_version=1.2, events_len=%d, text_len=%d, "
                         "rewrite_attempted=%s, selected_source=%s, selection_reason=%s",
                         len(result.events),
@@ -1338,7 +1370,7 @@ async def writer_node(state: AgentState, runtime: WriterRuntime) -> dict:
                     "validation_original": None,
                     "validation_rewritten": None,
                 }
-                logger.debug(
+                logger.info(
                     "WRITER_NODE_ARTIFACT: schema_version=1.2, events_len=%d, text_len=%d (WritingService path)",
                     len(result.events or []),
                     len(result.scene_text or "")
@@ -1939,6 +1971,12 @@ async def validate_node(state: AgentState, runtime: WriterRuntime) -> dict:
     }
 
     current_world = WorldState.from_dict(state.current_state) if state.current_state else WorldState()
+
+    logger.info(
+        "[16.0-diag] pre-command: state.narrative_intent_is_none=%s, type=%s",
+        state.narrative_intent is None,
+        type(state.narrative_intent).__name__ if state.narrative_intent else "None",
+    )
 
     cmd = SceneCompletionCommand(
         novel_id=state.novel_id,

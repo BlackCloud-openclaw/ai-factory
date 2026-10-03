@@ -205,6 +205,7 @@ class ScenePlanningService:
             current_volume=cmd.volume,
             current_chapter=cmd.chapter,
             current_state=world.to_dict(),
+            projection=cmd.projection,          # ← Phase 16.0
             metadata={"compiled_context": compiled},
         )
         planner_updates = await planner.run(temp_state)

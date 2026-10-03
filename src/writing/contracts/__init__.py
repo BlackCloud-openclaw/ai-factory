@@ -37,3 +37,4 @@ class WritingContract:
     writing_goal: Optional[WritingGoal] = None
     execution_contract: Optional[PlanningContract] = None   # ✅ 已添加
     previous_scene_tail: Optional[str] = None               # Phase 15.8 Commit 2
+    scene_spec: Optional[Dict[str, Any]] = None       # ← 新增
